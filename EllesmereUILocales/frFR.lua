@@ -5599,3 +5599,18 @@ L["This bar sizes its blocks itself, so the width is not this block's to choose.
 L["How precise the coordinates read. More decimals make the block wider."] = "Précision d'affichage des coordonnées. Plus il y a de décimales, plus le bloc est large."
 L["Hide in Instance"] = "Masquer en instance"
 L["Removes the block from the bar in instanced content, where player coordinates are unavailable."] = "Retire le bloc de la barre dans le contenu instancié, où les coordonnées du joueur ne sont pas disponibles."
+
+-- Fishing (EllesmereUIQoL_Fishing.lua)
+L["FISHING"] = "PÊCHE"
+L["Fishing Sounds"] = "Sons de pêche"
+L["While you fish, mutes music and ambience and raises sound effects (also when the game is in the background) so the bobber splash stands out. Your sound settings come back when you move, enter combat or change zone."] = "Pendant que vous pêchez, coupe la musique et l'ambiance et monte les effets sonores (même quand le jeu est en arrière-plan) pour bien entendre le bouchon. Vos réglages de son reviennent quand vous bougez, entrez en combat ou changez de zone."
+L["Double-Click to Fish"] = "Double-clic pour pêcher"
+L["Double right-click in the world to cast Fishing (with a fishing pole equipped on WoW Forever). Never in combat or while mounted."] = "Double clic droit dans le monde pour lancer Pêche (canne équipée sur WoW Forever). Jamais en combat ni sur une monture."
+L["Lure Reminder"] = "Rappel d'appât"
+L["While you fish with no lure on your pole, shows a button that applies the best lure in your bags. WoW Forever only: retail lures work differently."] = "Pendant que vous pêchez sans appât sur votre canne, affiche un bouton qui pose le meilleur appât de vos sacs. WoW Forever uniquement : les appâts fonctionnent autrement sur Retail."
+L["Apply Lure"] = "Poser un appât"
+L["Fishing Log"] = "Journal de pêche"
+L["Records what you fish, per zone. Type /euifish to see it with your fishing skill, /euifish reset to clear it."] = "Enregistre vos prises par zone. Tapez /euifish pour les voir avec votre compétence de pêche, /euifish reset pour les effacer."
+L["No catch recorded yet."] = "Aucune prise enregistrée pour l'instant."
+L["%1$d fish and items caught."] = "%1$d poissons et objets pêchés."
+L["Fishing log cleared."] = "Journal de pêche effacé."
