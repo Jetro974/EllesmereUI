@@ -5599,3 +5599,8 @@ L["This bar sizes its blocks itself, so the width is not this block's to choose.
 L["How precise the coordinates read. More decimals make the block wider."] = "Précision d'affichage des coordonnées. Plus il y a de décimales, plus le bloc est large."
 L["Hide in Instance"] = "Masquer en instance"
 L["Removes the block from the bar in instanced content, where player coordinates are unavailable."] = "Retire le bloc de la barre dans le contenu instancié, où les coordonnées du joueur ne sont pas disponibles."
+L["Quick Actions Icon"] = "Icône Actions rapides"
+L["Toggles a mode that dims every item but the ones you can disenchant, unlock, mill or prospect. Click one to cast the spell on it."] = "Active un mode qui assombrit tous les objets sauf ceux que vous pouvez désenchanter, crocheter, moudre ou prospecter. Cliquez sur l'un d'eux pour lancer le sort dessus."
+L["Quick Actions: dims every item but the ones you can disenchant, unlock, mill or prospect. Click one to cast the spell on it."] = "Actions rapides : assombrit tous les objets sauf ceux que vous pouvez désenchanter, crocheter, moudre ou prospecter. Cliquez sur l'un d'eux pour lancer le sort dessus."
+L["Leave Quick Actions."] = "Quitter les actions rapides."
+L["Click: %s"] = "Clic : %s"

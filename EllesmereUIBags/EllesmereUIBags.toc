@@ -19,3 +19,4 @@ EllesmereUIBags_Grid.lua
 EllesmereUIBags_List.lua
 EllesmereUIBags_Compact.lua
 EllesmereUIBags_Bank.lua
+EllesmereUIBags_QuickActions.lua

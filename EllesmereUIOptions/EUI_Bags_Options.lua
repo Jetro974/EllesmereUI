@@ -812,12 +812,19 @@ initFrame:SetScript("OnEvent", function(self)
                 local TOP_BAR_ICONS = {
                     { key = "bagShowBagsIcon", label = "Bags Icon" },
                     { key = "bagShowJunkIcon", label = "Junk Icon" },
+                    { key = "bagShowQuickIcon", label = "Quick Actions Icon",
+                      tooltip = "Toggles a mode that dims every item but the ones you can disenchant, unlock, mill or prospect. Click one to cast the spell on it." },
                     { key = "bagShowSortIcon", label = "Sort Icon" },
                 }
+                -- Off by default, unlike the other icons.
+                local OFF_BY_DEFAULT = { bagShowQuickIcon = true }
                 local leftRgn = iconsRow._leftRegion
                 local iconsDD, iconsDDRefresh = EllesmereUI.BuildVisOptsCBDropdown(
                     leftRgn, 210, leftRgn:GetFrameLevel() + 2, TOP_BAR_ICONS,
-                    function(key) return db.profile[key] ~= false end,
+                    function(key)
+                        if OFF_BY_DEFAULT[key] then return db.profile[key] == true end
+                        return db.profile[key] ~= false
+                    end,
                     function(key, v)
                         db.profile[key] = v and true or false
                         local bags = _G.EUI_Bags

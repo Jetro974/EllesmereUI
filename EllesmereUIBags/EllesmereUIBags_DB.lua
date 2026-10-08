@@ -33,9 +33,10 @@ local BAGS_DEFAULTS = {
         bagPinnedInOneBag     = true,
         bagRecentInOneBag     = false,
         bagShowRecentClear    = false,
-        -- Bag Top Bar Icons: the header's Show Bags, Junk Marker and Sort icons
+        -- Bag Top Bar Icons: the header's Show Bags, Junk Marker, Quick Actions and Sort icons
         bagShowBagsIcon       = true,
         bagShowJunkIcon       = true,    -- the Junk Marker: header coin, Junk category, Sell Junk at merchants
+        bagShowQuickIcon      = false,   -- Quick Actions: dim all but items a spell can work on, click to cast
         bagShowSortIcon       = true,
         bagSortToBottom       = false,
         bagDefaultBagType     = "all",   -- "all" | "onebag" | "multibag"
