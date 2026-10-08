@@ -5599,3 +5599,15 @@ L["This bar sizes its blocks itself, so the width is not this block's to choose.
 L["How precise the coordinates read. More decimals make the block wider."] = "Précision d'affichage des coordonnées. Plus il y a de décimales, plus le bloc est large."
 L["Hide in Instance"] = "Masquer en instance"
 L["Removes the block from the bar in instanced content, where player coordinates are unavailable."] = "Retire le bloc de la barre dans le contenu instancié, où les coordonnées du joueur ne sont pas disponibles."
+
+-- Auto Summon Pet (EllesmereUIQoL_PetSummon.lua)
+L["COMPANION PETS"] = "MASCOTTES"
+L["Auto Summon Pet"] = "Invocation auto de mascotte"
+L["Summons a companion pet again a moment after the game takes it away (death, loading screen, taxi, vehicle...). A pet you dismiss yourself stays dismissed. Never in combat, PvP, stealth or while mounted."] = "Réinvoque une mascotte peu après que le jeu l'a retirée (mort, écran de chargement, taxi, véhicule...). Une mascotte que vous renvoyez vous-même reste renvoyée. Jamais en combat, en JcJ, camouflé ou sur une monture."
+L["Pet to Summon"] = "Mascotte à invoquer"
+L["Last Summoned"] = "Dernière invoquée"
+L["Random Favorite"] = "Favorite au hasard"
+L["Summon in Dungeons and Raids"] = "Invoquer en donjon et en raid"
+L["Also summons the pet inside dungeons, raids and scenarios."] = "Invoque aussi la mascotte dans les donjons, les raids et les scénarios."
+L["Random Pet"] = "Mascotte au hasard"
+L["Random Favorite picks among all pets while none is a favorite, like the journal's random pet button. Random Pet picks among the whole collection, new pets included."] = "Favorite au hasard pioche parmi toutes les mascottes tant qu'aucune n'est en favori, comme le bouton de mascotte aléatoire du journal. Mascotte au hasard pioche dans toute la collection, nouvelles mascottes comprises."
