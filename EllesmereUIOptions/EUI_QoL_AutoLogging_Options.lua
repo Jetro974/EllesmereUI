@@ -60,6 +60,16 @@ local function TeleCfg()
     return EllesmereUIDB.teleportPrompt
 end
 
+local function MailCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.mailbox = EllesmereUIDB.mailbox or {}
+    return EllesmereUIDB.mailbox
+end
+
+local function ApplyMailbox()
+    if _G._EUI_ApplyMailbox then _G._EUI_ApplyMailbox() end
+end
+
 -- Built as the tail of the Quality of Life page (chained from BuildQoLPage),
 -- not as its own tab. Lays out from yOffset and returns the height used,
 -- like every other section builder.
@@ -262,6 +272,47 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         { type = "label", text = "" }
     ); y = y - h
     end   -- close Auto Logging hidden-while-disabled gate
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
+
+    ---------------------------------------------------------------------------
+    --  MAILBOX (runtime in EllesmereUIQoL_Mailbox.lua)
+    ---------------------------------------------------------------------------
+    _, h = W:SectionHeader(parent, "MAILBOX", y); y = y - h
+
+    local mailRow
+    mailRow, h = W:DualRow(parent, y,
+        { type    = "toggle",
+          text    = "Collect Gold Button",
+          tooltip = "Adds a coin button next to Open All Mail: hover it for a summary of your inbox, click it to take the gold of every mail.",
+          getValue = function() return MailCfg().collectGold == true end,
+          setValue = function(v)
+              MailCfg().collectGold = v
+              ApplyMailbox()
+          end },
+        { type    = "toggle",
+          text    = "Mail Expiry Warning",
+          tooltip = "When you open the mailbox, warns in chat about mail with gold or items that expires within 3 days.",
+          getValue = function() return MailCfg().expiryWarning == true end,
+          setValue = function(v)
+              MailCfg().expiryWarning = v
+              ApplyMailbox()
+          end }
+    ); y = y - h
+
+    if not EllesmereUI._prebuilding then
+        EllesmereUI.BuildInlineCog(mailRow._leftRegion, {
+            title = "Collect Gold Button",
+            disabled = function() return MailCfg().collectGold ~= true end,
+            disabledTooltip = "Collect Gold Button",
+            rows = {
+                { type="toggle", label="Collect on Open",
+                  tooltip="Takes the gold as soon as the mailbox opens, without a click.",
+                  get=function() return MailCfg().collectOnOpen == true end,
+                  set=function(v) MailCfg().collectOnOpen = v end },
+            },
+        })
+    end
 
     _, h = W:Spacer(parent, y, 20); y = y - h
 
