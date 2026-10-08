@@ -197,8 +197,17 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
           setValue = function(v)
               ZL.Cfg().enabled = v
               ZL.Apply()
+              EllesmereUI:RefreshPage()
           end },
-        BLANK()
+        { type = "toggle", text = "Show Fishing Skill",
+          tooltip = "Adds the zone's fishing skill under its levels: from the skill fish start to bite to the one where none get away, colored by your own skill.",
+          disabled = function() return not ZL.Get("enabled") end,
+          disabledTooltip = "Show Zone Levels",
+          getValue = function() return ZL.Get("fishing") end,
+          setValue = function(v)
+              ZL.Cfg().fishing = v
+              ZL.Apply()
+          end }
     );  y = y - h
 
     ---------------------------------------------------------------------------

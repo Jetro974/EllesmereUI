@@ -5602,3 +5602,5 @@ L["How precise the coordinates read. More decimals make the block wider."] = "Pr
 L["Hide in Instance"] = "Masquer en instance"
 L["Removes the block from the bar in instanced content, where player coordinates are unavailable."] = "Retire le bloc de la barre dans le contenu instancié, où les coordonnées du joueur ne sont pas disponibles."
 L["WORLD MAP"] = "CARTE DU MONDE"
+L["Show Fishing Skill"] = "Afficher la compétence de pêche"
+L["Adds the zone's fishing skill under its levels: from the skill fish start to bite to the one where none get away, colored by your own skill."] = "Ajoute la compétence de pêche de la zone sous ses niveaux : de la compétence où les poissons commencent à mordre à celle où plus aucun ne s'échappe, colorée selon votre propre compétence."

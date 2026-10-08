@@ -14,7 +14,7 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.zoneLevels; unset keys read these.
-local F = module.Feature("zoneLevels", { enabled = false })
+local F = module.Feature("zoneLevels", { enabled = false, fishing = false })
 
 -- uiMapID = { min, max }
 local LEVELS = {
@@ -66,10 +66,56 @@ local LEVELS = {
     [2521] = { 1, 12 },   -- Zephras Isle (Forever)
 }
 
+-- uiMapID = zone base fishing skill (original game). Fish bite from the base
+-- (at least 1) and stop getting away at base + 95. Zones without a known
+-- value show no fishing line.
+local FISHING_BASE = {
+    -- Eastern Kingdoms
+    [1426] = -70, [1429] = -70, [1420] = -70,                -- Dun Morogh, Elwynn Forest, Tirisfal Glades
+    [1432] = -20, [1436] = -20, [1421] = -20,                -- Loch Modan, Westfall, Silverpine Forest
+    [1433] = 55, [1431] = 55, [1437] = 55, [1424] = 55,      -- Redridge, Duskwood, Wetlands, Hillsbrad
+    [1416] = 130, [1417] = 130, [1434] = 130, [1435] = 130,  -- Alterac, Arathi, Stranglethorn, Swamp of Sorrows
+    [1425] = 205, [1422] = 205,                              -- The Hinterlands, Western Plaguelands
+    [1423] = 300,                                            -- Eastern Plaguelands
+    [1428] = 330, [1430] = 330,                              -- Burning Steppes, Deadwind Pass
+    -- Kalimdor
+    [1411] = -70, [1412] = -70, [1438] = -70,                -- Durotar, Mulgore, Teldrassil
+    [1439] = -20, [1413] = -20,                              -- Darkshore, The Barrens
+    [1442] = 55, [1440] = 55,                                -- Stonetalon Mountains, Ashenvale
+    [1441] = 130, [1443] = 130, [1445] = 130,                -- Thousand Needles, Desolace, Dustwallow Marsh
+    [1444] = 205, [1446] = 205, [1447] = 205, [1448] = 205, [1449] = 205, -- Feralas, Tanaris, Azshara, Felwood, Un'Goro
+    [1451] = 330, [1452] = 330,                              -- Silithus, Winterspring
+}
+local FISHING_NO_GETAWAY = 95
+local FISHING_ICON = "|TInterface\\Icons\\Trade_Fishing:16|t"
+
 local UPDATE_INTERVAL = 0.15
 local TEXT_OFFSET_Y   = -50  -- just under the map's own area name
 
 local watcher  -- ours; nil until the setting is first on
+
+-- The player's fishing skill, or nil while Fishing is not learned.
+local function FishingSkill()
+    if not GetProfessions then return nil end
+    local _, _, _, fishing = GetProfessions()
+    if not fishing then return nil end
+    local _, _, rank = GetProfessionInfo(fishing)
+    return rank
+end
+
+-- "min-reliable" for the zone, colored by the player's skill: red below the
+-- base, yellow while fish still get away, green once nothing does.
+local function FishingText(zone)
+    local base = FISHING_BASE[zone]
+    if not base then return nil end
+    local low, high = math.max(base, 1), base + FISHING_NO_GETAWAY
+    local skill = FishingSkill()
+    local color = "|cffffffff"
+    if skill then
+        color = skill < low and "|cffff4040" or skill < high and "|cffffd100" or "|cff40ff40"
+    end
+    return ("%s %s%d-%d|r"):format(FISHING_ICON, color, low, high)
+end
 
 -- The map's own format: the range is colored like a quest of the nearest level.
 local function LevelsText(lv)
@@ -112,7 +158,10 @@ local function OnUpdate(self, elapsed)
     if zone == self.zone and lv == self.lv then return end
     self.zone, self.lv = zone, lv
     if lv then
-        self.text:SetText(LevelsText(lv))
+        local text = LevelsText(lv)
+        local fishing = F.Get("fishing") and FishingText(zone)
+        if fishing then text = text .. "\n" .. fishing end
+        self.text:SetText(text)
         self.text:Show()
     else
         self.text:Hide()
@@ -139,6 +188,7 @@ local waiter
 local function Apply()
     if watcher then
         watcher:SetShown(F.Enabled())
+        watcher.zone = false  -- the next update redraws (the fishing line may have changed)
         return
     end
     if not F.Enabled() then return end
