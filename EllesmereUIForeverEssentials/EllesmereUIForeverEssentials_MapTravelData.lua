@@ -71,7 +71,8 @@ return {
         [1451] = { {82.0,18.0,1449} },
         [1452] = { {28.0,34.0,1448} },
     },
-    -- uiMapID = { { x, y, instance mapID, isRaid }, ... }
+    -- uiMapID = { { x, y, instance mapID, isRaid }, ... }: the instances in the
+    -- client's own dungeon list (LFGDungeons) that have an entrance point.
     instances = {
         [1413] = { {47.7,35.0,43}, {42.3,89.9,47}, {50.9,92.9,129} },  -- The Barrens
         [1418] = { {35.2,10.3,70} },                                  -- Badlands
@@ -91,7 +92,6 @@ return {
         [1444] = { {62.0,33.3,429} },                                 -- Feralas
         [1445] = { {52.9,77.7,249,true} },                            -- Dustwallow Marsh
         [1446] = { {38.7,19.9,209} },                                 -- Tanaris
-        [1451] = { {28.4,93.4,509,true}, {29.6,92.2,531,true} },      -- Silithus
         [1453] = { {50.4,66.2,34} },                                  -- Stormwind City
         [1454] = { {53.0,48.9,389} },                                 -- Orgrimmar
     },
