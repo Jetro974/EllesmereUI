@@ -73,7 +73,8 @@ return {
     },
     -- uiMapID = { { x, y, instance mapID, isRaid }, ... }: the instances in the
     -- client's own dungeon list (LFGDungeons) that have an entrance point,
-    -- minus Molten Core and Blackwing Lair (not open at WoW Forever's launch).
+    -- dungeons only: no raid is open at WoW Forever's launch (isRaid stays for
+    -- when they are).
     instances = {
         [1413] = { {47.7,35.0,43}, {42.3,89.9,47}, {50.9,92.9,129} },  -- The Barrens
         [1418] = { {35.2,10.3,70} },                                  -- Badlands
@@ -84,13 +85,11 @@ return {
         [1426] = { {17.7,39.2,90} },                                  -- Dun Morogh
         [1427] = { {40.8,95.6,229}, {27.1,72.5,230} },                -- Searing Gorge
         [1428] = { {33.0,25.2,229}, {22.6,7.5,230} },                 -- Burning Steppes
-        [1434] = { {54.0,17.6,309,true} },                            -- Stranglethorn Vale
         [1435] = { {77.3,35.9,109} },                                 -- Swamp of Sorrows
         [1436] = { {42.5,71.7,36} },                                  -- Westfall
         [1440] = { {16.5,11.0,48} },                                  -- Ashenvale
         [1443] = { {29.1,62.9,349} },                                 -- Desolace
         [1444] = { {62.0,33.3,429} },                                 -- Feralas
-        [1445] = { {52.9,77.7,249,true} },                            -- Dustwallow Marsh
         [1446] = { {38.7,19.9,209} },                                 -- Tanaris
         [1453] = { {50.4,66.2,34} },                                  -- Stormwind City
         [1454] = { {53.0,48.9,389} },                                 -- Orgrimmar
