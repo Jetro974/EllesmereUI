@@ -133,9 +133,9 @@ local function ZoneName(uiMapID)
 end
 
 local function TransportTip(t)
+    -- The place alone ("Orgrimmar"), its zone when the area has no name.
     local area = C_Map.GetAreaInfo(t[5])
-    local zone = ZoneName(t[4])
-    local where = area and area ~= zone and (area .. ", " .. zone) or zone
+    local where = area and area ~= "" and area or ZoneName(t[4])
     if t[3] == "boat" then return EllesmereUI.Lf("Boat to %s", where) end
     if t[3] == "zeppelin" then return EllesmereUI.Lf("Zeppelin to %s", where) end
     if t[3] == "skycutter" then return EllesmereUI.Lf("Skycutter to %s", where) end
@@ -279,12 +279,14 @@ local function ZoneList(zone)
         for i = 1, #groups do lines[#lines + 1] = groups[i].tip end
     end
     if F.Get("instances") then
-        local list = data.instances[zone]
+        -- Each instance once, whatever its number of entrances.
+        local list, seen = data.instances[zone], {}
         for i = 1, list and #list or 0 do
             local e = list[i]
-            local name = GetRealZoneText(e[3])
-            if e[5] then name = name .. " |cffffffff(" .. EllesmereUI.L(e[5]) .. ")|r" end
-            lines[#lines + 1] = ("|A:%s:16:16|a %s"):format(e[4] and "raid" or "dungeon", name)
+            if not seen[e[3]] then
+                seen[e[3]] = true
+                lines[#lines + 1] = ("|A:%s:16:16|a %s"):format(e[4] and "raid" or "dungeon", GetRealZoneText(e[3]))
+            end
         end
     end
     if F.Get("flights") then
