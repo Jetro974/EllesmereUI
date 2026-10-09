@@ -7905,6 +7905,11 @@ local WIDE_MONEY_W  = 120             -- Blizzard's MAX_MONEY_DISPLAY_WIDTH (a f
 
 local wide = { tiles = {}, page = 1 }
 
+-- The merchant reskin is on (any style but "off"): the wide parts take its look.
+local function WideThemed()
+    return WSkin.GetStyle("merchant") ~= "off"
+end
+
 -- An item the player already knows (recipe, mount, pet, toy...): its tooltip
 -- carries the "Already known" line.
 local function MerchantItemKnown(index)
@@ -8051,7 +8056,7 @@ local function UpdateWideMerchant()
             btn:SetID(index)
             btn:Show()
             tile:Show()
-            SkinMerchantTile(tile)
+            if WideThemed() then SkinMerchantTile(tile) end
         else
             btn.price, btn.hasItem, btn.name = nil, nil, nil
             tile:Hide()
@@ -8074,7 +8079,24 @@ local function WideTurnPage(delta)
     UpdateWideMerchant()
 end
 
--- Built once, on the first wide pass.
+-- A page arrow: the reskin's flat button, else Blizzard's own page art.
+local function WidePageButton(f, which, delta)
+    local b = CreateFrame("Button", nil, f)
+    b:SetSize(32, 32)
+    b:SetScript("OnClick", function() WideTurnPage(delta) end)
+    if WideThemed() then
+        WSkin.PageButton(b, delta < 0 and "<" or ">", 13)
+    else
+        local art = "Interface\\Buttons\\UI-SpellbookIcon-" .. which .. "Page-"
+        b:SetNormalTexture(art .. "Up")
+        b:SetPushedTexture(art .. "Down")
+        b:SetDisabledTexture(art .. "Disabled")
+        b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+    end
+    return b
+end
+
+-- Built once, on the first opening.
 local function BuildWideMerchant(f)
     f:SetWidth(f:GetWidth() + WIDE_EXTRA_W)
     for slot = 1, WIDE_PER_PAGE do
@@ -8086,25 +8108,21 @@ local function BuildWideMerchant(f)
         else
             tile:SetPoint("TOPLEFT", wide.tiles[slot - 1], "TOPRIGHT", 12, 0)
         end
-        SkinMerchantTile(tile)
-        LiftMerchantCurrency(_G[WIDE_PREFIX .. slot .. "MoneyFrame"])
-        LiftMerchantCurrency(_G[WIDE_PREFIX .. slot .. "AltCurrencyFrame"])
+        if WideThemed() then
+            SkinMerchantTile(tile)
+            LiftMerchantCurrency(_G[WIDE_PREFIX .. slot .. "MoneyFrame"])
+            LiftMerchantCurrency(_G[WIDE_PREFIX .. slot .. "AltCurrencyFrame"])
+        end
         wide.tiles[slot] = tile
     end
 
-    local prev = CreateFrame("Button", nil, f)
-    prev:SetSize(32, 32)
+    local prev = WidePageButton(f, "Prev", -1)
     prev:SetPoint("CENTER", f, "BOTTOMLEFT", 25, 96)
-    prev:SetScript("OnClick", function() WideTurnPage(-1) end)
-    WSkin.PageButton(prev, "<", 13)
-    local nxt = CreateFrame("Button", nil, f)
-    nxt:SetSize(32, 32)
+    local nxt = WidePageButton(f, "Next", 1)
     nxt:SetPoint("CENTER", f, "BOTTOMRIGHT", -25, 96)
-    nxt:SetScript("OnClick", function() WideTurnPage(1) end)
-    WSkin.PageButton(nxt, ">", 13)
     local pageText = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     pageText:SetPoint("BOTTOM", f, "BOTTOM", 0, 88)
-    WSkin.Font(pageText); WSkin.White(pageText)
+    if WideThemed() then WSkin.Font(pageText); WSkin.White(pageText) end
     wide.prev, wide.next, wide.pageText = prev, nxt, pageText
     -- The mouse wheel turns pages, as on Blizzard's grid.
     f:HookScript("OnMouseWheel", function(_, delta)
@@ -8137,6 +8155,30 @@ local function BuildWideMerchant(f)
     wide.built = true
 end
 
+-- Runs whatever the merchant window's style (reskinned or Blizzard's): built
+-- on the first opening, then refreshed with Blizzard's own updates (page,
+-- tab, purchases). Nothing is registered while the setting is off.
+local wideDriver = CreateFrame("Frame")
+wideDriver:RegisterEvent("PLAYER_LOGIN")
+wideDriver:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_LOGIN" then
+        self:UnregisterEvent("PLAYER_LOGIN")
+        if not EllesmereUIDB.merchantWide or EllesmereUIDB.merchantShowAsList then return end
+        self:RegisterEvent("MERCHANT_SHOW")
+        hooksecurefunc("MerchantFrame_Update", function()
+            if wide.built and _G.MerchantFrame:IsVisible() then UpdateWideMerchant() end
+        end)
+        return
+    end
+    if not wide.built then
+        HideNativeMerchantGrid()
+        BuildWideMerchant(_G.MerchantFrame)
+    end
+    -- Each opening starts on the first page.
+    wide.page = 1
+    UpdateWideMerchant()
+end)
+
 local _merchantHooked = false
 local function Skin_Merchant()
     local f = _G.MerchantFrame
@@ -8168,12 +8210,9 @@ local function Skin_Merchant()
             f.wSkinScrollChild = child
         end
     elseif EllesmereUIDB.merchantWide then
-        HideNativeMerchantGrid()
-        if not wide.built then BuildWideMerchant(f) end
+        -- The wide window has its own driver (it runs under any style); the reskin
+        -- only styles the most-recent-buyback slot here.
         SkinMerchantTile(_G.MerchantBuyBackItem)
-        -- Each opening starts on the first page.
-        wide.page = 1
-        UpdateWideMerchant()
     else
         -- Item tiles (10 merchant, buyback page reuses up to 12) plus the most-recent-buyback slot on the merchant tab.
         for i = 1, 12 do SkinMerchantTile(_G["MerchantItem" .. i]) end
@@ -8229,7 +8268,6 @@ local function Skin_Merchant()
                     if EllesmereUIDB.merchantShowAsList and f.wSkinScrollFrame then
                         UpdateCustomMerchantList(f.wSkinScrollFrame, f.wSkinScrollChild)
                     elseif wide.built and EllesmereUIDB.merchantWide then
-                        UpdateWideMerchant()
                         SkinMerchantTile(_G.MerchantBuyBackItem)
                     else
                         for i = 1, 12 do SkinMerchantTile(_G["MerchantItem" .. i]) end
