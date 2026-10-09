@@ -55,7 +55,7 @@ local SERVICES = {
     { kind = "mail",    icon = "mailbox",      name = "Mailbox" },
     { kind = "inn",     icon = "innkeeper",    name = "Innkeeper" },
     { kind = "repair",  icon = "repair",       name = "Repair" },
-    { kind = "stable",  icon = "Interface\\Minimap\\Tracking\\StableMaster", name = "Stable Master" },
+    { kind = "stable",  icon = "Interface\\Cursor\\Crosshair\\StableMaster", name = "Stable Master" },
     { kind = "battle",  icon = "battlemaster", name = "Battlemaster" },
     { kind = "class",   icon = "class",        name = "Class Trainer" },
     { kind = "prof",    icon = "profession",   name = "Profession Trainer" },
