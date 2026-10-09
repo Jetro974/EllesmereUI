@@ -31,8 +31,6 @@ EllesmereUIForeverEssentials_ThreatFeed.lua
 # Loot (loot feed)
 EllesmereUIForeverEssentials_LootFeed.lua
 
-# Ammo (ammo counter)
-EllesmereUIForeverEssentials_AmmoCounter.lua
 
 # Macros (macro manager)
 EllesmereUIForeverEssentials_MacroBuilder.lua
