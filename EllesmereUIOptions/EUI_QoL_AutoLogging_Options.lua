@@ -76,6 +76,12 @@ local function PetCfg()
     return EllesmereUIDB.petSummon
 end
 
+local function FishCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.fishing = EllesmereUIDB.fishing or {}
+    return EllesmereUIDB.fishing
+end
+
 -- Built as the tail of the Quality of Life page (chained from BuildQoLPage),
 -- not as its own tab. Lays out from yOffset and returns the height used,
 -- like every other section builder.
@@ -245,6 +251,41 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
           getValue = function() return PetCfg().instances == true end,
           setValue = function(v) PetCfg().instances = v; ApplyPet() end },
         EllesmereUI.BlankRowCfg()
+    ); y = y - h
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
+
+    ---------------------------------------------------------------------------
+    --  FISHING (runtime in EllesmereUIQoL_Fishing.lua)
+    ---------------------------------------------------------------------------
+    _, h = W:SectionHeader(parent, "FISHING", y); y = y - h
+
+    -- Every fishing toggle is off by default and applies live.
+    local function FishToggle(text, tooltip, key)
+        return { type = "toggle", text = text, tooltip = tooltip,
+            getValue = function() return FishCfg()[key] == true end,
+            setValue = function(v)
+                FishCfg()[key] = v
+                if _G._EUI_ApplyFishing then _G._EUI_ApplyFishing() end
+            end }
+    end
+
+    _, h = W:DualRow(parent, y,
+        FishToggle("Fishing Sounds",
+            "While you fish, mutes music and ambience and raises sound effects (also when the game is in the background) so the bobber splash stands out. Your sound settings come back when you move, enter combat or change zone.",
+            "sound"),
+        FishToggle("Double-Click to Fish",
+            "Double right-click in the world to cast Fishing (with a fishing pole equipped on WoW Forever). Never in combat or while mounted.",
+            "doubleClick")
+    ); y = y - h
+
+    _, h = W:DualRow(parent, y,
+        FishToggle("Lure Reminder",
+            "While you fish with no lure on your pole, shows a button that applies the best lure in your bags. WoW Forever only: retail lures work differently.",
+            "lure"),
+        FishToggle("Fishing Log",
+            "Records what you fish, per zone. Type /euifish to see it with your fishing skill, /euifish reset to clear it.",
+            "log")
     ); y = y - h
 
     _, h = W:Spacer(parent, y, 20); y = y - h
