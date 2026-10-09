@@ -5669,7 +5669,7 @@ L["Casts your fishing line. On WoW Forever without a fishing pole in hand, the f
 L["Left-click to set a keybind.\nRight-click to unbind."] = "Clic gauche pour définir un raccourci.\nClic droit pour le retirer."
 L["Wide Window"] = "Fenêtre large"
 L["The merchant Wide Window setting requires a UI reload to fully apply."] = "Le réglage Fenêtre large du marchand nécessite un rechargement de l'interface pour s'appliquer entièrement."
-L["AMMO"] = "MUNITIONS"
+L["AMMO (HUNTER)"] = "MUNITIONS (CHASSEUR)"
 L["Ammo Counter"] = "Compteur de munitions"
 L["Shows your equipped ammo and how many are left; move it in Unlock Mode."] = "Affiche vos munitions équipées et le nombre restant ; déplacez-le en mode Déverrouillage."
 L["Adds the zone's fishing skill to the same box: from the skill fish start to bite to the one where none get away, colored by your own skill with lures and gear. ~ marks an estimate for zones the original game did not have."] = "Ajoute la compétence de pêche de la zone au même encadré : de la compétence où les poissons commencent à mordre à celle où plus aucun ne s'échappe, colorée selon votre compétence avec appâts et équipement. ~ indique une estimation pour les zones absentes du jeu d'origine."

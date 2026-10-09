@@ -237,9 +237,11 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
     local AC = EllesmereUI._AmmoCounter
     if AC and AC.isHunter then
         _, h = W:Spacer(parent, y, 20);  y = y - h
-        _, h = W:SectionHeader(parent, "AMMO", y);  y = y - h
+        _, h = W:SectionHeader(parent, "AMMO (HUNTER)", y);  y = y - h
 
-        _, h = W:DualRow(parent, y,
+        -- Ammo Counter (+ Low Ammo Alert cog) | Low Ammo Threshold
+        local ammoRow
+        ammoRow, h = W:DualRow(parent, y,
             { type = "toggle", text = "Ammo Counter",
               tooltip = "Shows your equipped ammo and how many are left; move it in Unlock Mode.",
               getValue = function() return AC.Get("enabled") end,
@@ -259,18 +261,23 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
               end }
         );  y = y - h
 
-        _, h = W:DualRow(parent, y,
-            { type = "toggle", text = "Low Ammo Alert",
-              tooltip = "Like Low Durability, shows a pulsing warning above the middle of the screen while your ammo is under the Low Ammo Threshold. Hidden in combat.",
-              disabled = function() return not AC.Get("enabled") end,
-              disabledTooltip = "Ammo Counter",
-              getValue = function() return AC.Get("alert") end,
-              setValue = function(v)
-                  AC.Cfg().alert = v
-                  AC.Apply()
-              end },
-            BLANK()
-        );  y = y - h
+        if not EllesmereUI._prebuilding then
+            EllesmereUI.BuildInlineCog(ammoRow._leftRegion, {
+                title = "Ammo Counter",
+                rows = {
+                    { type = "toggle", label = "Low Ammo Alert",
+                      tooltip = "Like Low Durability, shows a pulsing warning above the middle of the screen while your ammo is under the Low Ammo Threshold. Hidden in combat.",
+                      get = function() return AC.Get("alert") end,
+                      set = function(v)
+                          AC.Cfg().alert = v
+                          AC.Apply()
+                      end },
+                },
+                gap = 9,
+                disabled = function() return not AC.Get("enabled") end,
+                disabledTooltip = "Ammo Counter",
+            })
+        end
     end
 
     ---------------------------------------------------------------------------
