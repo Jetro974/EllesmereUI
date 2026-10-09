@@ -25,6 +25,9 @@ EllesmereUIQoL_Shifter.lua
 EllesmereUIQoL_MovementAlert.lua
 EllesmereUIQoL_RaidTools.lua
 EllesmereUIQoL_SelfCombatText.lua
+EllesmereUIQoL_MapRevealData.lua
+EllesmereUIQoL_MapRevealData_Forever.lua
+EllesmereUIQoL_MapReveal.lua
 EUI_UpgradeCalc.lua
 
 # Options

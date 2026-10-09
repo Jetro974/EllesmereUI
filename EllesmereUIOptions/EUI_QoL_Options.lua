@@ -2509,6 +2509,22 @@ initFrame:SetScript("OnEvent", function(self)
             })
         end
 
+        -- Reveal Unexplored Areas (EllesmereUIQoL_MapReveal.lua): beside Bonus
+        -- Roll Confirmation on retail, on a row of its own on WoW Forever.
+        local function mapRevealOff()
+            return not (EllesmereUIDB and EllesmereUIDB.mapReveal == true)
+        end
+        local mapRevealCfg = { type="toggle", text="Reveal Unexplored Areas",
+              tooltip="Shows the parts of the world map you have not explored yet. Use the cog to choose whether they are dimmed.",
+              getValue=function() return not mapRevealOff() end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.mapReveal = v
+                  if EllesmereUI._applyMapReveal then EllesmereUI._applyMapReveal() end
+                  EllesmereUI:RefreshPage()
+              end }
+        local mapRevealRgn
+
         -- Bonus Roll Confirmation. Not offered on WoW Forever: no bonus rolls
         -- there, so the row is not built and the runtime block does not exist.
         if not EllesmereUI.IS_FOREVER then
@@ -2530,8 +2546,9 @@ initFrame:SetScript("OnEvent", function(self)
                   if EllesmereUI._applyBonusRollConfirmation then EllesmereUI._applyBonusRollConfirmation() end
                   EllesmereUI:RefreshPage()
               end },
-            EllesmereUI.BlankRowCfg()
+            mapRevealCfg
         );  y = y - h
+        mapRevealRgn = bonusRollRow._rightRegion
         if not EllesmereUI._prebuilding then
             EllesmereUI.BuildInlineCog(bonusRollRow._leftRegion, {
                 title = EllesmereUI.L("Bonus Roll Settings"),
@@ -2554,7 +2571,29 @@ initFrame:SetScript("OnEvent", function(self)
                 disabledTooltip = EllesmereUI.L("Bonus Roll Confirmation"),
             })
         end
+        else
+            local mapRevealRow
+            mapRevealRow, h = W:DualRow(parent, y, mapRevealCfg, EllesmereUI.BlankRowCfg());  y = y - h
+            mapRevealRgn = mapRevealRow._leftRegion
         end -- not IS_FOREVER
+        if not EllesmereUI._prebuilding then
+            EllesmereUI.BuildInlineCog(mapRevealRgn, {
+                title = "Reveal Unexplored Areas Settings",
+                rows = {
+                    { type="toggle", label="Dim Unexplored Areas",
+                      tooltip="Draws the unexplored areas darker so they stand apart from the ones you have explored.",
+                      get=function()
+                          return not EllesmereUIDB or EllesmereUIDB.mapRevealDim ~= false
+                      end,
+                      set=function(v)
+                          if not EllesmereUIDB then EllesmereUIDB = {} end
+                          EllesmereUIDB.mapRevealDim = v
+                          if EllesmereUI._applyMapReveal then EllesmereUI._applyMapReveal() end
+                      end },
+                },
+                gap = 9, disabled = mapRevealOff, disabledTooltip = "Reveal Unexplored Areas",
+            })
+        end
 
         -- Keys, Logs & Brez sections live at the bottom of this page (the
         -- separate tab was retired to keep the tab bar at five pages).
@@ -2571,7 +2610,7 @@ initFrame:SetScript("OnEvent", function(self)
     -- No item upgrade system on WoW Forever: the Upgrader tab is not offered there
     -- (its resident file returns at load, so the page builder never exists either).
     if not EllesmereUI.IS_FOREVER then pages[#pages + 1] = PAGE_UPGCALC end
-    local searchTerms = { "brez", "bres", "battle res", "combat res", "cursor", "macro", "fps", "logging", "combat log", "warcraft logs", "upgrade", "ilvl", "item level", "crest", "upgrade calculator", "shifter", "move", "drag", "position", "demodal", "drift", "combat alert", "enter combat", "leave combat", "in combat", "combat text", "combat notification", "transform", "transforms", "costume", "disguise", "chef's hat", "noggenfogger", "target distance", "distance to target", "range text", "yard", "yards", "movement", "mobility", "gap closer", "blink", "gateway", "warlock gateway", "control shard", "time spiral", "free movement", "raid tools", "raid", "pull timer", "pull", "ready check", "role check", "raid marker", "target marker", "world marker", "flare", "disband", "convert to raid", "countdown" }
+    local searchTerms = { "brez", "bres", "battle res", "combat res", "cursor", "macro", "fps", "logging", "combat log", "warcraft logs", "upgrade", "ilvl", "item level", "crest", "upgrade calculator", "shifter", "move", "drag", "position", "demodal", "drift", "combat alert", "enter combat", "leave combat", "in combat", "combat text", "combat notification", "transform", "transforms", "costume", "disguise", "chef's hat", "noggenfogger", "target distance", "distance to target", "range text", "yard", "yards", "movement", "mobility", "gap closer", "blink", "gateway", "warlock gateway", "control shard", "time spiral", "free movement", "raid tools", "raid", "world map", "map", "reveal", "unexplored", "fog of war", "pull timer", "pull", "ready check", "role check", "raid marker", "target marker", "world marker", "flare", "disband", "convert to raid", "countdown" }
     -- Terms for features WoW Forever does not have (the Battle Res indicator,
     -- the Macro Factory) are dropped there, so a sidebar search for them does
     -- not list this module; retail keeps the full list.
