@@ -24,6 +24,7 @@ local F = module.Feature("mapTravel", { transports = false, exits = false, insta
 
 local PIN_SIZE   = 22
 local ARROW_SIZE = 20
+local INSTANCE_SIZE = 32  -- the portal art leaves a wide margin in its atlas
 
 local KIND_ATLAS = {
     boat     = "flightmasterferry",
@@ -191,7 +192,7 @@ local function DrawZone(zone, shown, isZone)
             for i = 1, #list do
                 local e = list[i]
                 local x, y = Project(zone, shown, e[1] / 100, e[2] / 100)
-                if x then Place(x, y, e[4] and "raid" or "dungeon", PIN_SIZE, InstanceTip(e)) end
+                if x then Place(x, y, e[4] and "raid" or "dungeon", INSTANCE_SIZE, InstanceTip(e)) end
             end
         end
     end
