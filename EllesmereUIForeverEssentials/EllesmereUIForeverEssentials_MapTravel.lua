@@ -45,8 +45,24 @@ local function AnyOn()
     return F.Get("transports") or F.Get("exits") or F.Get("instances") or F.Get("flights")
 end
 
+-- Pins that touch on screen (it depends on the zoom) share one tooltip: the
+-- hovered pin's first, then each one touching it. Offsets and sizes are both
+-- in the pins' own (scaled) units, as Anchor sets them.
 local function PinOnEnter(self)
-    EllesmereUI.ShowWidgetTooltip(self, self.tip)
+    local canvas = layer:GetParent()
+    local w, h = canvas:GetSize()
+    local cs = canvas:GetScale()
+    local tip = self.tip
+    for i = 1, used do
+        local p = pins[i]
+        if p ~= self then
+            local reach = (p.size + self.size) / 2
+            if math.abs(p.x - self.x) * w * cs < reach and math.abs(p.y - self.y) * h * cs < reach then
+                tip = tip .. "\n\n" .. p.tip
+            end
+        end
+    end
+    EllesmereUI.ShowWidgetTooltip(self, tip)
 end
 
 local function PinOnLeave()
@@ -92,7 +108,7 @@ end
 -- A pin at (x, y) of the canvas (0..1); count > 1 shows as a badge.
 local function Place(x, y, atlas, size, tip, rotation, count)
     local p = NextPin()
-    p.x, p.y = x, y
+    p.x, p.y, p.size = x, y, size
     p:SetSize(size, size)
     Anchor(p)
     p.tex:SetAtlas(atlas)
