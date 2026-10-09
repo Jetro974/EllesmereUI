@@ -123,15 +123,42 @@ local function ExitRotation(zone, x, y, dest)
     return math.atan2(-dx, -dy)  -- the atlas points up; screen y grows down
 end
 
+-- A zone's transports, those of one place (a dock's boats, a tower's
+-- zeppelins) sharing one pin whose tooltip lists them all. Built once per zone.
+local GROUP_DIST = 7  -- percent of the zone map
+local transportGroups = {}
+local function TransportGroups(zone)
+    local groups = transportGroups[zone]
+    if groups then return groups end
+    groups = {}
+    local list = data.transports[zone] or {}
+    for i = 1, #list do
+        local t = list[i]
+        local g
+        for j = 1, #groups do
+            local h = groups[j]
+            if math.abs(h.x - t[1]) < GROUP_DIST and math.abs(h.y - t[2]) < GROUP_DIST then
+                g = h
+                break
+            end
+        end
+        if g then
+            g.tip = g.tip .. "\n" .. TransportTip(t)
+        else
+            groups[#groups + 1] = { x = t[1], y = t[2], atlas = KIND_ATLAS[t[3]], tip = TransportTip(t) }
+        end
+    end
+    transportGroups[zone] = groups
+    return groups
+end
+
 local function DrawZone(zone, shown, isZone)
     if F.Get("transports") then
-        local list = data.transports[zone]
-        if list then
-            for i = 1, #list do
-                local t = list[i]
-                local x, y = Project(zone, shown, t[1] / 100, t[2] / 100)
-                if x then Place(x, y, KIND_ATLAS[t[3]], PIN_SIZE, TransportTip(t)) end
-            end
+        local groups = TransportGroups(zone)
+        for i = 1, #groups do
+            local g = groups[i]
+            local x, y = Project(zone, shown, g.x / 100, g.y / 100)
+            if x then Place(x, y, g.atlas, PIN_SIZE, g.tip) end
         end
     end
     if F.Get("instances") then
