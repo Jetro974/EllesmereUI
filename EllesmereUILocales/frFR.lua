@@ -5685,3 +5685,4 @@ L["In the wide window, tints red the items you already know, have learned or hav
 L["Hide Owned (%d)"] = "Masquer les acquis (%d)"
 L["Show Owned (%d)"] = "Afficher les acquis (%d)"
 L["Items you already know, have learned or have collected (recipes, mounts, pets, toys...) are tinted red. Click to hide them from the list, or to show them again."] = "Les objets que vous connaissez, avez appris ou collectionnés (recettes, montures, mascottes, jouets...) sont teintés en rouge. Cliquez pour les masquer de la liste, ou pour les afficher à nouveau."
+L["%d transports"] = "%d transports"
