@@ -4,10 +4,11 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  EllesmereUIForeverEssentials_AmmoCounter.lua  (WoW Forever only)
 --  Hunters: the equipped ammo's icon and how many are left (the ammo slot
 --  counts that type across the bags), orange under the warning threshold and
---  red under a quarter of it. Placed by unlock mode. An optional alert shows
+--  red under half of it. Placed by unlock mode. An optional alert shows
 --  on screen when the count falls under the threshold, and at zero.
 --
---  Event driven: bag and equipment changes (each shot takes ammo from a bag).
+--  Event driven: bag and inventory changes (each shot takes ammo from a bag;
+--  equipping other ammo only fires UNIT_INVENTORY_CHANGED).
 --  Nothing is built for other classes or while the setting is off.
 -------------------------------------------------------------------------------
 local _, module = ...
@@ -70,7 +71,7 @@ local function Update()
     frame.icon:SetTexture(GetInventoryItemTexture("player", INVSLOT_AMMO) or NO_AMMO_ICON)
     frame.icon:SetDesaturated(count == 0)
     local warn = Get("warn")
-    if count < warn / 4 then
+    if count < warn / 2 then
         frame.count:SetTextColor(1, 0.25, 0.25)
     elseif count < warn then
         frame.count:SetTextColor(1, 0.6, 0.1)
@@ -117,6 +118,7 @@ local function Apply()
     if on then
         events:RegisterEvent("BAG_UPDATE_DELAYED")
         events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+        events:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
         Update()
     else
         events:UnregisterAllEvents()
