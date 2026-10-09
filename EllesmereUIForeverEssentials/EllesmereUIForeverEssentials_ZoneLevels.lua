@@ -2,16 +2,15 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
 --  EllesmereUIForeverEssentials_ZoneLevels.lua  (WoW Forever only)
---  Shows the level range of the zone under the cursor on a continent map,
---  as the map does on its own wherever C_Map.GetMapLevels has data (it
---  returns 0 on Forever), colored by the quest difficulty colors. A separate
---  toggle shows the fishing skill of the hovered zone (else of the zone the
---  map shows) on the same line, beside the levels or in their place.
+--  A box on the world map, dragged where the player wants it, names the zone
+--  under the cursor (else the zone the map shows) with its level range
+--  (C_Map.GetMapLevels returns 0 on Forever), colored by the quest difficulty
+--  colors, and with a separate toggle its fishing skill range.
 --
 --  Taint: nothing of Blizzard's map is hooked or written to, only read. A frame
 --  of our own, child of the map's scroll container (so it only updates while
 --  the map shows), reads the cursor and the canvas geometry through widget
---  API and shows the range in a text of its own under the zone name.
+--  API and fills a box of its own.
 -------------------------------------------------------------------------------
 local _, module = ...
 
@@ -92,7 +91,8 @@ local FISHING_NO_GETAWAY = 95
 local FISHING_ICON = "|TInterface\\Icons\\Trade_Fishing:16|t"
 
 local UPDATE_INTERVAL = 0.15
-local TEXT_OFFSET_Y   = -50  -- just under the map's own area name
+local BOX_PAD         = 6
+local BOX_MARGIN      = 10  -- the info box's first spot, from the map's top left corner
 
 local watcher  -- ours; nil until a setting is first on
 
@@ -112,13 +112,14 @@ local function FishingBase(zone)
     return 330, true
 end
 
--- The player's fishing skill, or nil while Fishing is not learned.
+-- The player's effective fishing skill (lures and gear included), or nil while
+-- Fishing is not learned.
 local function FishingSkill()
     if not GetProfessions then return nil end
     local _, _, _, fishing = GetProfessions()
     if not fishing then return nil end
-    local _, _, rank = GetProfessionInfo(fishing)
-    return rank
+    local _, _, rank, _, _, _, _, modifier = GetProfessionInfo(fishing)
+    return rank + (modifier or 0)
 end
 
 -- Fishing icon and "min-reliable", colored by the player's skill: red below the base,
@@ -170,28 +171,51 @@ local function HoveredZone(self, mapID)
     if info and info.mapID ~= mapID then return info.mapID end
 end
 
--- One line under the zone name: the hovered zone's levels, then fishing for
--- the hovered zone, else for the zone the map shows.
+-- The info box: the zone's name, its levels and its fishing, for the hovered
+-- zone, else for the zone the map shows.
 local function OnUpdate(self, elapsed)
     self.elapsed = self.elapsed + elapsed
     if self.elapsed < UPDATE_INTERVAL then return end
     self.elapsed = 0
     local mapID = WorldMapFrame:GetMapID()
-    local hovered = HoveredZone(self, mapID)
-    local fishZone = hovered or mapID
-    if hovered == self.zone and fishZone == self.fishZone then return end
-    self.zone, self.fishZone = hovered, fishZone
+    local zone = HoveredZone(self, mapID) or mapID
+    if zone == self.zone then return end
+    self.zone = zone
 
-    local lv = F.Get("enabled") and hovered and LEVELS[hovered]
+    local lv = F.Get("enabled") and LEVELS[zone]
     local levels = lv and LevelsText(lv)
-    local fishing = F.Get("fishing") and FishingText(fishZone)
-    local text = levels and fishing and (levels .. "   " .. fishing) or levels or fishing
-    if text then
-        self.text:SetText(text)
-        self.text:Show()
-    else
-        self.text:Hide()
+    local fishing = F.Get("fishing") and FishingText(zone)
+    local box = self.box
+    if not (levels or fishing) then
+        box:Hide()
+        return
     end
+    local info = C_Map.GetMapInfo(zone)
+    local text = (info and info.name or "")
+    if levels then text = text .. "\n" .. levels end
+    if fishing then text = text .. "\n" .. fishing end
+    box.text:SetText(text)
+    box:SetSize(box.text:GetStringWidth() + 2 * BOX_PAD, box.text:GetStringHeight() + 2 * BOX_PAD)
+    box:Show()
+end
+
+-- The box sits where it was dragged, kept inside the map.
+local function PlaceBox()
+    local box, scroll = watcher.box, watcher.scroll
+    local pos = F.Get("box")
+    box:ClearAllPoints()
+    box:SetPoint("TOPLEFT", scroll, "TOPLEFT", pos and pos.x or BOX_MARGIN, pos and pos.y or -BOX_MARGIN)
+end
+
+local function SaveBox(box)
+    box:StopMovingOrSizing()
+    local scroll = watcher.scroll
+    local maxX = scroll:GetWidth() - box:GetWidth()
+    local minY = box:GetHeight() - scroll:GetHeight()
+    local x = math.min(math.max(box:GetLeft() - scroll:GetLeft(), 0), math.max(maxX, 0))
+    local y = math.max(math.min(box:GetTop() - scroll:GetTop(), 0), math.min(minY, 0))
+    F.Cfg().box = { x = x, y = y }
+    PlaceBox()
 end
 
 local function Build()
@@ -201,11 +225,26 @@ local function Build()
     watcher:SetFrameStrata("HIGH")
     watcher.scroll = scroll
     watcher.elapsed = 0
-    watcher.text = watcher:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    watcher.text:SetPoint("TOP", 0, TEXT_OFFSET_Y)
-    watcher.text:Hide()
+
+    local box = CreateFrame("Frame", nil, watcher)
+    box:SetMovable(true)
+    box:EnableMouse(true)
+    box:RegisterForDrag("LeftButton")
+    box:SetScript("OnDragStart", box.StartMoving)
+    box:SetScript("OnDragStop", SaveBox)
+    local bg = box:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0, 0, 0, 0.7)
+    box.text = box:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    box.text:SetPoint("TOPLEFT", BOX_PAD, -BOX_PAD)
+    box.text:SetJustifyH("LEFT")
+    box.text:SetSpacing(3)
+    box:Hide()
+    watcher.box = box
+    PlaceBox()
     watcher:SetScript("OnUpdate", OnUpdate)
 end
+
 
 local function AnyOn()
     return F.Get("enabled") or F.Get("fishing")
@@ -218,7 +257,7 @@ local waiter
 local function Apply()
     if watcher then
         watcher:SetShown(AnyOn())
-        watcher.zone, watcher.fishZone = false, false  -- the next update redraws
+        watcher.zone = false  -- the next update redraws
         return
     end
     if not AnyOn() then return end

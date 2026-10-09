@@ -192,7 +192,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
 
     _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Show Zone Levels",
-          tooltip = "Shows the level range of the zone you hover on a continent of the world map, under its name, colored by difficulty.",
+          tooltip = "Shows the level range of the zone you hover on the world map (else of the zone the map shows), colored by difficulty, in a box you can drag anywhere on the map.",
           getValue = function() return ZL.Get("enabled") end,
           setValue = function(v)
               ZL.Cfg().enabled = v
@@ -200,7 +200,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
               EllesmereUI:RefreshPage()
           end },
         { type = "toggle", text = "Show Fishing Skill",
-          tooltip = "Shows under the zone name on the world map the fishing skill of the zone you hover, or of the zone the map shows, beside the zone levels when they are on: from the skill fish start to bite to the one where none get away, colored by your own skill. ~ marks an estimate for zones the original game did not have.",
+          tooltip = "Adds the zone's fishing skill to the same box: from the skill fish start to bite to the one where none get away, colored by your own skill with lures and gear. ~ marks an estimate for zones the original game did not have.",
           getValue = function() return ZL.Get("fishing") end,
           setValue = function(v)
               ZL.Cfg().fishing = v
