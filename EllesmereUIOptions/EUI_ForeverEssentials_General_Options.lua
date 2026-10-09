@@ -152,6 +152,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
     local W = EllesmereUI.Widgets
     local SU = EllesmereUI._SpellUprank
     local MM = EllesmereUI._MacroManager
+    local ZL = EllesmereUI._ZoneLevels
     local BLANK = EllesmereUI.BlankRowCfg
     local y = yOffset
     local _, h
@@ -184,6 +185,29 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
               EllesmereUI:InvalidateModulePageCache("EllesmereUIForeverEssentials")
           end },
         BLANK()
+    );  y = y - h
+
+    _, h = W:Spacer(parent, y, 20);  y = y - h
+    _, h = W:SectionHeader(parent, "WORLD MAP", y);  y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Show Zone Levels",
+          tooltip = "Shows the level range of the zone you hover on a continent of the world map, under its name, colored by difficulty.",
+          getValue = function() return ZL.Get("enabled") end,
+          setValue = function(v)
+              ZL.Cfg().enabled = v
+              ZL.Apply()
+              EllesmereUI:RefreshPage()
+          end },
+        { type = "toggle", text = "Show Fishing Skill",
+          tooltip = "Adds the zone's fishing skill under its levels: from the skill fish start to bite to the one where none get away, colored by your own skill.",
+          disabled = function() return not ZL.Get("enabled") end,
+          disabledTooltip = "Show Zone Levels",
+          getValue = function() return ZL.Get("fishing") end,
+          setValue = function(v)
+              ZL.Cfg().fishing = v
+              ZL.Apply()
+          end }
     );  y = y - h
 
     ---------------------------------------------------------------------------
