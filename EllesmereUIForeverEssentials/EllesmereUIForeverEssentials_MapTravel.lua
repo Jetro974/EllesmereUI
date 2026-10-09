@@ -10,7 +10,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --   - Town services (banker, auctioneer, flight master, mailbox, innkeeper,
 --     repair, stable master, battlemaster, class and profession trainers):
 --     learned where the player uses them (PLAYER_INTERACTION_MANAGER_FRAME_SHOW
---     and the player's map position), each kind its own cog toggle.
+--     and the player's map position), each kind its own cog toggle, and
+--     shared with the guild and group when the cog says so.
 --  Transports and instances also show on the continent maps. Hovering a pin
 --  names it; pins never take clicks (moving the map from our code would leave
 --  its state tainted), so the map's own clicks go through them.
@@ -26,7 +27,7 @@ local _, module = ...
 -- Settings live in EllesmereUIDB.mapTravel; unset keys read these.
 -- learned: uiMapID = { { kind, x, y, label }, ... } (town services met).
 -- svc: kind = false for a service kind hidden in the cog.
-local F = module.Feature("mapTravel", { transports = false, exits = false, instances = false, services = false })
+local F = module.Feature("mapTravel", { transports = false, exits = false, instances = false, services = false, share = false })
 
 local PIN_SIZE   = 22
 local ARROW_SIZE = 20
@@ -55,6 +56,7 @@ local SERVICE_BY_KIND = {}
 for i = 1, #SERVICES do SERVICE_BY_KIND[SERVICES[i].kind] = SERVICES[i] end
 
 local data, provider, layer, waiter, recorder
+local AskAbout  -- defined with the sharing code below
 local added = false
 local pins, used = {}, 0
 local shownKey  -- what the pins show (map and toggles); nil when cleared
@@ -245,7 +247,8 @@ local function DrawZone(zone, shown, isZone)
                 local svc = SERVICE_BY_KIND[s[1]]
                 if svc and ServiceShown(s[1]) then
                     local tip = EllesmereUI.L(svc.name)
-                    if s[4] then tip = tip .. "\n|cffffffff" .. s[4] .. "|r" end
+                    local label = s[1] == "class" and LOCALIZED_CLASS_NAMES_MALE[s[4]] or s[4]
+                    if label then tip = tip .. "\n|cffffffff" .. label .. "|r" end
                     Place(s[2], s[3], svc.icon, PIN_SIZE, tip)
                 end
             end
@@ -291,7 +294,13 @@ local function Build()
     layer:SetFrameLevel(WorldMapFrame:GetPinFrameLevelsManager():GetValidFrameLevel("PIN_FRAME_LEVEL_MAP_LINK"))
 
     provider = CreateFromMixins(MapCanvasDataProviderMixin)
-    provider.OnMapChanged = function() Refresh() end
+    provider.OnMapChanged = function(self)
+        Refresh()
+        -- A town or zone opened: the guild and the group may know its services.
+        local mapID = self:GetMap():GetMapID()
+        local info = mapID and C_Map.GetMapInfo(mapID)
+        if info and info.mapType >= Enum.UIMapType.Zone then AskAbout(mapID) end
+    end
     provider.RefreshAllData = function() Refresh() end
     provider.RemoveAllData = Clear
     provider.OnCanvasScaleChanged = Rescale
@@ -314,19 +323,13 @@ local function ServiceOf(interaction)
         if IsTradeskillTrainer() then
             return "prof", GetTrainerServiceSkillLine(1) or UnitName("npc")
         end
-        return "class", (UnitClass("player"))
+        return "class", (select(2, UnitClass("player")))  -- the class token, the same in every language
     end
 end
 
--- A service used where the player stands: stored for the map the player is
--- on, the same kind and label met again close by moving the existing one.
-local function Learn(_, _, interaction)
-    local kind, label = ServiceOf(interaction)
-    if not kind then return end
-    local mapID = C_Map.GetBestMapForUnit("player")
-    local pos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
-    if not pos then return end
-    local x, y = pos:GetXY()
+-- A service stored for a map: the same kind and label met again close by
+-- moves the existing one. Returns true when the map gained an entry.
+local function Store(mapID, kind, x, y, label)
     local cfg = F.Cfg()
     cfg.learned = cfg.learned or {}
     local list = cfg.learned[mapID]
@@ -336,25 +339,154 @@ local function Learn(_, _, interaction)
         if s[1] == kind and s[4] == label
             and math.abs(s[2] - x) < SAME_SPOT and math.abs(s[3] - y) < SAME_SPOT then
             s[2], s[3] = x, y
-            return
+            return false
         end
     end
     list[#list + 1] = { kind, x, y, label }
-    if WorldMapFrame and WorldMapFrame:IsShown() then Refresh(true) end
+    if WorldMapFrame and WorldMapFrame:IsShown() and WorldMapFrame:GetMapID() == mapID then
+        Refresh(true)
+    end
+    return true
 end
 
--- Listening only while Town Services is on.
+-------------------------------------------------------------------------------
+--  Sharing (Share Town Services, off by default): what one player learns
+--  reaches the guild and the group through addon messages, and a town opened
+--  on the map asks them for what they know there. One player answers a
+--  question: each waits a random moment and stays quiet once another's
+--  answer has started. Everything received is checked (map, kind, position,
+--  label) before it is stored; sends are spaced out.
+-------------------------------------------------------------------------------
+local PREFIX       = "EUIMapSvc"
+local SEND_GAP     = 0.25  -- seconds between two of our messages
+local ANSWER_DELAY = 4     -- an answer waits up to this many seconds
+local MAX_LABEL    = 40
+
+local outbox, sending = {}, false
+local asked = {}     -- mapID = true once asked this session
+local answering = {} -- mapID = channel while our answer waits
+local me
+
+local function Sharing()
+    return F.Get("services") and F.Get("share")
+end
+
+-- The channels a message goes to: the guild, and the group.
+local function Channels()
+    local guild = IsInGuild() and "GUILD" or nil
+    local group = IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and "INSTANCE_CHAT"
+        or IsInRaid() and "RAID" or IsInGroup() and "PARTY" or nil
+    return guild, group
+end
+
+local function Drain()
+    local msg = table.remove(outbox, 1)
+    if not msg then
+        sending = false
+        return
+    end
+    C_ChatInfo.SendAddonMessage(PREFIX, msg[1], msg[2])
+    C_Timer.After(SEND_GAP, Drain)
+end
+
+local function Send(text, channel)
+    if not channel then return end
+    outbox[#outbox + 1] = { text, channel }
+    if not sending then
+        sending = true
+        Drain()
+    end
+end
+
+local function EntryText(mapID, s)
+    return ("L|%d|%s|%d|%d|%s"):format(mapID, s[1], math.floor(s[2] * 1000 + 0.5),
+        math.floor(s[3] * 1000 + 0.5), s[4] or "")
+end
+
+local function Broadcast(text)
+    local guild, group = Channels()
+    Send(text, guild)
+    Send(text, group)
+end
+
+-- A town opened on the map: ask the guild and the group once a session.
+function AskAbout(mapID)
+    if not Sharing() or asked[mapID] then return end
+    asked[mapID] = true
+    local learned = F.Get("learned")
+    local n = learned and learned[mapID] and #learned[mapID] or 0
+    Broadcast(("Q|%d|%d"):format(mapID, n))
+end
+
+local function Answer(mapID, channel)
+    answering[mapID] = nil
+    local learned = F.Get("learned")
+    local list = learned and learned[mapID]
+    if not list then return end
+    for i = 1, #list do Send(EntryText(mapID, list[i]), channel) end
+end
+
+local function Receive(_, _, prefix, text, channel, sender)
+    if prefix ~= PREFIX or sender == me or not Sharing() then return end
+    local tag, a, b, c, d, e = strsplit("|", text, 6)
+    local mapID = tonumber(a)
+    if not (mapID and C_Map.GetMapInfo(mapID)) then return end
+    if tag == "L" then
+        -- Someone answers about this map: ours is not needed.
+        answering[mapID] = nil
+        local x, y = tonumber(c), tonumber(d)
+        if not (SERVICE_BY_KIND[b] and x and y and x >= 0 and x <= 1000 and y >= 0 and y <= 1000) then
+            return
+        end
+        local label = e and e:gsub("[|\r\n]", ""):sub(1, MAX_LABEL) or ""
+        Store(mapID, b, x / 1000, y / 1000, label ~= "" and label or nil)
+    elseif tag == "Q" then
+        local theirs = tonumber(b) or 0
+        local learned = F.Get("learned")
+        local mine = learned and learned[mapID] and #learned[mapID] or 0
+        if mine <= theirs or answering[mapID] then return end
+        answering[mapID] = channel
+        C_Timer.After(math.random() * ANSWER_DELAY, function()
+            if answering[mapID] == channel then Answer(mapID, channel) end
+        end)
+    end
+end
+
+-- A service used where the player stands: stored, and shared when on.
+local function Learn(_, _, interaction)
+    local kind, label = ServiceOf(interaction)
+    if not kind then return end
+    local mapID = C_Map.GetBestMapForUnit("player")
+    local pos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
+    if not pos then return end
+    local x, y = pos:GetXY()
+    if Store(mapID, kind, x, y, label) and Sharing() then
+        Broadcast(EntryText(mapID, { kind, x, y, label }))
+    end
+end
+
+-- Listening only while Town Services is on; the addon channel only while it
+-- is shared.
 local function SyncRecorder()
     local on = F.Get("services")
     if on and not recorder then
         recorder = CreateFrame("Frame")
-        recorder:SetScript("OnEvent", Learn)
+        recorder:SetScript("OnEvent", function(self, event, ...)
+            if event == "CHAT_MSG_ADDON" then Receive(self, event, ...) else Learn(self, event, ...) end
+        end)
     end
     if not recorder then return end
     if on then
         recorder:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW")
     else
         recorder:UnregisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW")
+    end
+    if Sharing() then
+        me = me or (UnitName("player") .. "-" .. GetNormalizedRealmName())
+        C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
+        recorder:RegisterEvent("CHAT_MSG_ADDON")
+    else
+        recorder:UnregisterEvent("CHAT_MSG_ADDON")
     end
 end
 
