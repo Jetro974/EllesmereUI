@@ -32,5 +32,8 @@ EllesmereUIForeverEssentials_ThreatFeed.lua
 # Loot (loot feed)
 EllesmereUIForeverEssentials_LootFeed.lua
 
+# Training (training planner)
+EllesmereUIForeverEssentials_Training.lua
+
 # Macros (macro manager)
 EllesmereUIForeverEssentials_MacroManager.lua

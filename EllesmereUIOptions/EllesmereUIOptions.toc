@@ -63,6 +63,7 @@ EUI_ForeverEssentials_Travel_Options.lua
 EUI_ForeverEssentials_Threat_Options.lua
 EUI_ForeverEssentials_Loot_Options.lua
 EUI_ForeverEssentials_MacroModel_Options.lua
+EUI_ForeverEssentials_Training_Options.lua
 EUI_ForeverEssentials_Macros_Options.lua
 EUI_Friends_Options.lua
 EUI_LoadoutManager_Options.lua
