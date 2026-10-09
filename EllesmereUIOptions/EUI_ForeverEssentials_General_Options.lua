@@ -208,6 +208,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
           setValue = function(v)
               MT.Cfg()[key] = v
               MT.Apply()
+              EllesmereUI:RefreshPage()  -- the Town Services cog follows its toggle
           end }
     end
     _, h = W:DualRow(parent, y,
@@ -226,6 +227,36 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
             "Shows the flight masters on the world map, those you have not found yet included; hover one for its name.",
             "flights")
     );  y = y - h
+    local servicesRow
+    servicesRow, h = W:DualRow(parent, y,
+        travelToggle("Show Town Services",
+            "Shows bankers, auctioneers, flight masters, mailboxes, innkeepers, repairs, stable masters, battlemasters and trainers on the world map. Each one appears once you have used it: the map learns where it stands. Pick which ones show with the cog.",
+            "services"),
+        BLANK()
+    );  y = y - h
+
+    -- One toggle per service kind, all shown until turned off.
+    if not EllesmereUI._prebuilding then
+        local rows = {}
+        for _, svc in ipairs(MT.services) do
+            local kind = svc.kind
+            rows[#rows + 1] = { type = "toggle", label = svc.name,
+                get = function() return MT.ServiceShown(kind) end,
+                set = function(v)
+                    local cfg = MT.Cfg()
+                    cfg.svc = cfg.svc or {}
+                    cfg.svc[kind] = v
+                    MT.Apply()
+                end }
+        end
+        EllesmereUI.BuildInlineCog(servicesRow._leftRegion, {
+            title = "Town Services",
+            rows = rows,
+            gap = 9,
+            disabled = function() return not MT.Get("services") end,
+            disabledTooltip = "Show Town Services",
+        })
+    end
 
     ---------------------------------------------------------------------------
     --  NAME FORMAT (while a module with a Name Format is on)
