@@ -17,16 +17,21 @@ return {
     transports = {
         [1411] = { {51.2,13.4,"zeppelin",1420,1497}, {50.4,14.3,"zeppelin",1434,117} },         -- Durotar
         [1413] = { {63.7,38.6,"boat",1434,35} },                                                -- The Barrens (Ratchet)
+        [1412] = { {34.3,25.8,"zeppelin",2521,16628} },                                         -- Mulgore (Skywatcher Plateau)
+        [1416] = { {12.5,51.8,"skycutter",2521,16628} },                                        -- Alterac Mountains (Dalaran)
         [1420] = { {61.3,58.6,"zeppelin",1411,1637}, {60.4,59.1,"zeppelin",1434,117} },         -- Tirisfal Glades
+        [1424] = { {50.5,65.0,"boat",1439,442} },                                               -- Hillsbrad Foothills (Southshore)
         [1434] = { {25.8,73.1,"boat",1413,392}, {31.6,29.0,"zeppelin",1411,1637},
                    {31.0,30.2,"zeppelin",1420,1497} },                                          -- Stranglethorn Vale
-        [1437] = { {4.6,57.1,"boat",1439,442}, {5.0,63.5,"boat",1445,513} },                    -- Wetlands (Menethil Harbor)
+        [1437] = { {4.6,57.1,"boat",1424,271}, {5.0,63.5,"boat",1445,513} },                    -- Wetlands (Menethil Harbor)
         [1438] = { {55.2,95.0,"boat",1439,442} },                                               -- Teldrassil (Rut'theran Village)
-        [1439] = { {32.4,43.8,"boat",1437,150}, {33.2,40.2,"boat",1438,702} },                  -- Darkshore (Auberdine)
+        [1439] = { {32.4,43.8,"boat",1437,150}, {33.2,40.2,"boat",1438,702},
+                   {32.4,43.8,"boat",1453,17203} },                                             -- Darkshore (Auberdine)
         [1444] = { {43.3,42.8,"boat",1444,1116}, {31.0,39.7,"boat",1444,1108} },                -- Feralas (Feathermoon ferry)
         [1445] = { {71.6,56.4,"boat",1437,150} },                                               -- Dustwallow Marsh (Theramore)
         [1453] = { {69.4,30.5,"tram",1455,1537} },                                              -- Stormwind City
         [1455] = { {76.6,51.2,"tram",1453,1519} },                                              -- Ironforge
+        [2548] = { {79.0,52.3,"boat",1446,977} },                                               -- The Riverglades (Powderfuse Port)
     },
     -- uiMapID = { { x, y, uiMapID the road leads to }, ... }
     exits = {
