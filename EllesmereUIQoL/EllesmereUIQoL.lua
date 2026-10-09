@@ -58,6 +58,8 @@ qolFrame:SetScript("OnEvent", function(self)
     if EllesmereUIDB.envPingKey then EllesmereUI._applyEnvPing() end
     -- Self Combat Text (EllesmereUIQoL_SelfCombatText.lua): nothing is built while off.
     ns.SCT_Refresh()
+    -- Reveal Unexplored Areas (EllesmereUIQoL_MapReveal.lua): nothing is built while off.
+    ns.MapReveal_Apply()
 
     ---------------------------------------------------------------------------
     -- Bonus roll confirmation. Addon-owned overlays intercept Roll/Pass clicks;

@@ -5599,3 +5599,8 @@ L["This bar sizes its blocks itself, so the width is not this block's to choose.
 L["How precise the coordinates read. More decimals make the block wider."] = "Précision d'affichage des coordonnées. Plus il y a de décimales, plus le bloc est large."
 L["Hide in Instance"] = "Masquer en instance"
 L["Removes the block from the bar in instanced content, where player coordinates are unavailable."] = "Retire le bloc de la barre dans le contenu instancié, où les coordonnées du joueur ne sont pas disponibles."
+L["Reveal Unexplored Areas"] = "Révéler les zones inexplorées"
+L["Shows the parts of the world map you have not explored yet. Use the cog to choose whether they are dimmed."] = "Affiche les parties de la carte du monde que vous n'avez pas encore explorées. Le rouage permet de choisir si elles sont assombries."
+L["Reveal Unexplored Areas Settings"] = "Réglages de la révélation des zones inexplorées"
+L["Dim Unexplored Areas"] = "Assombrir les zones inexplorées"
+L["Draws the unexplored areas darker so they stand apart from the ones you have explored."] = "Affiche les zones inexplorées plus sombres pour les distinguer de celles que vous avez explorées."
