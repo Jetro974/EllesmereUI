@@ -6,7 +6,7 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  as the map does on its own wherever C_Map.GetMapLevels has data (it
 --  returns 0 on Forever), colored by the quest difficulty colors. A separate
 --  toggle shows the fishing skill of the hovered zone (else of the zone the
---  map shows) in a box in the map's top left corner.
+--  map shows) on the same line, beside the levels or in their place.
 --
 --  Taint: nothing of Blizzard's map is hooked or written to, only read. A frame
 --  of our own, child of the map's scroll container (so it only updates while
@@ -89,12 +89,10 @@ local FISHING_BASE = {
     [1451] = 330, [1452] = 330,                              -- Silithus, Winterspring
 }
 local FISHING_NO_GETAWAY = 95
-local FISHING_ICON = "|TInterface\Icons\Trade_Fishing:16|t"
+local FISHING_ICON = "|TInterface\\Icons\\Trade_Fishing:16|t"
 
 local UPDATE_INTERVAL = 0.15
 local TEXT_OFFSET_Y   = -50  -- just under the map's own area name
-local BOX_OFFSET      = 10   -- the fishing box, in the map's top left corner
-local BOX_PAD         = 6
 
 local watcher  -- ours; nil until a setting is first on
 
@@ -123,7 +121,7 @@ local function FishingSkill()
     return rank
 end
 
--- "Fishing - Zone" over "min-reliable", colored by the player's skill: red below the base,
+-- "Fishing min-reliable", colored by the player's skill: red below the base,
 -- yellow while fish still get away, green once nothing does. "~" marks an
 -- estimate.
 local function FishingText(zone)
@@ -135,9 +133,8 @@ local function FishingText(zone)
     if skill then
         color = skill < low and "|cffff4040" or skill < high and "|cffffd100" or "|cff40ff40"
     end
-    local info = C_Map.GetMapInfo(zone)
-    return ("%s %s - %s\n%s%s%d-%d|r"):format(FISHING_ICON, EllesmereUI.L("Fishing"),
-        info and info.name or "", color, estimate and "~" or "", low, high)
+    return ("%s %s %s%s%d-%d|r"):format(FISHING_ICON, EllesmereUI.L("Fishing"),
+        color, estimate and "~" or "", low, high)
 end
 
 -- The map's own format: the range is colored like a quest of the nearest level.
@@ -171,8 +168,8 @@ local function HoveredZone(self, mapID)
     if info and info.mapID ~= mapID then return info.mapID end
 end
 
--- Levels: the hovered zone of a continent. Fishing: the hovered zone, else
--- the zone the map shows.
+-- One line under the zone name: the hovered zone's levels, then fishing for
+-- the hovered zone, else for the zone the map shows.
 local function OnUpdate(self, elapsed)
     self.elapsed = self.elapsed + elapsed
     if self.elapsed < UPDATE_INTERVAL then return end
@@ -184,21 +181,14 @@ local function OnUpdate(self, elapsed)
     self.zone, self.fishZone = hovered, fishZone
 
     local lv = F.Get("enabled") and hovered and LEVELS[hovered]
-    if lv then
-        self.text:SetText(LevelsText(lv))
+    local levels = lv and LevelsText(lv)
+    local fishing = F.Get("fishing") and FishingText(fishZone)
+    local text = levels and fishing and (levels .. "   " .. fishing) or levels or fishing
+    if text then
+        self.text:SetText(text)
         self.text:Show()
     else
         self.text:Hide()
-    end
-
-    local fishing = F.Get("fishing") and FishingText(fishZone)
-    if fishing then
-        local box = self.fishBox
-        box.text:SetText(fishing)
-        box:SetSize(box.text:GetStringWidth() + BOX_PAD * 2, box.text:GetStringHeight() + BOX_PAD * 2)
-        box:Show()
-    else
-        self.fishBox:Hide()
     end
 end
 
@@ -212,16 +202,6 @@ local function Build()
     watcher.text = watcher:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     watcher.text:SetPoint("TOP", 0, TEXT_OFFSET_Y)
     watcher.text:Hide()
-    local box = CreateFrame("Frame", nil, watcher)
-    box:SetPoint("TOPLEFT", BOX_OFFSET, -BOX_OFFSET)
-    local bg = box:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0, 0, 0, 0.65)
-    box.text = box:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    box.text:SetPoint("TOPLEFT", BOX_PAD, -BOX_PAD)
-    box.text:SetJustifyH("LEFT")
-    box:Hide()
-    watcher.fishBox = box
     watcher:SetScript("OnUpdate", OnUpdate)
 end
 
