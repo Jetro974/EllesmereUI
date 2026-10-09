@@ -235,9 +235,18 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
         BLANK()
     );  y = y - h
 
-    -- One toggle per service kind, all shown until turned off.
+    -- Where the services are kept (the account by default), then one toggle
+    -- per service kind, all shown until turned off.
     if not EllesmereUI._prebuilding then
-        local rows = {}
+        local rows = {
+            { type = "toggle", label = "Limit to Character",
+              tooltip = "Keeps the services each character has used for that character only. Off, every character of the account shares the same map.",
+              get = function() return MT.Get("perChar") == true end,
+              set = function(v)
+                  MT.Cfg().perChar = v
+                  MT.Apply()
+              end },
+        }
         for _, svc in ipairs(MT.services) do
             local kind = svc.kind
             rows[#rows + 1] = { type = "toggle", label = svc.name,

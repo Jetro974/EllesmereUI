@@ -12,7 +12,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --   - Town services (banker, auctioneer, flight master, mailbox, innkeeper,
 --     repair, stable master, battlemaster, class and profession trainers):
 --     learned where the player uses them (PLAYER_INTERACTION_MANAGER_FRAME_SHOW
---     and the player's map position), each kind its own cog toggle.
+--     and the player's map position), kept for the account or, with Limit to
+--     Character, for each character; each kind its own cog toggle.
 --  Hovering a pin names it; pins never take clicks (moving the map from our
 --  code would leave its state tainted), so the map's own clicks go through
 --  them. A continent map stays clean: no pins, the zone under the cursor lists
@@ -29,10 +30,12 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.mapTravel; unset keys read these.
--- learned: uiMapID = { { kind, x, y, label }, ... } (town services met).
+-- learned: uiMapID = { { kind, x, y, label }, ... } (town services met by
+-- the account); learnedChar: "Name-Realm" = the same, per character, used
+-- while perChar (Limit to Character) is on.
 -- svc: kind = false for a service kind hidden in the cog.
 local F = module.Feature("mapTravel", { transports = false, exits = false, instances = false,
-    flights = false, services = false })
+    flights = false, services = false, perChar = false })
 
 local PIN_SIZE   = 22
 local ARROW_SIZE = 20
@@ -76,6 +79,24 @@ end
 local function ServiceShown(kind)
     local svc = F.Get("svc")
     return not svc or svc[kind] ~= false
+end
+
+-- The learned services in use: the account's, or this character's while Limit to
+-- Character is on. create makes the tables on the first write.
+local function Learned(create)
+    if not F.Get("perChar") then
+        if not create then return F.Get("learned") end
+        local cfg = F.Cfg()
+        cfg.learned = cfg.learned or {}
+        return cfg.learned
+    end
+    local key = UnitName("player") .. "-" .. GetNormalizedRealmName()
+    local byChar = F.Get("learnedChar")
+    if not create then return byChar and byChar[key] end
+    local cfg = F.Cfg()
+    cfg.learnedChar = cfg.learnedChar or {}
+    cfg.learnedChar[key] = cfg.learnedChar[key] or {}
+    return cfg.learnedChar[key]
 end
 
 -- Pins that touch on screen (it depends on the zoom) share one tooltip: the
@@ -255,7 +276,7 @@ local function DrawZone(zone)
         end
     end
     if F.Get("services") then
-        local learned = F.Get("learned")
+        local learned = Learned()
         local list = learned and learned[zone]
         if list then
             for i = 1, #list do
@@ -263,7 +284,8 @@ local function DrawZone(zone)
                 local svc = SERVICE_BY_KIND[s[1]]
                 if svc and ServiceShown(s[1]) then
                     local tip = EllesmereUI.L(svc.name)
-                    if s[4] then tip = tip .. "\n|cffffffff" .. s[4] .. "|r" end
+                    local label = s[1] == "class" and LOCALIZED_CLASS_NAMES_MALE[s[4]] or s[4]
+                    if label then tip = tip .. "\n|cffffffff" .. label .. "|r" end
                     Place(s[2], s[3], svc.icon, PIN_SIZE, tip)
                 end
             end
@@ -449,7 +471,7 @@ local function ServiceOf(interaction)
         if IsTradeskillTrainer() then
             return "prof", GetTrainerServiceSkillLine(1) or UnitName("npc")
         end
-        return "class", (UnitClass("player"))
+        return "class", (select(2, UnitClass("player")))  -- the class token, the same in every language
     end
 end
 
@@ -462,10 +484,9 @@ local function Learn(_, _, interaction)
     local pos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
     if not pos then return end
     local x, y = pos:GetXY()
-    local cfg = F.Cfg()
-    cfg.learned = cfg.learned or {}
-    local list = cfg.learned[mapID]
-    if not list then list = {}; cfg.learned[mapID] = list end
+    local learned = Learned(true)
+    local list = learned[mapID]
+    if not list then list = {}; learned[mapID] = list end
     for i = 1, #list do
         local s = list[i]
         if s[1] == kind and s[4] == label
