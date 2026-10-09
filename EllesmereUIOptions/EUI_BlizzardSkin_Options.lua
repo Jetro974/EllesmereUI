@@ -1745,7 +1745,7 @@ initFrame:SetScript("OnEvent", function(self)
                   if EllesmereUI._Merchant_RefreshItemLevels then EllesmereUI._Merchant_RefreshItemLevels() end
               end },
             { type="toggle", text="Wide Window",
-              tooltip="Doubles the merchant window's width to show 20 items per page, with a button in its header that marks the items you already know.",
+              tooltip="Doubles the merchant window's width to show 20 items per page, with the items you already know or own marked, and a button in its header that hides them.",
               -- Locked only while Show As List actually runs (it needs the reskin).
               disabled=function()
                   return EllesmereUIDB and EllesmereUIDB.merchantShowAsList == true and not themedOff()
@@ -4036,7 +4036,7 @@ initFrame:SetScript("OnEvent", function(self)
                     "charSheetSocketPanel", "charSheetIconZoom", "charSheetEnchantNames",
                     "charSheetEnchantSize", "inspectShowEnchants", "inspectShowItemLevel",
                     "inspectShowUpgradeTrack", "merchantShowAsList", "merchantListRowHeight",
-                    "merchantShowItemLevel", "merchantWide", "merchantHighlightKnown",
+                    "merchantShowItemLevel", "merchantWide", "merchantHideKnown",
                     "tooltipItemLevel", "tooltipShowMode",
                     "tooltipShowModifier", "tooltipGrowthDirection", "tooltipBgColor",
                     "tooltipBgOpacity", "showSpellID", "spellIDModifier", "showIconID",

@@ -7894,8 +7894,9 @@ end
 --  hidden (HideNativeMerchantGrid) and 20 tiles of ours, built from
 --  MerchantItemTemplate (Blizzard's own click, tooltip and confirm handlers,
 --  which read the slot index from the button ID), fill pages of 20. The
---  buyback tab shows its 12 items on the same tiles. A header toggle marks the
---  items already known (EllesmereUIDB.merchantHighlightKnown).
+--  buyback tab shows its 12 items on the same tiles. Items the player already
+--  knows or owns are marked, and a header button hides them from the grid
+--  (EllesmereUIDB.merchantHideKnown).
 -------------------------------------------------------------------------------
 local WIDE_PREFIX   = "EUI_MerchantWideItem"
 local WIDE_PER_PAGE = 20
@@ -7903,22 +7904,32 @@ local WIDE_COLS     = 4
 local WIDE_EXTRA_W  = 2 * (153 + 12)  -- two more tile columns
 local WIDE_MONEY_W  = 120             -- Blizzard's MAX_MONEY_DISPLAY_WIDTH (a file local there)
 
-local wide = { tiles = {}, page = 1 }
+local wide = { tiles = {}, page = 1, list = {} }
 
 -- The merchant reskin is on (any style but "off"): the wide parts take its look.
 local function WideThemed()
     return WSkin.GetStyle("merchant") ~= "off"
 end
 
--- An item the player already knows (recipe, mount, pet, toy...): its tooltip
--- carries the "Already known" line.
+-- An item the player already has: its tooltip reads "Already known" (recipe,
+-- mount, toy...) or "Collected (x/y)" (a companion pet already in the
+-- journal). Cached per merchant index until the merchant's goods change.
+local PET_COLLECTED = "^" .. ITEM_PET_KNOWN:gsub("[%(%)%.%-%+%[%]]", "%%%0"):gsub("%%d", "%%d+") .. "$"
+local knownCache = {}
 local function MerchantItemKnown(index)
+    local known = knownCache[index]
+    if known ~= nil then return known end
+    known = false
     local tip = C_TooltipInfo.GetMerchantItem(index)
-    if not (tip and tip.lines) then return false end
-    for _, line in ipairs(tip.lines) do
-        if line.leftText == ITEM_SPELL_KNOWN then return true end
+    for _, line in ipairs(tip and tip.lines or {}) do
+        local text = line.leftText
+        if text == ITEM_SPELL_KNOWN or (text and text:find(PET_COLLECTED)) then
+            known = true
+            break
+        end
     end
-    return false
+    knownCache[index] = known
+    return known
 end
 
 local function WideKnownMark(tile)
@@ -8000,7 +8011,7 @@ local function WideFillMerchant(tile, slot, index)
     SetItemButtonTextureVertexColor(btn, r, g, b)
     SetItemButtonNormalTextureVertexColor(btn, r, g, b)
 
-    local known = EllesmereUIDB.merchantHighlightKnown and MerchantItemKnown(index)
+    local known = MerchantItemKnown(index)
     local mark = (known or GetFFD(tile).known) and WideKnownMark(tile)
     if mark then
         mark[1]:SetShown(known)
@@ -8038,18 +8049,36 @@ local function WideFillBuyback(tile, index)
     return true
 end
 
+-- The header button's label: what a click does, and how many items it hides.
+local function SyncKnownButton(numKnown)
+    local b = wide.known
+    b.text:SetFormattedText(EllesmereUIDB.merchantHideKnown
+        and EllesmereUI.L("Show known items (%d)") or EllesmereUI.L("Hide known items (%d)"), numKnown)
+    b:SetWidth(b.text:GetStringWidth() + 26)
+    b:SetEnabled(numKnown > 0 or EllesmereUIDB.merchantHideKnown)
+    b:SetAlpha(numKnown > 0 and 1 or 0.5)
+end
+
 local function UpdateWideMerchant()
     local f = _G.MerchantFrame
     local isBuyback = f.selectedTab == 2
+    -- The merchant indexes the grid shows, known items left out when hidden.
+    local list, numKnown = wide.list, 0
+    wipe(list)
     local numItems = isBuyback and GetNumBuybackItems() or GetMerchantNumItems()
-    local pages = isBuyback and 1 or math.max(1, math.ceil(numItems / WIDE_PER_PAGE))
+    for i = 1, numItems do
+        local known = not isBuyback and MerchantItemKnown(i)
+        if known then numKnown = numKnown + 1 end
+        if not (known and EllesmereUIDB.merchantHideKnown) then list[#list + 1] = i end
+    end
+    local pages = isBuyback and 1 or math.max(1, math.ceil(#list / WIDE_PER_PAGE))
     if wide.page > pages then wide.page = pages end
     local first = isBuyback and 0 or (wide.page - 1) * WIDE_PER_PAGE
     for slot = 1, WIDE_PER_PAGE do
         local tile = wide.tiles[slot]
-        local index = first + slot
+        local index = list[first + slot]
         local btn = tile.ItemButton
-        local filled = index <= numItems
+        local filled = index
             and (isBuyback and WideFillBuyback(tile, index) or (not isBuyback and WideFillMerchant(tile, slot, index)))
         if filled then
             btn.hasItem = true
@@ -8070,8 +8099,7 @@ local function UpdateWideMerchant()
     wide.pageText:SetShown(paged)
     wide.pageText:SetFormattedText(MERCHANT_PAGE_NUMBER, wide.page, pages)
     wide.known:SetShown(not isBuyback)
-    wide.known.icon:SetDesaturated(not EllesmereUIDB.merchantHighlightKnown)
-    wide.known.icon:SetAlpha(EllesmereUIDB.merchantHighlightKnown and 1 or 0.5)
+    SyncKnownButton(numKnown)
 end
 
 local function WideTurnPage(delta)
@@ -8130,25 +8158,34 @@ local function BuildWideMerchant(f)
         elseif delta < 0 and nxt:IsShown() and nxt:IsEnabled() then WideTurnPage(1) end
     end)
 
+    -- Hide / show the known items: a labeled button left of the filter.
     local known = CreateFrame("Button", nil, f)
-    known:SetSize(22, 22)
+    known:SetHeight(22)
     if f.FilterDropdown then
         known:SetPoint("RIGHT", f.FilterDropdown, "LEFT", -8, 0)
     else
         known:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, -32)
     end
+    local kbg = known:CreateTexture(nil, "BACKGROUND")
+    kbg:SetAllPoints()
+    kbg:SetColorTexture(0, 0, 0, 0.5)
+    local khl = known:CreateTexture(nil, "HIGHLIGHT")
+    khl:SetAllPoints()
+    khl:SetColorTexture(1, 1, 1, 0.1)
     known.icon = known:CreateTexture(nil, "ARTWORK")
-    known.icon:SetAllPoints()
+    known.icon:SetSize(14, 14)
+    known.icon:SetPoint("LEFT", 5, 0)
     known.icon:SetAtlas("groupfinder-icon-greencheckmark")
+    known.text = known:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    known.text:SetPoint("LEFT", known.icon, "RIGHT", 3, 0)
+    if WideThemed() then WSkin.Font(known.text) end
     known:SetScript("OnClick", function(self)
-        EllesmereUIDB.merchantHighlightKnown = not EllesmereUIDB.merchantHighlightKnown
+        EllesmereUIDB.merchantHideKnown = not EllesmereUIDB.merchantHideKnown
         UpdateWideMerchant()
         self:GetScript("OnEnter")(self)
     end)
     known:SetScript("OnEnter", function(self)
-        EllesmereUI.ShowWidgetTooltip(self, EllesmereUIDB.merchantHighlightKnown
-            and EllesmereUI.L("Known items are marked. Click to stop marking them.")
-            or EllesmereUI.L("Click to mark the items you already know."))
+        EllesmereUI.ShowWidgetTooltip(self, EllesmereUI.L("Items you already know or own (recipes, mounts, pets, toys) are marked with a green check. Click to hide them from the list, or to show them again."))
     end)
     known:SetScript("OnLeave", function() EllesmereUI.HideWidgetTooltip() end)
     wide.known = known
@@ -8167,9 +8204,16 @@ wideDriver:SetScript("OnEvent", function(self, event)
         if not EllesmereUIDB.merchantWide
             or (EllesmereUIDB.merchantShowAsList and WideThemed()) then return end
         self:RegisterEvent("MERCHANT_SHOW")
+        self:RegisterEvent("MERCHANT_UPDATE")
         hooksecurefunc("MerchantFrame_Update", function()
             if wide.built and _G.MerchantFrame:IsVisible() then UpdateWideMerchant() end
         end)
+        return
+    end
+    -- A new merchant, or its goods changed (a purchase): what is known is read again.
+    wipe(knownCache)
+    if event == "MERCHANT_UPDATE" then
+        if wide.built and _G.MerchantFrame:IsVisible() then UpdateWideMerchant() end
         return
     end
     if not wide.built then
