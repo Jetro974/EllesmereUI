@@ -4,8 +4,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  EllesmereUIForeverEssentials_AmmoCounter.lua  (WoW Forever only)
 --  Hunters: the equipped ammo's icon and how many are left (the ammo slot
 --  counts that type across the bags), orange under the warning threshold and
---  red under half of it. Placed by unlock mode. An optional alert shows
---  on screen when the count falls under the threshold, and at zero.
+--  red under half of it. Placed by unlock mode. An optional alert, read like
+--  the Low Durability warning, pulses while the count is under the threshold.
 --
 --  Event driven: bag and inventory changes (each shot takes ammo from a bag;
 --  equipping other ammo only fires UNIT_INVENTORY_CHANGED).
@@ -16,6 +16,7 @@ local _, module = ...
 local ICON_SIZE = 22
 local PAD = 4
 local NO_AMMO_ICON = "Interface\\Icons\\INV_Ammo_Arrow_02"
+local ALERT_Y = 210  -- under the Low Durability warning's default spot (250)
 
 -- Settings live in EllesmereUIDB.ammoCounter; unset keys read these.
 local F = module.Feature("ammoCounter", { enabled = false, width = 80, warn = 200, alert = false },
@@ -24,50 +25,54 @@ local Get = F.Get
 
 local IS_HUNTER = select(2, UnitClass("player")) == "HUNTER"
 local frame, events
-local alert, lastCount
+local alert  -- the Low Ammo Alert, built on its first show
 
--- Low Ammo Alert: a large line at the top of the screen and the raid warning
--- sound, once when the count falls under the threshold and once at zero.
-local function Alert(text, r, g, b)
-    if not alert then
-        alert = UIParent:CreateFontString(nil, "OVERLAY")
-        alert:SetFont(EllesmereUI.GetFontPath(), 30, EllesmereUI.SlugFlag("OUTLINE, SLUG"))
-        alert:SetPoint("TOP", UIParent, "TOP", 0, -170)
-        alert.fade = alert:CreateAnimationGroup()
-        local hold = alert.fade:CreateAnimation("Alpha")
-        hold:SetFromAlpha(1)
-        hold:SetToAlpha(1)
-        hold:SetDuration(2.5)
-        local out = alert.fade:CreateAnimation("Alpha")
-        out:SetFromAlpha(1)
-        out:SetToAlpha(0)
-        out:SetStartDelay(2.5)
-        out:SetDuration(1)
-        alert.fade:SetScript("OnFinished", function() alert:Hide() end)
-    end
-    alert:SetText(text)
-    alert:SetTextColor(r, g, b)
-    alert:Show()
-    alert.fade:Stop()
-    alert.fade:Play()
-    PlaySound(SOUNDKIT.RAID_WARNING)
+-- Low Ammo Alert, read like the Low Durability warning: a pulsing line above
+-- the middle of the screen (just under that warning's spot) while the ammo is
+-- under the threshold, out of combat only; it comes back once combat ends.
+local function BuildAlert()
+    alert = CreateFrame("Frame", nil, UIParent)
+    alert:SetSize(400, 40)
+    alert:SetFrameStrata("HIGH")
+    alert:SetFrameLevel(50)
+    alert:SetPoint("CENTER", UIParent, "CENTER", 0, ALERT_Y)
+    alert:EnableMouse(false)
+    local fs = alert:CreateFontString(nil, "OVERLAY")
+    fs:SetFont(EllesmereUI.GetFontPath("extras"), 30, EllesmereUI.GetFontOutlineFlag("extras"))
+    fs:SetPoint("CENTER")
+    fs:SetTextColor(1, 0.27, 0.27, 1)
+    alert.text = fs
+    local pulse = fs:CreateAnimationGroup()
+    local dim = pulse:CreateAnimation("Alpha")
+    dim:SetFromAlpha(1)
+    dim:SetToAlpha(0.3)
+    dim:SetDuration(0.4)
+    dim:SetOrder(1)
+    local lit = pulse:CreateAnimation("Alpha")
+    lit:SetFromAlpha(0.3)
+    lit:SetToAlpha(1)
+    lit:SetDuration(0.4)
+    lit:SetOrder(2)
+    pulse:SetLooping("REPEAT")
+    alert:SetScript("OnShow", function() pulse:Play() end)
+    alert:SetScript("OnHide", function() pulse:Stop() end)
+    alert:Hide()
 end
 
-local function CheckAlert(count)
-    local was = lastCount
-    lastCount = count
-    if not (was and Get("alert")) or count >= was then return end
-    if count == 0 then
-        Alert(EllesmereUI.L("Out of ammo!"), 1, 0.25, 0.25)
-    elseif count < Get("warn") and was >= Get("warn") then
-        Alert(EllesmereUI.Lf("Low ammo: %d left", count), 1, 0.6, 0.1)
+local function SyncAlert(count)
+    if not (Get("alert") and count < Get("warn") and not InCombatLockdown()) then
+        if alert then alert:Hide() end
+        return
     end
+    if not alert then BuildAlert() end
+    alert.text:SetText(count == 0 and EllesmereUI.L("No Ammo") or EllesmereUI.Lf("Low Ammo (%d)", count))
+    alert:Show()
 end
 
 local function Update()
     if not frame then return end
     local count = GetInventoryItemCount("player", INVSLOT_AMMO) or 0
-    CheckAlert(count)
+    SyncAlert(count)
     frame.icon:SetTexture(GetInventoryItemTexture("player", INVSLOT_AMMO) or NO_AMMO_ICON)
     frame.icon:SetDesaturated(count == 0)
     local warn = Get("warn")
@@ -105,7 +110,14 @@ local function Build()
     F.Place(frame)
 
     events = CreateFrame("Frame")
-    events:SetScript("OnEvent", Update)
+    events:SetScript("OnEvent", function(_, event)
+        -- Before lockdown starts: the alert steps aside for the fight.
+        if event == "PLAYER_REGEN_DISABLED" then
+            if alert then alert:Hide() end
+            return
+        end
+        Update()
+    end)
 end
 
 -- Off (or not a hunter): hidden and deaf. On: built once, then shown and
@@ -119,10 +131,17 @@ local function Apply()
         events:RegisterEvent("BAG_UPDATE_DELAYED")
         events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
         events:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+        if Get("alert") then
+            events:RegisterEvent("PLAYER_REGEN_DISABLED")
+            events:RegisterEvent("PLAYER_REGEN_ENABLED")
+        else
+            events:UnregisterEvent("PLAYER_REGEN_DISABLED")
+            events:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        end
         Update()
     else
         events:UnregisterAllEvents()
-        lastCount = nil  -- turned back on, the first count is not a drop
+        if alert then alert:Hide() end
     end
 end
 

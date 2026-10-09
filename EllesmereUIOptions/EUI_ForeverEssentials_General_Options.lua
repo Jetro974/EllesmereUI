@@ -214,11 +214,14 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
 
         _, h = W:DualRow(parent, y,
             { type = "toggle", text = "Low Ammo Alert",
-              tooltip = "Shows a large warning at the top of the screen, with the raid warning sound, when your ammo falls under the Low Ammo Warning and when it runs out.",
+              tooltip = "Like Low Durability, shows a pulsing warning above the middle of the screen while your ammo is under the Low Ammo Warning. Hidden in combat.",
               disabled = function() return not AC.Get("enabled") end,
               disabledTooltip = "Ammo Counter",
               getValue = function() return AC.Get("alert") end,
-              setValue = function(v) AC.Cfg().alert = v end },
+              setValue = function(v)
+                  AC.Cfg().alert = v
+                  AC.Apply()
+              end },
             BLANK()
         );  y = y - h
     end

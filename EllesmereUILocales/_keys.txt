@@ -590,10 +590,10 @@ Loading item data...
 Locked
 Locked in combat
 Loot specialization: %s
+Low Ammo (%d)
 Low Durability
 Low Durability (%d%%)
 Low Durability (Preview)
-Low ammo: %d left
 Lower Alpha
 Lower Alpha (On CD)
 MINE
@@ -653,6 +653,7 @@ New Patch Reminder Dot
 New Profile
 Next sockets
 No
+No Ammo
 No Bars - Click to Add
 No Items
 No Saved Presets
@@ -709,7 +710,6 @@ Open Great Vault
 Open Settings
 Optimize My FPS and Graphics
 Other
-Out of ammo!
 Overall %1$s
 Override Anchor Direction
 Overrides
