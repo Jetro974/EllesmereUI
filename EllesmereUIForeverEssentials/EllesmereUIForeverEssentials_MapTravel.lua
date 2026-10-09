@@ -27,9 +27,10 @@ local ARROW_SIZE = 20
 local INSTANCE_SIZE = 32  -- the portal art leaves a wide margin in its atlas
 
 local KIND_ATLAS = {
-    boat     = "flightmasterferry",
-    zeppelin = "vehicle-air-horde",
-    tram     = "vehicle-alliancecart",
+    boat      = "flightmasterferry",
+    zeppelin  = "vehicle-air-horde",
+    tram      = "vehicle-alliancecart",
+    skycutter = "vehicle-air-alliance",
 }
 
 local data, provider, layer, waiter
@@ -114,6 +115,7 @@ local function TransportTip(t)
     local where = area and area ~= zone and (area .. ", " .. zone) or zone
     if t[3] == "boat" then return EllesmereUI.Lf("Boat to %s", where) end
     if t[3] == "zeppelin" then return EllesmereUI.Lf("Zeppelin to %s", where) end
+    if t[3] == "skycutter" then return EllesmereUI.Lf("Skycutter to %s", where) end
     return EllesmereUI.Lf("Tram to %s", where)
 end
 
