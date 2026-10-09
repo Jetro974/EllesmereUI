@@ -234,8 +234,9 @@ local function DrawZone(zone)
     end
 end
 
--- The flight masters the game lists for a map, the other faction's and the
--- retired ones ("zz" names) left out; none where the map draws its own.
+-- The flight masters standing on a map (the game also lists those of the rest
+-- of the continent, off its edges), the other faction's and the retired ones
+-- ("zz" names) left out; none where the map draws its own.
 local function FlightNodes(mapID)
     if C_TaxiMap.ShouldMapShowTaxiNodes(mapID) then return nil end
     local nodes = C_TaxiMap.GetTaxiNodesForMap(mapID)
@@ -245,7 +246,9 @@ local function FlightNodes(mapID)
     local list = {}
     for i = 1, #nodes do
         local n = nodes[i]
-        if (n.faction == Faction.Neutral or n.faction == mine) and not n.name:find("^zz") then
+        local x, y = n.position.x, n.position.y
+        if (n.faction == Faction.Neutral or n.faction == mine) and not n.name:find("^zz")
+            and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
             if n.isUndiscovered then
                 n.note = n.faction == Faction.Neutral and UNDISCOVERED_NEUTRAL_FLIGHTPOINT
                     or UNDISCOVERED_FACTION_FLIGHTPOINT:format(mine == Faction.Horde and FACTION_HORDE or FACTION_ALLIANCE)
@@ -288,7 +291,9 @@ local function ZoneList(zone)
         local list = FlightNodes(zone)
         for i = 1, list and #list or 0 do
             local n = list[i]
-            local name = n.note and ("|cff808080" .. n.name .. "|r") or n.name
+            -- "Ratchet, The Barrens": the zone already heads the list.
+            local name = n.name:match("^[^,]+")
+            if n.note then name = "|cff808080" .. name .. "|r" end
             lines[#lines + 1] = ("|A:%s:16:16|a %s"):format(n.atlasName, name)
         end
     end
