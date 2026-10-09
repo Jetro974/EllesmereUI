@@ -9,14 +9,17 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --   - Instance entrances: dungeons and raids.
 --   - Flight points: the game's own list for the map, undiscovered ones
 --     included (the map only draws them where the game asks it to).
---  Transports, instances and flight points also show on the continent maps. Hovering a pin
---  names it; pins never take clicks (moving the map from our code would leave
---  its state tainted), so the map's own clicks go through them.
+--  Hovering a pin names it; pins never take clicks (moving the map from our
+--  code would leave its state tainted), so the map's own clicks go through
+--  them. A continent map stays clean: no pins, the zone under the cursor lists
+--  its transports, instances and flight points in a tooltip.
 --
 --  Taint: nothing of Blizzard's map is hooked and no pin comes from its pools.
 --  A data provider (the map's extension point, which the canvas only calls
 --  through secureexecuterange) reports map changes, shows and zoom; the pins
---  are frames of our own on a frame of ours, child of the canvas.
+--  are frames of our own on a frame of ours, child of the canvas. On a
+--  continent, another frame of ours reads the cursor and the canvas geometry
+--  through widget API (as Zone Levels does) to find the hovered zone.
 --  Places: EllesmereUIForeverEssentials_MapTravelData.lua.
 -------------------------------------------------------------------------------
 local _, module = ...
@@ -36,7 +39,7 @@ local KIND_ATLAS = {
     portal    = "mageportalalliance",
 }
 
-local data, provider, layer, waiter, taxiWatch
+local data, provider, layer, waiter, taxiWatch, watcher
 local added = false
 local pins, used = {}, 0
 local shownKey  -- what the pins show (map and toggles); nil when cleared
@@ -73,6 +76,7 @@ local function Clear()
     for i = 1, used do pins[i]:Hide() end
     used = 0
     shownKey = nil
+    if watcher then watcher:Hide() end
 end
 
 -- The next pin from our pool: hover only, clicks go through to the map.
@@ -199,13 +203,13 @@ local function TransportGroups(zone)
     return groups
 end
 
-local function DrawZone(zone, shown, isZone)
+-- A zone map's pins.
+local function DrawZone(zone)
     if F.Get("transports") then
         local groups = TransportGroups(zone)
         for i = 1, #groups do
             local g = groups[i]
-            local x, y = Project(zone, shown, g.x / 100, g.y / 100)
-            if x then Place(x, y, g.atlas, PIN_SIZE, g.tip, nil, g.count) end
+            Place(g.x / 100, g.y / 100, g.atlas, PIN_SIZE, g.tip, nil, g.count)
         end
     end
     if F.Get("instances") then
@@ -213,12 +217,11 @@ local function DrawZone(zone, shown, isZone)
         if list then
             for i = 1, #list do
                 local e = list[i]
-                local x, y = Project(zone, shown, e[1] / 100, e[2] / 100)
-                if x then Place(x, y, e[4] and "raid" or "dungeon", INSTANCE_SIZE, InstanceTip(e)) end
+                Place(e[1] / 100, e[2] / 100, e[4] and "raid" or "dungeon", INSTANCE_SIZE, InstanceTip(e))
             end
         end
     end
-    if isZone and F.Get("exits") then
+    if F.Get("exits") then
         local list = data.exits[zone]
         if list then
             for i = 1, #list do
@@ -231,24 +234,106 @@ local function DrawZone(zone, shown, isZone)
     end
 end
 
--- The flight masters the game lists for the shown map, the other faction's
--- left out; none where the map draws its own.
-local function DrawFlights(mapID)
-    if C_TaxiMap.ShouldMapShowTaxiNodes(mapID) then return end
+-- The flight masters the game lists for a map, the other faction's and the
+-- retired ones ("zz" names) left out; none where the map draws its own.
+local function FlightNodes(mapID)
+    if C_TaxiMap.ShouldMapShowTaxiNodes(mapID) then return nil end
     local nodes = C_TaxiMap.GetTaxiNodesForMap(mapID)
-    if not nodes then return end
+    if not nodes then return nil end
     local Faction = Enum.FlightPathFaction
     local mine = UnitFactionGroup("player") == "Horde" and Faction.Horde or Faction.Alliance
+    local list = {}
     for i = 1, #nodes do
         local n = nodes[i]
-        if n.faction == Faction.Neutral or n.faction == mine then
-            local tip = n.name
+        if (n.faction == Faction.Neutral or n.faction == mine) and not n.name:find("^zz") then
             if n.isUndiscovered then
-                tip = tip .. "\n|cff808080" .. (n.faction == Faction.Neutral and UNDISCOVERED_NEUTRAL_FLIGHTPOINT
-                    or UNDISCOVERED_FACTION_FLIGHTPOINT:format(mine == Faction.Horde and FACTION_HORDE or FACTION_ALLIANCE)) .. "|r"
+                n.note = n.faction == Faction.Neutral and UNDISCOVERED_NEUTRAL_FLIGHTPOINT
+                    or UNDISCOVERED_FACTION_FLIGHTPOINT:format(mine == Faction.Horde and FACTION_HORDE or FACTION_ALLIANCE)
             end
-            Place(n.position.x, n.position.y, n.atlasName ~= "" and n.atlasName or "flightmaster", PIN_SIZE, tip)
+            if n.atlasName == "" then n.atlasName = "flightmaster" end
+            list[#list + 1] = n
         end
+    end
+    return list
+end
+
+local function DrawFlights(mapID)
+    local list = FlightNodes(mapID)
+    if not list then return end
+    for i = 1, #list do
+        local n = list[i]
+        local tip = n.note and (n.name .. "\n|cff808080" .. n.note .. "|r") or n.name
+        Place(n.position.x, n.position.y, n.atlasName, PIN_SIZE, tip)
+    end
+end
+
+-- A continent keeps its art clean: no pins, and the zone under the cursor
+-- lists its points in a tooltip, each line led by its pin's icon.
+local function ZoneList(zone)
+    local lines = {}
+    if F.Get("transports") then
+        local groups = TransportGroups(zone)
+        for i = 1, #groups do lines[#lines + 1] = groups[i].tip end
+    end
+    if F.Get("instances") then
+        local list = data.instances[zone]
+        for i = 1, list and #list or 0 do
+            local e = list[i]
+            local name = GetRealZoneText(e[3])
+            if e[5] then name = name .. " |cffffffff(" .. EllesmereUI.L(e[5]) .. ")|r" end
+            lines[#lines + 1] = ("|A:%s:16:16|a %s"):format(e[4] and "raid" or "dungeon", name)
+        end
+    end
+    if F.Get("flights") then
+        local list = FlightNodes(zone)
+        for i = 1, list and #list or 0 do
+            local n = list[i]
+            local name = n.note and ("|cff808080" .. n.name .. "|r") or n.name
+            lines[#lines + 1] = ("|A:%s:16:16|a %s"):format(n.atlasName, name)
+        end
+    end
+    if #lines == 0 then return nil end
+    return "|cffffd100" .. ZoneName(zone) .. "|r\n" .. table.concat(lines, "\n")
+end
+
+-- The zone (child map) under the cursor, or nil: the map's own label lookup,
+-- with the cursor normalized against the canvas by widget API only.
+local function HoveredZone(scroll)
+    if not scroll:IsMouseOver() then return nil end
+    local canvas = scroll.Child
+    local left, top = canvas:GetLeft(), canvas:GetTop()
+    local width, height = canvas:GetWidth(), canvas:GetHeight()
+    if not (left and top) or width == 0 or height == 0 then return nil end
+    local cx, cy = GetCursorPosition()
+    local scale = canvas:GetEffectiveScale()
+    local mapID = WorldMapFrame:GetMapID()
+    local info = C_Map.GetMapInfoAtPosition(mapID, (cx / scale - left) / width, (top - cy / scale) / height)
+    if info and info.mapID ~= mapID then return info.mapID end
+end
+
+local UPDATE_INTERVAL = 0.15
+local function WatchUpdate(self, elapsed)
+    self.elapsed = self.elapsed + elapsed
+    if self.elapsed < UPDATE_INTERVAL then return end
+    self.elapsed = 0
+    local zone = HoveredZone(self:GetParent())
+    if zone == self.zone then return end
+    self.zone = zone
+    local text = zone and ZoneList(zone)
+    if text then
+        EllesmereUI.ShowWidgetTooltip(self, text, { anchor = "cursor", justify = "LEFT" })
+        self.showing = true
+    elseif self.showing then
+        EllesmereUI.HideWidgetTooltip()
+        self.showing = false
+    end
+end
+
+local function WatchHide(self)
+    self.zone = nil
+    if self.showing then
+        EllesmereUI.HideWidgetTooltip()
+        self.showing = false
     end
 end
 
@@ -268,16 +353,12 @@ local function Refresh(force)
     shownKey = key
     local info = mapID and C_Map.GetMapInfo(mapID)
     if not info then return end
-    if F.Get("flights") then DrawFlights(mapID) end
     if info.mapType == Enum.UIMapType.Continent then
-        local children = C_Map.GetMapChildrenInfo(mapID)
-        if not children then return end
-        for i = 1, #children do
-            DrawZone(children[i].mapID, mapID, false)
-        end
-    else
-        DrawZone(mapID, mapID, true)
+        watcher:Show()
+        return
     end
+    if F.Get("flights") then DrawFlights(mapID) end
+    DrawZone(mapID)
 end
 
 local function Build()
@@ -289,6 +370,14 @@ local function Build()
     -- Above the map's own points of interest (a city's pin must not take the
     -- mouse from a dock or a tower beside it).
     layer:SetFrameLevel(WorldMapFrame:GetPinFrameLevelsManager():GetValidFrameLevel("PIN_FRAME_LEVEL_MAP_LINK"))
+
+    -- Reads the hovered zone while a continent shows (hidden otherwise, and
+    -- with the map, so it only updates then).
+    watcher = CreateFrame("Frame", nil, WorldMapFrame.ScrollContainer)
+    watcher.elapsed = 0
+    watcher:Hide()
+    watcher:SetScript("OnUpdate", WatchUpdate)
+    watcher:SetScript("OnHide", WatchHide)
 
     provider = CreateFromMixins(MapCanvasDataProviderMixin)
     provider.OnMapChanged = function() Refresh() end
