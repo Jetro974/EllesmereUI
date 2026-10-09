@@ -121,7 +121,7 @@ local function FishingSkill()
     return rank
 end
 
--- "Fishing min-reliable", colored by the player's skill: red below the base,
+-- Fishing icon and "min-reliable", colored by the player's skill: red below the base,
 -- yellow while fish still get away, green once nothing does. "~" marks an
 -- estimate.
 local function FishingText(zone)
@@ -133,11 +133,11 @@ local function FishingText(zone)
     if skill then
         color = skill < low and "|cffff4040" or skill < high and "|cffffd100" or "|cff40ff40"
     end
-    return ("%s %s %s%s%d-%d|r"):format(FISHING_ICON, EllesmereUI.L("Fishing"),
-        color, estimate and "~" or "", low, high)
+    return ("%s %s%s%d-%d|r"):format(FISHING_ICON, color, estimate and "~" or "", low, high)
 end
 
--- The map's own format: the range is colored like a quest of the nearest level.
+-- The player's class icon, then the map's own format: the range colored like
+-- a quest of the nearest level.
 local function LevelsText(lv)
     local lo, hi = lv[1], lv[2]
     local level = UnitLevel("player")
@@ -149,7 +149,9 @@ local function LevelsText(lv)
     else
         c = QuestDifficultyColors["difficult"]
     end
-    return ("|cff%02x%02x%02x(%d-%d)|r"):format(c.r * 255, c.g * 255, c.b * 255, lo, hi)
+    local _, class = UnitClass("player")
+    return ("|A:groupfinder-icon-class-%s:16:16|a |cff%02x%02x%02x(%d-%d)|r"):format(
+        class:lower(), c.r * 255, c.g * 255, c.b * 255, lo, hi)
 end
 
 -- The zone (child map) under the cursor, or nil. Same lookup as the map's own
