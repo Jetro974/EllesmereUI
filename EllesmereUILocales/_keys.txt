@@ -507,8 +507,8 @@ Hex#
 Hide
 Hide Inactive Glows (%d)
 Hide Item Transforms
+Hide Owned (%d)
 Hide in All Items
-Hide known items (%d)
 Hide these instead of showing them
 Hit
 Holy Res
@@ -560,7 +560,7 @@ Item ID
 Item Level
 Item Level:
 Items
-Items you already know or own (recipes, mounts, pets, toys) are marked with a green check. Click to hide them from the list, or to show them again.
+Items you already know, have learned or have collected (recipes, mounts, pets, toys...) are tinted red. Click to hide them from the list, or to show them again.
 Its Cooldown Manager spells come from the other game client and will not be imported.
 Keep Mine
 Keybind
@@ -887,11 +887,11 @@ Show 'Not Needed' Reminder
 Show All Debuffs
 Show Charges
 Show Hash Lines
+Show Owned (%d)
 Show Tooltip
 Show a pulsing dot on the Patch Notes button whenever EllesmereUI updates to a new version.
 Show a tracked buff in this slot while it is active.
 Show in All Items
-Show known items (%d)
 Show this icon only while the talents you pick are taken, or not taken.
 Showing this aura from any caster; click for your casts only.
 Showing this aura from your casts only; click for any caster.

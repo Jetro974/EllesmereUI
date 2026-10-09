@@ -2119,7 +2119,7 @@ do
         -- LFG / Merchant cards
         "lfgRememberRoles",
         "merchantShowAsList", "merchantListRowHeight", "merchantShowItemLevel",
-        "merchantWide", "merchantHideKnown",
+        "merchantWide", "merchantHideKnown", "merchantMarkOwned",
         -- Friends List card (WoW Forever: the friend tiles and auto-accept)
         "friendsListCard",
     })

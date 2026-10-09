@@ -7894,7 +7894,8 @@ end
 --  hidden (HideNativeMerchantGrid) and 20 tiles of ours, built from
 --  MerchantItemTemplate (Blizzard's own click, tooltip and confirm handlers,
 --  which read the slot index from the button ID), fill pages of 20. The
---  buyback tab shows its 12 items on the same tiles. Items the player already
+--  buyback tab shows its 12 items on the same tiles. With Mark Owned Items
+--  (EllesmereUIDB.merchantMarkOwned), items the player already
 --  knows or owns are marked, and a header button hides them from the grid
 --  (EllesmereUIDB.merchantHideKnown).
 -------------------------------------------------------------------------------
@@ -7932,18 +7933,15 @@ local function MerchantItemKnown(index)
     return known
 end
 
+-- The red wash over an owned item's tile.
 local function WideKnownMark(tile)
     local d = GetFFD(tile)
     if not d.known then
-        local glow = tile:CreateTexture(nil, "ARTWORK", nil, 7)
-        glow:SetPoint("TOPLEFT", 2, -1)
-        glow:SetPoint("BOTTOMRIGHT", -2, 1)
-        glow:SetColorTexture(0.2, 0.9, 0.3, 0.18)
-        local check = tile.ItemButton:CreateTexture(nil, "OVERLAY", nil, 7)
-        check:SetAtlas("groupfinder-icon-greencheckmark")
-        check:SetSize(16, 16)
-        check:SetPoint("TOPRIGHT", tile.ItemButton, "TOPRIGHT", 3, 3)
-        d.known = { glow, check }
+        local wash = tile:CreateTexture(nil, "ARTWORK", nil, 7)
+        wash:SetPoint("TOPLEFT", 2, -1)
+        wash:SetPoint("BOTTOMRIGHT", -2, 1)
+        wash:SetColorTexture(0.9, 0.15, 0.15, 0.22)
+        d.known = wash
     end
     return d.known
 end
@@ -8011,11 +8009,10 @@ local function WideFillMerchant(tile, slot, index)
     SetItemButtonTextureVertexColor(btn, r, g, b)
     SetItemButtonNormalTextureVertexColor(btn, r, g, b)
 
-    local known = MerchantItemKnown(index)
+    local known = EllesmereUIDB.merchantMarkOwned and MerchantItemKnown(index)
     local mark = (known or GetFFD(tile).known) and WideKnownMark(tile)
     if mark then
-        mark[1]:SetShown(known)
-        mark[2]:SetShown(known)
+        mark:SetShown(known)
     end
     return true
 end
@@ -8045,18 +8042,25 @@ local function WideFillBuyback(tile, index)
     SetItemButtonTextureVertexColor(btn, c, isUsable and 1 or 0, isUsable and 1 or 0)
     SetItemButtonNormalTextureVertexColor(btn, c, isUsable and 1 or 0, isUsable and 1 or 0)
     local mark = GetFFD(tile).known
-    if mark then mark[1]:Hide(); mark[2]:Hide() end
+    if mark then mark:Hide() end
     return true
 end
 
--- The header button's label: what a click does, and how many items it hides.
+-- The header button's label: what a click does, and how many owned items.
 local function SyncKnownButton(numKnown)
     local b = wide.known
-    b.text:SetFormattedText(EllesmereUIDB.merchantHideKnown
-        and EllesmereUI.L("Show known items (%d)") or EllesmereUI.L("Hide known items (%d)"), numKnown)
-    b:SetWidth(b.text:GetStringWidth() + 26)
+    -- Right edge of the window, or left of Blizzard's filter while it shows.
+    local filter = _G.MerchantFrame.FilterDropdown
+    b:ClearAllPoints()
+    if filter and filter:IsShown() then
+        b:SetPoint("RIGHT", filter, "LEFT", -8, 0)
+    else
+        b:SetPoint("TOPRIGHT", _G.MerchantFrame, "TOPRIGHT", -11, -30)
+    end
+    b:SetFormattedText(EllesmereUIDB.merchantHideKnown
+        and EllesmereUI.L("Show Owned (%d)") or EllesmereUI.L("Hide Owned (%d)"), numKnown)
+    b:SetWidth(b:GetFontString():GetStringWidth() + 24)
     b:SetEnabled(numKnown > 0 or EllesmereUIDB.merchantHideKnown)
-    b:SetAlpha(numKnown > 0 and 1 or 0.5)
 end
 
 local function UpdateWideMerchant()
@@ -8064,10 +8068,11 @@ local function UpdateWideMerchant()
     local isBuyback = f.selectedTab == 2
     -- The merchant indexes the grid shows, known items left out when hidden.
     local list, numKnown = wide.list, 0
+    local mark = EllesmereUIDB.merchantMarkOwned
     wipe(list)
     local numItems = isBuyback and GetNumBuybackItems() or GetMerchantNumItems()
     for i = 1, numItems do
-        local known = not isBuyback and MerchantItemKnown(i)
+        local known = mark and not isBuyback and MerchantItemKnown(i)
         if known then numKnown = numKnown + 1 end
         if not (known and EllesmereUIDB.merchantHideKnown) then list[#list + 1] = i end
     end
@@ -8098,8 +8103,8 @@ local function UpdateWideMerchant()
     wide.next:SetShown(paged)
     wide.pageText:SetShown(paged)
     wide.pageText:SetFormattedText(MERCHANT_PAGE_NUMBER, wide.page, pages)
-    wide.known:SetShown(not isBuyback)
-    SyncKnownButton(numKnown)
+    wide.known:SetShown(mark and not isBuyback)
+    if mark then SyncKnownButton(numKnown) end
 end
 
 local function WideTurnPage(delta)
@@ -8158,34 +8163,20 @@ local function BuildWideMerchant(f)
         elseif delta < 0 and nxt:IsShown() and nxt:IsEnabled() then WideTurnPage(1) end
     end)
 
-    -- Hide / show the known items: a labeled button left of the filter.
-    local known = CreateFrame("Button", nil, f)
+    -- Hide / show the owned items: a standard panel button left of the filter,
+    -- in the reskin's flat look when it is on.
+    local known = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     known:SetHeight(22)
-    if f.FilterDropdown then
-        known:SetPoint("RIGHT", f.FilterDropdown, "LEFT", -8, 0)
-    else
-        known:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, -32)
+    if WideThemed() then
+        WSkin.Button(known)
+        WSkin.StateButtonLabel(known)
     end
-    local kbg = known:CreateTexture(nil, "BACKGROUND")
-    kbg:SetAllPoints()
-    kbg:SetColorTexture(0, 0, 0, 0.5)
-    local khl = known:CreateTexture(nil, "HIGHLIGHT")
-    khl:SetAllPoints()
-    khl:SetColorTexture(1, 1, 1, 0.1)
-    known.icon = known:CreateTexture(nil, "ARTWORK")
-    known.icon:SetSize(14, 14)
-    known.icon:SetPoint("LEFT", 5, 0)
-    known.icon:SetAtlas("groupfinder-icon-greencheckmark")
-    known.text = known:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    known.text:SetPoint("LEFT", known.icon, "RIGHT", 3, 0)
-    if WideThemed() then WSkin.Font(known.text) end
     known:SetScript("OnClick", function(self)
         EllesmereUIDB.merchantHideKnown = not EllesmereUIDB.merchantHideKnown
         UpdateWideMerchant()
-        self:GetScript("OnEnter")(self)
     end)
     known:SetScript("OnEnter", function(self)
-        EllesmereUI.ShowWidgetTooltip(self, EllesmereUI.L("Items you already know or own (recipes, mounts, pets, toys) are marked with a green check. Click to hide them from the list, or to show them again."))
+        EllesmereUI.ShowWidgetTooltip(self, EllesmereUI.L("Items you already know, have learned or have collected (recipes, mounts, pets, toys...) are tinted red. Click to hide them from the list, or to show them again."))
     end)
     known:SetScript("OnLeave", function() EllesmereUI.HideWidgetTooltip() end)
     wide.known = known
@@ -8195,6 +8186,11 @@ end
 -- Runs whatever the merchant window's style (reskinned or Blizzard's): built
 -- on the first opening, then refreshed with Blizzard's own updates (page,
 -- tab, purchases). Nothing is registered while the setting is off.
+-- Options entry point: Mark Owned Items applies to an open window at once.
+EllesmereUI._Merchant_RefreshWide = function()
+    if wide.built and _G.MerchantFrame:IsVisible() then UpdateWideMerchant() end
+end
+
 local wideDriver = CreateFrame("Frame")
 wideDriver:RegisterEvent("PLAYER_LOGIN")
 wideDriver:SetScript("OnEvent", function(self, event)
