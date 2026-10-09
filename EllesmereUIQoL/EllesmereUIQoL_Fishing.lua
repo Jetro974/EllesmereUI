@@ -11,6 +11,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  Double-Click     Double right-click in the world casts Fishing, through a
 --                   secure button and a one-shot override binding set out of
 --                   combat only (WorldFrame:HookScript reads the clicks).
+--                   On WoW Forever without a pole in hand, it equips the
+--                   best pole in the bags first.
 --  Lure Reminder    While fishing with a pole in the main hand and no lure on
 --                   it (WoW Forever), a secure button applies the best lure
 --                   in the bags. Retail has no pole in the main hand, so it
@@ -81,6 +83,24 @@ local function PoleInMainHand()
     if not id then return false end
     local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(id)
     return classID == Enum.ItemClass.Weapon and subClassID == Enum.ItemWeaponSubclass.Fishingpole
+end
+
+-- The best fishing pole in the bags (highest item level), or nil.
+local function PoleInBags()
+    local best, bestLevel
+    for bag = 0, NUM_BAG_SLOTS do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local id = C_Container.GetContainerItemID(bag, slot)
+            if id then
+                local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(id)
+                if classID == Enum.ItemClass.Weapon and subClassID == Enum.ItemWeaponSubclass.Fishingpole then
+                    local level = select(4, C_Item.GetItemInfo(id)) or 0
+                    if not best or level > bestLevel then best, bestLevel = id, level end
+                end
+            end
+        end
+    end
+    return best
 end
 
 -- Fishing can be cast: WoW Forever needs the pole in the main hand.
@@ -182,7 +202,8 @@ end
 
 -- Double right-click: the first press arms nothing; a second one within
 -- DOUBLE_CLICK_TIME binds the right button to the cast button, so its
--- release casts Fishing.
+-- release casts Fishing. On WoW Forever without a pole in hand, it equips
+-- the best pole in the bags instead; the next double-click fishes.
 local lastRightDown = 0
 local function OnWorldMouseDown(_, button)
     if button ~= "RightButton" or not On("doubleClick") or not castButton then return end
@@ -190,10 +211,18 @@ local function OnWorldMouseDown(_, button)
     local double = now - lastRightDown < DOUBLE_CLICK_TIME
     lastRightDown = double and 0 or now
     if not double or InCombatLockdown() or IsMounted() or IsFishingChannel()
-       or not CanFish() then
+       or not fishingID then
         return
     end
-    castButton:SetAttribute("spell", fishingID)
+    if CanFish() then
+        castButton:SetAttribute("type", "spell")
+        castButton:SetAttribute("spell", fishingID)
+    else
+        local pole = EllesmereUI.IS_FOREVER and PoleInBags()
+        if not pole then return end
+        castButton:SetAttribute("type", "item")
+        castButton:SetAttribute("item", "item:" .. pole)
+    end
     SetOverrideBindingClick(castButton, true, "BUTTON2", castButton:GetName())
     -- A release that never reaches the button (over a window) must not leave
     -- the right button casting Fishing.
