@@ -150,23 +150,15 @@ local function InstanceTip(i)
     return tip .. "\n" .. (i[4] and EllesmereUI.L("Raid") or EllesmereUI.L("Dungeon"))
 end
 
--- Where a zone point lands on the shown map: the zone itself, or a map that
--- contains it (the continent).
-local function Project(zone, shown, x, y)
-    if zone == shown then return x, y end
-    local left, right, top, bottom = C_Map.GetMapRectOnMap(zone, shown)
-    if not left then return nil end
-    return left + x * (right - left), top + y * (bottom - top)
-end
-
 -- The arrow's angle toward the destination zone's middle, read on the continent.
 local function ExitRotation(zone, x, y, dest)
     local info = C_Map.GetMapInfo(zone)
     local continent = info and info.parentMapID
     if not continent or continent == 0 then return 0 end
-    local px, py = Project(zone, continent, x, y)
+    local zl, zr, zt, zb = C_Map.GetMapRectOnMap(zone, continent)
     local l, r, t, b = C_Map.GetMapRectOnMap(dest, continent)
-    if not (px and l) then return 0 end
+    if not (zl and l) then return 0 end
+    local px, py = zl + x * (zr - zl), zt + y * (zb - zt)
     local dx, dy = (l + r) / 2 - px, (t + b) / 2 - py
     return math.atan2(-dx, -dy)  -- the atlas points up; screen y grows down
 end
@@ -361,7 +353,8 @@ local function Refresh(force)
     local info = mapID and C_Map.GetMapInfo(mapID)
     if not info then return end
     if info.mapType == Enum.UIMapType.Continent then
-        watcher:Show()
+        -- Zone exits have nothing to list there.
+        watcher:SetShown(F.Get("transports") or F.Get("instances") or F.Get("flights"))
         return
     end
     if F.Get("flights") then DrawFlights(mapID) end

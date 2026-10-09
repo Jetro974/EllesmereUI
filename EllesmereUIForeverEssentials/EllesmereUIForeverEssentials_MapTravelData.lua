@@ -5,7 +5,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  Places for the world map travel pins (EllesmereUIForeverEssentials_MapTravel.lua),
 --  in percent of each zone map. Instance entrances are the instances' corpse
 --  points (Map table) placed with UiMapAssignment; docks and zeppelin towers
---  follow the TaxiNodes and AreaPOI positions. Names are read in game
+--  follow the TaxiNodes and AreaPOI positions; Forever's new docks and
+--  dungeons, absent from the client data, are read on the map. Names are read in game
 --  (map, area and instance names), so they follow the client's language.
 --  Wrapped in a function so the tables are only built on first enable.
 -------------------------------------------------------------------------------
