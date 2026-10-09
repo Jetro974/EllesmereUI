@@ -153,6 +153,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
     local SU = EllesmereUI._SpellUprank
     local MM = EllesmereUI._MacroManager
     local ZL = EllesmereUI._ZoneLevels
+    local MT = EllesmereUI._MapTravel
     local BLANK = EllesmereUI.BlankRowCfg
     local y = yOffset
     local _, h
@@ -208,6 +209,29 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
               ZL.Cfg().fishing = v
               ZL.Apply()
           end }
+    );  y = y - h
+
+    local function travelToggle(text, tooltip, key)
+        return { type = "toggle", text = text, tooltip = tooltip,
+          getValue = function() return MT.Get(key) end,
+          setValue = function(v)
+              MT.Cfg()[key] = v
+              MT.Apply()
+          end }
+    end
+    _, h = W:DualRow(parent, y,
+        travelToggle("Show Transports",
+            "Shows boats, zeppelins and the tram on the world map, with where each one goes when you hover it.",
+            "transports"),
+        travelToggle("Show Zone Exits",
+            "Shows an arrow on each road out of the zone, pointing to the zone it leads to; hover it for the name.",
+            "exits")
+    );  y = y - h
+    _, h = W:DualRow(parent, y,
+        travelToggle("Show Instance Entrances",
+            "Shows dungeon and raid entrances on the world map; hover one for its name.",
+            "instances"),
+        BLANK()
     );  y = y - h
 
     ---------------------------------------------------------------------------
