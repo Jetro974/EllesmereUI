@@ -202,7 +202,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
                   EllesmereUI:RefreshPage()
               end },
             { type = "slider", text = "Low Ammo Warning", min = 0, max = 1000, step = 50,
-              tooltip = "Under this many, the count turns orange; under a quarter of it, red.",
+              tooltip = "Under this many, the count turns orange; under half of it, red.",
               disabled = function() return not AC.Get("enabled") end,
               disabledTooltip = "Ammo Counter",
               getValue = function() return AC.Get("warn") end,
