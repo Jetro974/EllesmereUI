@@ -33,6 +33,9 @@ EllesmereUIForeverEssentials_LootFeed.lua
 EllesmereUIForeverEssentials_LevelUp.lua
 
 
+# Training (training planner)
+EllesmereUIForeverEssentials_Training.lua
+
 # Macros (macro manager)
 EllesmereUIForeverEssentials_MacroBuilder.lua
 EllesmereUIForeverEssentials_MacroManager.lua

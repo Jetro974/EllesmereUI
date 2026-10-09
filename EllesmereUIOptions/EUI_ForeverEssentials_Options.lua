@@ -8,6 +8,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --    * Threat -- threat meter (built by EUI_ForeverEssentials_Threat_Options.lua)
 --    * Loot   -- loot feed (built by EUI_ForeverEssentials_Loot_Options.lua)
 --    * Macros -- macro manager (built by EUI_ForeverEssentials_Macros_Options.lua)
+--    * Training -- training planner (built by EUI_ForeverEssentials_Training_Options.lua)
 -------------------------------------------------------------------------------
 -- Page names are DEEP-LINK IDENTIFIERS: every NavigateToElementSettings tuple
 -- and What's New nav carries them as strings and fails SILENTLY on a mismatch.
@@ -18,6 +19,7 @@ local PAGE_TRAVEL  = "Travel"
 local PAGE_THREAT  = "Threat"
 local PAGE_LOOT    = "Loot"
 local PAGE_MACROS  = "Macros"
+local PAGE_TRAINING = "Training"
 
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
@@ -27,8 +29,8 @@ initFrame:SetScript("OnEvent", function(self)
     EllesmereUI:RegisterModule("EllesmereUIForeverEssentials", {
         title       = "Forever Essentials",
         description = "Essential tools for WoW Forever.",
-        pages       = { PAGE_GENERAL, PAGE_TRAVEL, PAGE_THREAT, PAGE_LOOT, PAGE_MACROS },
-        searchTerms = { "flight timer", "flight path", "threat", "threat meter", "aggro", "loot", "loot feed", "reputation", "currency", "uprank", "spell rank", "macro", "macros", "macro manager", "world map", "boat", "zeppelin", "zone exit", "dungeon entrance", "instance", "level up", "toast" },
+        pages       = { PAGE_GENERAL, PAGE_TRAVEL, PAGE_THREAT, PAGE_LOOT, PAGE_MACROS, PAGE_TRAINING },
+        searchTerms = { "flight timer", "flight path", "threat", "threat meter", "aggro", "loot", "loot feed", "reputation", "currency", "uprank", "spell rank", "macro", "macros", "macro manager", "world map", "boat", "zeppelin", "zone exit", "dungeon entrance", "instance", "level up", "toast", "training", "trainer" },
         buildPage   = function(pageName, parent, yOffset)
             if pageName == PAGE_GENERAL and _G._EUI_BuildForeverGeneralPage then
                 return _G._EUI_BuildForeverGeneralPage(pageName, parent, yOffset)
@@ -44,6 +46,9 @@ initFrame:SetScript("OnEvent", function(self)
             end
             if pageName == PAGE_MACROS and _G._EUI_BuildForeverMacrosPage then
                 return _G._EUI_BuildForeverMacrosPage(pageName, parent, yOffset)
+            end
+            if pageName == PAGE_TRAINING and _G._EUI_BuildForeverTrainingPage then
+                return _G._EUI_BuildForeverTrainingPage(pageName, parent, yOffset)
             end
         end,
         -- The Travel, Threat, Loot and Macros headers live in the content header; declaring a
@@ -66,6 +71,7 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.levelUpToast = nil
                 -- The stored builder models are user data: only the switch resets.
                 if EllesmereUIDB.macroManager then EllesmereUIDB.macroManager.enabled = nil end
+                if EllesmereUIDB.trainingPlanner then EllesmereUIDB.trainingPlanner.enabled = nil end
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_FlightTimer = nil
                     EllesmereUIDB.unlockAnchors.EUI_ThreatMeter = nil
@@ -93,6 +99,7 @@ initFrame:SetScript("OnEvent", function(self)
             end
             if EllesmereUI._SpellUprank then EllesmereUI._SpellUprank.Apply() end
             if EllesmereUI._LevelUpToast then EllesmereUI._LevelUpToast.Apply() end
+            if EllesmereUI._TrainingPlanner then EllesmereUI._TrainingPlanner.Apply() end
             EllesmereUI:InvalidatePageCache()
         end,
     })
