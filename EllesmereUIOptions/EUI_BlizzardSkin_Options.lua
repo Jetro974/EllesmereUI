@@ -1880,7 +1880,18 @@ initFrame:SetScript("OnEvent", function(self)
                       end,
                   })
               end },
-            EllesmereUI.BlankRowCfg()
+            { type="toggle", text="Flag/Hide Owned Items",
+              tooltip="In the wide window, tints red the items you already know, have learned or have collected (recipes, mounts, pets, toys...), and adds a button at the top right that hides them.",
+              disabled=function() return not (EllesmereUIDB and EllesmereUIDB.merchantWide == true) end,
+              disabledTooltip="Wide Window",
+              getValue=function()
+                  return EllesmereUIDB and EllesmereUIDB.merchantMarkOwned == true
+              end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.merchantMarkOwned = v
+                  if EllesmereUI._Merchant_RefreshWide then EllesmereUI._Merchant_RefreshWide() end
+              end }
         ); y = y - h
 
         return y
@@ -4152,7 +4163,7 @@ initFrame:SetScript("OnEvent", function(self)
                     "charSheetSocketPanel", "charSheetIconZoom", "charSheetEnchantNames",
                     "charSheetEnchantSize", "inspectShowEnchants", "inspectShowItemLevel",
                     "inspectShowUpgradeTrack", "merchantShowAsList", "merchantListRowHeight",
-                    "merchantShowItemLevel", "merchantBulkBuy", "merchantWide",
+                    "merchantShowItemLevel", "merchantBulkBuy", "merchantWide", "merchantHideKnown", "merchantMarkOwned",
                     "tooltipItemLevel", "tooltipShowMode",
                     "tooltipShowModifier", "tooltipGrowthDirection", "tooltipBgColor",
                     "tooltipBgOpacity", "showSpellID", "spellIDModifier", "showIconID",
