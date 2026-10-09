@@ -29,8 +29,11 @@ return {
                    {32.4,43.8,"boat",1453,17203} },                                             -- Darkshore (Auberdine)
         [1444] = { {43.3,42.8,"boat",1444,1116}, {31.0,39.7,"boat",1444,1108} },                -- Feralas (Feathermoon ferry)
         [1445] = { {71.6,56.4,"boat",1437,150} },                                               -- Dustwallow Marsh (Theramore)
-        [1453] = { {69.4,30.5,"tram",1455,1537} },                                              -- Stormwind City
+        [1446] = { {69.0,23.0,"boat",2548,16727} },                                             -- Tanaris (Steamwheedle Port)
+        [1453] = { {69.4,30.5,"tram",1455,1537}, {22.0,57.0,"boat",1439,442},
+                   {50.0,87.0,"portal",1416,279} },                                             -- Stormwind City
         [1455] = { {76.6,51.2,"tram",1453,1519} },                                              -- Ironforge
+        [2521] = { {65.0,81.0,"skycutter",1416,279}, {58.0,81.0,"zeppelin",1412,17045} },       -- Zephras Isle (Valanaar)
         [2548] = { {79.0,52.3,"boat",1446,977} },                                               -- The Riverglades (Powderfuse Port)
     },
     -- uiMapID = { { x, y, uiMapID the road leads to }, ... }

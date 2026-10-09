@@ -7,7 +7,9 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --   - Zone exits: an arrow on each road out of the zone, toward the zone it
 --     leads to.
 --   - Instance entrances: dungeons and raids.
---  Transports and instances also show on the continent maps. Hovering a pin
+--   - Flight points: the game's own list for the map, undiscovered ones
+--     included (the map only draws them where the game asks it to).
+--  Transports, instances and flight points also show on the continent maps. Hovering a pin
 --  names it; pins never take clicks (moving the map from our code would leave
 --  its state tainted), so the map's own clicks go through them.
 --
@@ -20,7 +22,7 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.mapTravel; unset keys read these.
-local F = module.Feature("mapTravel", { transports = false, exits = false, instances = false })
+local F = module.Feature("mapTravel", { transports = false, exits = false, instances = false, flights = false })
 
 local PIN_SIZE   = 22
 local ARROW_SIZE = 20
@@ -31,15 +33,16 @@ local KIND_ATLAS = {
     zeppelin  = "vehicle-air-horde",
     tram      = "vehicle-alliancecart",
     skycutter = "vehicle-air-alliance",
+    portal    = "mageportalalliance",
 }
 
-local data, provider, layer, waiter
+local data, provider, layer, waiter, taxiWatch
 local added = false
 local pins, used = {}, 0
 local shownKey  -- what the pins show (map and toggles); nil when cleared
 
 local function AnyOn()
-    return F.Get("transports") or F.Get("exits") or F.Get("instances")
+    return F.Get("transports") or F.Get("exits") or F.Get("instances") or F.Get("flights")
 end
 
 local function PinOnEnter(self)
@@ -116,6 +119,7 @@ local function TransportTip(t)
     if t[3] == "boat" then return EllesmereUI.Lf("Boat to %s", where) end
     if t[3] == "zeppelin" then return EllesmereUI.Lf("Zeppelin to %s", where) end
     if t[3] == "skycutter" then return EllesmereUI.Lf("Skycutter to %s", where) end
+    if t[3] == "portal" then return EllesmereUI.Lf("Portal to %s", where) end
     return EllesmereUI.Lf("Tram to %s", where)
 end
 
@@ -211,13 +215,35 @@ local function DrawZone(zone, shown, isZone)
     end
 end
 
+-- The flight masters the game lists for the shown map, the other faction's
+-- left out; none where the map draws its own.
+local function DrawFlights(mapID)
+    if C_TaxiMap.ShouldMapShowTaxiNodes(mapID) then return end
+    local nodes = C_TaxiMap.GetTaxiNodesForMap(mapID)
+    if not nodes then return end
+    local Faction = Enum.FlightPathFaction
+    local mine = UnitFactionGroup("player") == "Horde" and Faction.Horde or Faction.Alliance
+    for i = 1, #nodes do
+        local n = nodes[i]
+        if n.faction == Faction.Neutral or n.faction == mine then
+            local tip = n.name
+            if n.isUndiscovered then
+                tip = tip .. "\n|cff808080" .. (n.faction == Faction.Neutral and UNDISCOVERED_NEUTRAL_FLIGHTPOINT
+                    or UNDISCOVERED_FACTION_FLIGHTPOINT:format(mine == Faction.Horde and FACTION_HORDE or FACTION_ALLIANCE)) .. "|r"
+            end
+            Place(n.position.x, n.position.y, n.atlasName ~= "" and n.atlasName or "flightmaster", PIN_SIZE, tip)
+        end
+    end
+end
+
 -- The map redraws its providers often (shows, quest and area updates): the
 -- pins are rebuilt only when the map or the toggles changed, so a hovered
 -- pin keeps its tooltip.
 local function Refresh(force)
     local mapID = WorldMapFrame:GetMapID()
     local key = mapID and (mapID .. (F.Get("transports") and "t" or "")
-        .. (F.Get("instances") and "i" or "") .. (F.Get("exits") and "e" or ""))
+        .. (F.Get("instances") and "i" or "") .. (F.Get("exits") and "e" or "")
+        .. (F.Get("flights") and "f" or ""))
     if key and key == shownKey and force ~= true then
         Rescale()
         return
@@ -226,6 +252,7 @@ local function Refresh(force)
     shownKey = key
     local info = mapID and C_Map.GetMapInfo(mapID)
     if not info then return end
+    if F.Get("flights") then DrawFlights(mapID) end
     if info.mapType == Enum.UIMapType.Continent then
         local children = C_Map.GetMapChildrenInfo(mapID)
         if not children then return end
@@ -264,6 +291,7 @@ local function Apply()
             added = false
         end
         if waiter then waiter:UnregisterEvent("ADDON_LOADED") end
+        if taxiWatch then taxiWatch:UnregisterEvent("TAXI_NODE_STATUS_CHANGED") end
         return
     end
     if not provider then
@@ -284,6 +312,16 @@ local function Apply()
     if not added then
         WorldMapFrame:AddDataProvider(provider)
         added = true
+    end
+    -- A flight point found: the next draw rebuilds the pins.
+    if F.Get("flights") then
+        if not taxiWatch then
+            taxiWatch = CreateFrame("Frame")
+            taxiWatch:SetScript("OnEvent", function() shownKey = nil end)
+        end
+        taxiWatch:RegisterEvent("TAXI_NODE_STATUS_CHANGED")
+    elseif taxiWatch then
+        taxiWatch:UnregisterEvent("TAXI_NODE_STATUS_CHANGED")
     end
     if WorldMapFrame:IsShown() then Refresh(true) end
 end
