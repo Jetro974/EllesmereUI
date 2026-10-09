@@ -75,11 +75,14 @@ return {
     -- client's own dungeon list (LFGDungeons) that have an entrance point,
     -- dungeons only: no raid is open at WoW Forever's launch (isRaid stays for
     -- when they are). Secondary entrances and wing names are placed by hand
-    -- (the game gives one point per instance).
+    -- (the game gives one point per instance), as are Forever's new dungeons
+    -- (no entrance point in the client): their published spots, those with
+    -- none yet (Excavation Site: Wetlands, Dalaran's sewer way in) left out.
     instances = {
         [1413] = { {47.7,35.0,43}, {42.3,89.9,47}, {50.9,92.9,129} },  -- The Barrens
         [1418] = { {35.2,10.3,70,nil,"Main Entrance"}, {65.4,43.6,70,nil,"Back Entrance"} },  -- Badlands
-        [1420] = { {85.1,31.4,189,nil,"Graveyard, Library, Armory, Cathedral"} },  -- Tirisfal Glades
+        [1420] = { {85.1,31.4,189,nil,"Graveyard, Library, Armory, Cathedral"}, {63.1,67.5,2999} },  -- Tirisfal Glades
+        [1416] = { {8.8,59.6,2959,nil,"Sewer Tunnel"} },             -- Alterac Mountains
         [1421] = { {44.7,67.8,33} },                                  -- Silverpine Forest
         [1422] = { {69.1,73.0,289} },                                 -- Western Plaguelands
         [1423] = { {26.1,10.4,329,nil,"Main Gate"}, {43.6,19.0,329,nil,"Service Entrance"} },  -- Eastern Plaguelands
@@ -93,6 +96,7 @@ return {
         [1444] = { {62.5,24.9,429,nil,"North"}, {65.0,29.8,429,nil,"East"}, {60.3,30.3,429,nil,"West"} },  -- Feralas
         [1446] = { {38.7,19.9,209} },                                 -- Tanaris
         [1453] = { {50.4,66.2,34} },                                  -- Stormwind City
+        [1455] = { {43.5,52.0,3065} },                                -- Ironforge
         [1454] = { {53.0,48.9,389} },                                 -- Orgrimmar
     },
 }
