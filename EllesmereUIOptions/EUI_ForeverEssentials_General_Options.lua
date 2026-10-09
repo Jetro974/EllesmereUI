@@ -226,47 +226,12 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
             "Shows an arrow on each road out of the zone, pointing to the zone it leads to; hover it for the name.",
             "exits")
     );  y = y - h
-    local servicesRow
-    servicesRow, h = W:DualRow(parent, y,
+    _, h = W:DualRow(parent, y,
         travelToggle("Show Instance Entrances",
             "Shows dungeon and raid entrances on the world map; hover one for its name.",
             "instances"),
-        travelToggle("Show Town Services",
-            "Shows bankers, auctioneers, flight masters, mailboxes, innkeepers, repairs, stable masters, battlemasters and trainers on the world map. Each one appears once you have used it: the map learns where it stands. Pick which ones show with the cog.",
-            "services")
+        BLANK()
     );  y = y - h
-
-    -- Where the services are kept (the account by default), then one toggle
-    -- per service kind, all shown until turned off.
-    if not EllesmereUI._prebuilding then
-        local rows = {
-            { type = "toggle", label = "Limit to Character",
-              tooltip = "Keeps the services each character has used for that character only. Off, every character of the account shares the same map.",
-              get = function() return MT.Get("perChar") == true end,
-              set = function(v)
-                  MT.Cfg().perChar = v
-                  MT.Apply()
-              end },
-        }
-        for _, svc in ipairs(MT.services) do
-            local kind = svc.kind
-            rows[#rows + 1] = { type = "toggle", label = svc.name,
-                get = function() return MT.ServiceShown(kind) end,
-                set = function(v)
-                    local cfg = MT.Cfg()
-                    cfg.svc = cfg.svc or {}
-                    cfg.svc[kind] = v
-                    MT.Apply()
-                end }
-        end
-        EllesmereUI.BuildInlineCog(servicesRow._rightRegion, {
-            title = "Town Services",
-            rows = rows,
-            gap = 9,
-            disabled = function() return not MT.Get("services") end,
-            disabledTooltip = "Show Town Services",
-        })
-    end
 
     -- Hunters only: no ammo counter is built for other classes.
     local AC = EllesmereUI._AmmoCounter

@@ -7,11 +7,6 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --   - Zone exits: an arrow on each road out of the zone, toward the zone it
 --     leads to.
 --   - Instance entrances: dungeons and raids.
---   - Town services (banker, auctioneer, flight master, mailbox, innkeeper,
---     repair, stable master, battlemaster, class and profession trainers):
---     learned where the player uses them (PLAYER_INTERACTION_MANAGER_FRAME_SHOW
---     and the player's map position), kept for the account or, with Limit to
---     Character, for each character; each kind its own cog toggle.
 --  Transports and instances also show on the continent maps. Hovering a pin
 --  names it; pins never take clicks (moving the map from our code would leave
 --  its state tainted), so the map's own clicks go through them.
@@ -25,16 +20,10 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.mapTravel; unset keys read these.
--- learned: uiMapID = { { kind, x, y, label }, ... } (town services met by
--- the account); learnedChar: "Name-Realm" = the same, per character, used
--- while perChar (Limit to Character) is on.
--- svc: kind = false for a service kind hidden in the cog.
-local F = module.Feature("mapTravel", { transports = false, exits = false, instances = false,
-    services = false, perChar = false })
+local F = module.Feature("mapTravel", { transports = false, exits = false, instances = false })
 
 local PIN_SIZE   = 22
 local ARROW_SIZE = 20
-local SAME_SPOT  = 0.03  -- a service met again this close (map fraction) is the same one
 
 local KIND_ATLAS = {
     boat     = "flightmasterferry",
@@ -42,52 +31,13 @@ local KIND_ATLAS = {
     tram     = "vehicle-alliancecart",
 }
 
--- Town services, in cog order: kind, icon (atlas or file), name.
-local SERVICES = {
-    { kind = "bank",    icon = "banker",       name = "Banker" },
-    { kind = "auction", icon = "auctioneer",   name = "Auctioneer" },
-    { kind = "flight",  icon = "flightmaster", name = "Flight Master" },
-    { kind = "mail",    icon = "mailbox",      name = "Mailbox" },
-    { kind = "inn",     icon = "innkeeper",    name = "Innkeeper" },
-    { kind = "repair",  icon = "repair",       name = "Repair" },
-    { kind = "stable",  icon = "Interface\\Cursor\\Crosshair\\StableMaster", name = "Stable Master" },
-    { kind = "battle",  icon = "battlemaster", name = "Battlemaster" },
-    { kind = "class",   icon = "class",        name = "Class Trainer" },
-    { kind = "prof",    icon = "profession",   name = "Profession Trainer" },
-}
-local SERVICE_BY_KIND = {}
-for i = 1, #SERVICES do SERVICE_BY_KIND[SERVICES[i].kind] = SERVICES[i] end
-
-local data, provider, layer, waiter, recorder
+local data, provider, layer, waiter
 local added = false
 local pins, used = {}, 0
 local shownKey  -- what the pins show (map and toggles); nil when cleared
 
 local function AnyOn()
-    return F.Get("transports") or F.Get("exits") or F.Get("instances") or F.Get("services")
-end
-
-local function ServiceShown(kind)
-    local svc = F.Get("svc")
-    return not svc or svc[kind] ~= false
-end
-
--- The learned services in use: the account's, or this character's while Limit to
--- Character is on. create makes the tables on the first write.
-local function Learned(create)
-    if not F.Get("perChar") then
-        if not create then return F.Get("learned") end
-        local cfg = F.Cfg()
-        cfg.learned = cfg.learned or {}
-        return cfg.learned
-    end
-    local key = UnitName("player") .. "-" .. GetNormalizedRealmName()
-    local byChar = F.Get("learnedChar")
-    if not create then return byChar and byChar[key] end
-    local cfg = F.Cfg()
-    cfg.learnedChar = cfg.learnedChar or {}
-    cfg.learnedChar[key] = cfg.learnedChar[key] or {}
-    return cfg.learnedChar[key]
+    return F.Get("transports") or F.Get("exits") or F.Get("instances")
 end
 
 local function PinOnEnter(self)
@@ -140,7 +90,7 @@ local function Place(x, y, atlas, size, tip, rotation, count)
     p.x, p.y = x, y
     p:SetSize(size, size)
     Anchor(p)
-    if atlas:find("\\", 1, true) then p.tex:SetTexture(atlas) else p.tex:SetAtlas(atlas) end
+    p.tex:SetAtlas(atlas)
     p.tex:SetRotation(rotation or 0)
     p.count:SetText(count and count > 1 and count or "")
     p.tip = tip
@@ -253,22 +203,6 @@ local function DrawZone(zone, shown, isZone)
             end
         end
     end
-    if isZone and F.Get("services") then
-        local learned = Learned()
-        local list = learned and learned[zone]
-        if list then
-            for i = 1, #list do
-                local s = list[i]
-                local svc = SERVICE_BY_KIND[s[1]]
-                if svc and ServiceShown(s[1]) then
-                    local tip = EllesmereUI.L(svc.name)
-                    local label = s[1] == "class" and LOCALIZED_CLASS_NAMES_MALE[s[4]] or s[4]
-                    if label then tip = tip .. "\n|cffffffff" .. label .. "|r" end
-                    Place(s[2], s[3], svc.icon, PIN_SIZE, tip)
-                end
-            end
-        end
-    end
 end
 
 -- The map redraws its providers often (shows, quest and area updates): the
@@ -277,8 +211,7 @@ end
 local function Refresh(force)
     local mapID = WorldMapFrame:GetMapID()
     local key = mapID and (mapID .. (F.Get("transports") and "t" or "")
-        .. (F.Get("instances") and "i" or "") .. (F.Get("exits") and "e" or "")
-        .. (F.Get("services") and "s" or ""))
+        .. (F.Get("instances") and "i" or "") .. (F.Get("exits") and "e" or ""))
     if key and key == shownKey and force ~= true then
         Rescale()
         return
@@ -316,69 +249,9 @@ local function Build()
     provider.OnGlobalAlphaChanged = function(self) layer:SetAlpha(self:GetMap():GetGlobalAlpha()) end
 end
 
--- Which town service an NPC window opened for, and its label (the trainer's
--- class or profession), or nil.
-local function ServiceOf(interaction)
-    local T = Enum.PlayerInteractionType
-    if interaction == T.Banker then return "bank" end
-    if interaction == T.Auctioneer then return "auction" end
-    if interaction == T.TaxiNode then return "flight" end
-    if interaction == T.MailInfo then return "mail" end
-    if interaction == T.Binder then return "inn" end
-    if interaction == T.StableMaster then return "stable" end
-    if interaction == T.BattleMaster then return "battle" end
-    if interaction == T.Merchant then return CanMerchantRepair() and "repair" or nil end
-    if interaction == T.Trainer then
-        if IsTradeskillTrainer() then
-            return "prof", GetTrainerServiceSkillLine(1) or UnitName("npc")
-        end
-        return "class", (select(2, UnitClass("player")))  -- the class token, the same in every language
-    end
-end
-
--- A service used where the player stands: stored for the map the player is
--- on, the same kind and label met again close by moving the existing one.
-local function Learn(_, _, interaction)
-    local kind, label = ServiceOf(interaction)
-    if not kind then return end
-    local mapID = C_Map.GetBestMapForUnit("player")
-    local pos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
-    if not pos then return end
-    local x, y = pos:GetXY()
-    local learned = Learned(true)
-    local list = learned[mapID]
-    if not list then list = {}; learned[mapID] = list end
-    for i = 1, #list do
-        local s = list[i]
-        if s[1] == kind and s[4] == label
-            and math.abs(s[2] - x) < SAME_SPOT and math.abs(s[3] - y) < SAME_SPOT then
-            s[2], s[3] = x, y
-            return
-        end
-    end
-    list[#list + 1] = { kind, x, y, label }
-    if WorldMapFrame and WorldMapFrame:IsShown() then Refresh(true) end
-end
-
--- Listening only while Town Services is on.
-local function SyncRecorder()
-    local on = F.Get("services")
-    if on and not recorder then
-        recorder = CreateFrame("Frame")
-        recorder:SetScript("OnEvent", Learn)
-    end
-    if not recorder then return end
-    if on then
-        recorder:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW")
-    else
-        recorder:UnregisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW")
-    end
-end
-
 -- Nothing exists until a toggle is first on; all off, the provider is removed.
 -- The world map loads on demand, so building may wait for it.
 local function Apply()
-    SyncRecorder()
     if not AnyOn() then
         if added then
             WorldMapFrame:RemoveDataProvider(provider)
@@ -414,8 +287,6 @@ EllesmereUI._MapTravel = {
     Get = F.Get,
     Cfg = F.Cfg,
     Apply = Apply,
-    services = SERVICES,
-    ServiceShown = ServiceShown,
 }
 
 F.Start(Apply)
