@@ -236,18 +236,9 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
             "services")
     );  y = y - h
 
-    -- Sharing first (off by default), then one toggle per service kind, all
-    -- shown until turned off.
+    -- One toggle per service kind, all shown until turned off.
     if not EllesmereUI._prebuilding then
-        local rows = {
-            { type = "toggle", label = "Share With Guild and Group",
-              tooltip = "Sends the services you learn to your guild and group, and fills your map with theirs: opening a town asks them what they know there. Only players with this option on take part.",
-              get = function() return MT.Get("share") == true end,
-              set = function(v)
-                  MT.Cfg().share = v
-                  MT.Apply()
-              end },
-        }
+        local rows = {}
         for _, svc in ipairs(MT.services) do
             local kind = svc.kind
             rows[#rows + 1] = { type = "toggle", label = svc.name,
