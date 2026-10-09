@@ -154,6 +154,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
     local MM = EllesmereUI._MacroManager
     local ZL = EllesmereUI._ZoneLevels
     local MT = EllesmereUI._MapTravel
+    local LU = EllesmereUI._LevelUpToast
     local BLANK = EllesmereUI.BlankRowCfg
     local y = yOffset
     local _, h
@@ -170,6 +171,23 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
               SU.Apply()
           end },
         BLANK()
+    );  y = y - h
+
+    _, h = W:Spacer(parent, y, 20);  y = y - h
+    _, h = W:SectionHeader(parent, "LEVEL UP", y);  y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Level Up Toast",
+          tooltip = "Shows a toast when you level up: your new level, the health, power and stats you gained, new talent points and the abilities the level brings. Place it in unlock mode.",
+          getValue = function() return LU.Get("enabled") end,
+          setValue = function(v)
+              LU.Cfg().enabled = v
+              LU.Apply()
+          end },
+        { type = "labeledButton", text = "Preview", buttonText = "Show Sample",
+          tooltip = "Shows the toast for your current level.",
+          disabled = function() return not LU.Get("enabled") end, disabledTooltip = "Level Up Toast",
+          onClick = function() LU.Preview() end }
     );  y = y - h
 
     _, h = W:Spacer(parent, y, 20);  y = y - h

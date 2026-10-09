@@ -28,8 +28,9 @@ EllesmereUIForeverEssentials_Window.lua
 EllesmereUIForeverEssentials_ThreatMeter.lua
 EllesmereUIForeverEssentials_ThreatFeed.lua
 
-# Loot (loot feed)
+# Loot (loot feed, level up toast)
 EllesmereUIForeverEssentials_LootFeed.lua
+EllesmereUIForeverEssentials_LevelUp.lua
 
 
 # Macros (macro manager)

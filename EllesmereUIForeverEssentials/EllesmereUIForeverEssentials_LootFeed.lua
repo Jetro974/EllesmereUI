@@ -171,6 +171,9 @@ local function ToastChrome(r)
     return o
 end
 
+-- The toast plate, shared with the level up toast.
+module.ToastPlate = { Chrome = ToastChrome, gold = TOAST_GOLD, top = TOAST_TOP, bottom = TOAST_BOTTOM }
+
 local function StyleRow(r)
     local h, size, style = Get("rowHeight"), Get("textSize"), Get("style")
     local tray, bar, toast = style == "TRAY", style == "BAR", style == "TOAST"
