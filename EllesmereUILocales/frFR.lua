@@ -5680,7 +5680,7 @@ L["Shows a large warning at the top of the screen, with the raid warning sound, 
 L["Out of ammo!"] = "Plus de munitions !"
 L["Low ammo: %d left"] = "Munitions faibles : plus que %d"
 L["Doubles the merchant window's width to show 20 items per page."] = "Double la largeur de la fenêtre du marchand pour afficher 20 objets par page."
-L["Mark Owned Items"] = "Marquer les objets acquis"
+L["Flag/Hide Owned Items"] = "Signaler/masquer les objets acquis"
 L["In the wide window, tints red the items you already know, have learned or have collected (recipes, mounts, pets, toys...), and adds a button at the top right that hides them."] = "Dans la fenêtre large, teinte en rouge les objets que vous connaissez, avez appris ou collectionnés (recettes, montures, mascottes, jouets...), et ajoute en haut à droite un bouton qui les masque."
 L["Hide Owned (%d)"] = "Masquer les acquis (%d)"
 L["Show Owned (%d)"] = "Afficher les acquis (%d)"
