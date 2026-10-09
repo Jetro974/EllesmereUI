@@ -8,11 +8,10 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --                   previous values come back after it, through
 --                   EllesmereUI.HoldCVar / ReleaseCVar, so a reload
 --                   mid-session restores them at the next login.
---  Double-Click     Double right-click in the world casts Fishing, through a
---                   secure button and a one-shot override binding set out of
---                   combat only (WorldFrame:HookScript reads the clicks).
---                   On WoW Forever without a pole in hand, it equips the
---                   best pole in the bags first.
+--  Fishing Key      A key of the player's choice casts Fishing, through a
+--                   secure button and an override binding set out of combat
+--                   only. On WoW Forever without a pole in hand, it equips
+--                   the best pole in the bags instead.
 --  Lure Reminder    While fishing with a pole in the main hand and no lure on
 --                   it (WoW Forever), a secure button applies the best lure
 --                   in the bags. Retail has no pole in the main hand, so it
@@ -27,7 +26,6 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  feature has been on.
 -------------------------------------------------------------------------------
 local OWNER = "EllesmereUIQoL"
-local DOUBLE_CLICK_TIME = 0.4
 
 -- Fishing spells, most likely first: retail, then the WoW Forever ranks.
 local FISHING_SPELLS = { 131474, 18248, 7732, 7731, 7620 }
@@ -53,7 +51,7 @@ end
 
 local function On(key) return FishCfg()[key] == true end
 local function AnyOn()
-    return On("sound") or On("doubleClick") or On("lure") or On("log")
+    return On("sound") or FishCfg().key ~= nil or On("lure") or On("log")
 end
 
 local ev = CreateFrame("Frame")
@@ -61,7 +59,7 @@ local fishingID, fishingName  -- the Fishing spell known (nil: none)
 local inSession = false
 local heldWas                  -- [cvar] = value before the session (nil: none held)
 local castButton, lureButton   -- secure buttons, built out of combat on first use
-local pendingBuild = false
+local pendingApply = false     -- an apply waits for the end of combat
 
 -------------------------------------------------------------------------------
 --  Helpers
@@ -110,11 +108,6 @@ local function CanFish()
     return true
 end
 
-local function IsFishingChannel()
-    local name = UnitChannelInfo("player")
-    return fishingName ~= nil and name == fishingName
-end
-
 -------------------------------------------------------------------------------
 --  Fishing Sounds
 -------------------------------------------------------------------------------
@@ -140,7 +133,7 @@ local function ReleaseSounds()
 end
 
 -------------------------------------------------------------------------------
---  Secure buttons (Double-Click cast, Lure Reminder)
+--  Secure buttons (Fishing Key, Lure Reminder)
 -------------------------------------------------------------------------------
 local function BestLure()
     for i = 1, #LURES do
@@ -164,23 +157,28 @@ local function UpdateLureButton()
     lureButton:SetShown(show)
 end
 
-local function BuildButtons()
-    if InCombatLockdown() then
-        pendingBuild = true
-        ev:RegisterEvent("PLAYER_REGEN_ENABLED")
-        return
+-- What the Fishing Key does: cast Fishing, or on WoW Forever without a pole
+-- in hand, equip the best pole in the bags. Out of combat only.
+local function UpdateCastButton()
+    if not castButton or InCombatLockdown() then return end
+    local pole = not CanFish() and EllesmereUI.IS_FOREVER and PoleInBags()
+    if pole then
+        castButton:SetAttribute("type", "item")
+        castButton:SetAttribute("item", "item:" .. pole)
+    else
+        castButton:SetAttribute("type", "spell")
+        castButton:SetAttribute("spell", fishingID)
     end
-    pendingBuild = false
+end
+
+-- Built out of combat (the caller checks).
+local function BuildButtons()
     if not castButton then
         castButton = CreateFrame("Button", "EllesmereUIFishingCastButton", UIParent,
             "SecureActionButtonTemplate")
-        castButton:RegisterForClicks("AnyUp", "AnyDown")
-        castButton:SetAttribute("type", "spell")
+        castButton:RegisterForClicks("AnyDown")
+        castButton:SetAttribute("useOnKeyDown", true)
         castButton:Hide()
-        -- One cast per double-click: the binding goes as soon as it fired.
-        castButton:SetScript("PostClick", function()
-            if not InCombatLockdown() then ClearOverrideBindings(castButton) end
-        end)
     end
     if not lureButton then
         lureButton = CreateFrame("Button", "EllesmereUIFishingLureButton", UIParent,
@@ -198,44 +196,6 @@ local function BuildButtons()
         label:SetText(EllesmereUI.L("Apply Lure"))
         lureButton:Hide()
     end
-end
-
--- Double right-click: the first press arms nothing; a second one within
--- DOUBLE_CLICK_TIME binds the right button to the cast button, so its
--- release casts Fishing. On WoW Forever without a pole in hand, it equips
--- the best pole in the bags instead; the next double-click fishes.
-local lastRightDown = 0
-local function OnWorldMouseDown(_, button)
-    if button ~= "RightButton" or not On("doubleClick") or not castButton then return end
-    local now = GetTime()
-    local double = now - lastRightDown < DOUBLE_CLICK_TIME
-    lastRightDown = double and 0 or now
-    if not double or InCombatLockdown() or IsMounted() or IsFishingChannel()
-       or not fishingID then
-        return
-    end
-    if CanFish() then
-        castButton:SetAttribute("type", "spell")
-        castButton:SetAttribute("spell", fishingID)
-    else
-        local pole = EllesmereUI.IS_FOREVER and PoleInBags()
-        if not pole then return end
-        castButton:SetAttribute("type", "item")
-        castButton:SetAttribute("item", "item:" .. pole)
-    end
-    SetOverrideBindingClick(castButton, true, "BUTTON2", castButton:GetName())
-    -- A release that never reaches the button (over a window) must not leave
-    -- the right button casting Fishing.
-    C_Timer.After(1, function()
-        if not InCombatLockdown() then ClearOverrideBindings(castButton) end
-    end)
-end
-
-local worldHooked = false
-local function HookWorld()
-    if worldHooked then return end
-    worldHooked = true
-    WorldFrame:HookScript("OnMouseDown", OnWorldMouseDown)
 end
 
 -------------------------------------------------------------------------------
@@ -340,11 +300,13 @@ ev:SetScript("OnEvent", function(_, event, unit, _, spellID)
         if On("log") then RecordLoot() end
     elseif event == "SPELLS_CHANGED" then
         ResolveFishing()
+        UpdateCastButton()
     elseif event == "UNIT_INVENTORY_CHANGED" or event == "BAG_UPDATE_DELAYED" then
+        UpdateCastButton()
         UpdateLureButton()
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if pendingBuild then BuildButtons() end
-        if not pendingBuild then ev:UnregisterEvent("PLAYER_REGEN_ENABLED") end
+        ev:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        if pendingApply then _G._EUI_ApplyFishing() end
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- Before lockdown: the lure button can still be hidden.
         if lureButton then lureButton:Hide() end
@@ -357,27 +319,39 @@ end)
 
 local FEATURE_EVENTS = { "SPELLS_CHANGED", "PLAYER_REGEN_DISABLED", "PLAYER_LEAVING_WORLD" }
 
--- Login and the options toggles; takes effect immediately in both directions.
+-- Login and the options; takes effect immediately in both directions. The
+-- secure buttons and the binding only change out of combat: in combat the
+-- apply waits for its end.
 local function ApplyFishing()
+    if InCombatLockdown() then
+        pendingApply = true
+        ev:RegisterEvent("PLAYER_REGEN_ENABLED")
+        return
+    end
+    pendingApply = false
+    local key = FishCfg().key
+    if castButton then ClearOverrideBindings(castButton) end
     if not AnyOn() then
         EndSession()
         ev:UnregisterAllEvents()
-        if castButton and not InCombatLockdown() then ClearOverrideBindings(castButton) end
         return
     end
     ResolveFishing()
     ev:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")
     for i = 1, #FEATURE_EVENTS do ev:RegisterEvent(FEATURE_EVENTS[i]) end
     if On("log") then ev:RegisterEvent("LOOT_OPENED") else ev:UnregisterEvent("LOOT_OPENED") end
-    if On("lure") then
+    if key or On("lure") then
         ev:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
         ev:RegisterEvent("BAG_UPDATE_DELAYED")
+        BuildButtons()
     else
         ev:UnregisterEvent("UNIT_INVENTORY_CHANGED")
         ev:UnregisterEvent("BAG_UPDATE_DELAYED")
     end
-    if On("doubleClick") or On("lure") then BuildButtons() end
-    if On("doubleClick") then HookWorld() end
+    if key then
+        UpdateCastButton()
+        SetOverrideBindingClick(castButton, true, key, castButton:GetName())
+    end
     if not On("sound") then ReleaseSounds() elseif inSession then HoldSounds() end
     UpdateLureButton()
 end
