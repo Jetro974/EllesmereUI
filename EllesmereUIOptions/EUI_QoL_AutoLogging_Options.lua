@@ -211,7 +211,7 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
             "While you fish, mutes music and ambience and raises sound effects (also when the game is in the background) so the bobber splash stands out. Your sound settings come back when you move, enter combat or change zone.",
             "sound"),
         FishToggle("Double-Click to Fish",
-            "Double right-click in the world to cast Fishing (with a fishing pole equipped on WoW Forever). Never in combat or while mounted.",
+            "Double right-click in the world to cast Fishing. On WoW Forever without a fishing pole in hand, it equips the best one in your bags first. Never in combat or while mounted.",
             "doubleClick")
     ); y = y - h
 
