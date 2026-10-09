@@ -5599,3 +5599,8 @@ L["This bar sizes its blocks itself, so the width is not this block's to choose.
 L["How precise the coordinates read. More decimals make the block wider."] = "Précision d'affichage des coordonnées. Plus il y a de décimales, plus le bloc est large."
 L["Hide in Instance"] = "Masquer en instance"
 L["Removes the block from the bar in instanced content, where player coordinates are unavailable."] = "Retire le bloc de la barre dans le contenu instancié, où les coordonnées du joueur ne sont pas disponibles."
+L["Wide Window"] = "Fenêtre large"
+L["Doubles the merchant window's width to show 20 items per page, with a button in its header that marks the items you already know."] = "Double la largeur de la fenêtre du marchand pour afficher 20 objets par page, avec un bouton dans son en-tête qui marque les objets que vous connaissez déjà."
+L["The merchant Wide Window setting requires a UI reload to fully apply."] = "Le réglage Fenêtre large du marchand nécessite un rechargement de l'interface pour s'appliquer entièrement."
+L["Known items are marked. Click to stop marking them."] = "Les objets connus sont marqués. Cliquez pour ne plus les marquer."
+L["Click to mark the items you already know."] = "Cliquez pour marquer les objets que vous connaissez déjà."

@@ -7476,10 +7476,11 @@ local function CreateMerchantScrollList(parent)
     return sf, child
 end
 
--- Same as the default UI's version, with frameName pointed at our own buttons.
-function EUI_MerchantFrame_UpdateAltCurrency(index, indexOnPage, canAfford)
+-- Same as the default UI's version, with frameName pointed at our own buttons
+-- (the list rows, or another set of ours named by prefix).
+function EUI_MerchantFrame_UpdateAltCurrency(index, indexOnPage, canAfford, prefix)
 	local itemCount = GetMerchantItemCostInfo(index);
-	local frameName = "EUI_MerchantItem"..indexOnPage.."AltCurrencyFrame";
+	local frameName = (prefix or "EUI_MerchantItem")..indexOnPage.."AltCurrencyFrame";
 	local usedCurrencies = 0;
 	local width = 0;
 
@@ -7887,6 +7888,255 @@ local function SkinMerchantIconButton(btn)
     end
 end
 
+-------------------------------------------------------------------------------
+--  Wide merchant (EllesmereUIDB.merchantWide, needs a reload like Show As
+--  List). The window is twice as wide: Blizzard's 10-tile grid and paging are
+--  hidden (HideNativeMerchantGrid) and 20 tiles of ours, built from
+--  MerchantItemTemplate (Blizzard's own click, tooltip and confirm handlers,
+--  which read the slot index from the button ID), fill pages of 20. The
+--  buyback tab shows its 12 items on the same tiles. A header toggle marks the
+--  items already known (EllesmereUIDB.merchantHighlightKnown).
+-------------------------------------------------------------------------------
+local WIDE_PREFIX   = "EUI_MerchantWideItem"
+local WIDE_PER_PAGE = 20
+local WIDE_COLS     = 4
+local WIDE_EXTRA_W  = 2 * (153 + 12)  -- two more tile columns
+local WIDE_MONEY_W  = 120             -- Blizzard's MAX_MONEY_DISPLAY_WIDTH (a file local there)
+
+local wide = { tiles = {}, page = 1 }
+
+-- An item the player already knows (recipe, mount, pet, toy...): its tooltip
+-- carries the "Already known" line.
+local function MerchantItemKnown(index)
+    local tip = C_TooltipInfo.GetMerchantItem(index)
+    if not (tip and tip.lines) then return false end
+    for _, line in ipairs(tip.lines) do
+        if line.leftText == ITEM_SPELL_KNOWN then return true end
+    end
+    return false
+end
+
+local function WideKnownMark(tile)
+    local d = GetFFD(tile)
+    if not d.known then
+        local glow = tile:CreateTexture(nil, "ARTWORK", nil, 7)
+        glow:SetPoint("TOPLEFT", 2, -1)
+        glow:SetPoint("BOTTOMRIGHT", -2, 1)
+        glow:SetColorTexture(0.2, 0.9, 0.3, 0.18)
+        local check = tile.ItemButton:CreateTexture(nil, "OVERLAY", nil, 7)
+        check:SetAtlas("groupfinder-icon-greencheckmark")
+        check:SetSize(16, 16)
+        check:SetPoint("TOPRIGHT", tile.ItemButton, "TOPRIGHT", 3, 3)
+        d.known = { glow, check }
+    end
+    return d.known
+end
+
+-- One merchant item on a tile, as MerchantFrame_UpdateMerchantInfo does it.
+local function WideFillMerchant(tile, slot, index)
+    local info = C_MerchantFrame.GetItemInfo(index)
+    if not info then return false end
+    if info.currencyID then
+        info.name, info.texture, info.numAvailable = CurrencyContainerUtil.GetCurrencyContainerInfo(
+            info.currencyID, info.numAvailable, info.name, info.texture, nil)
+    end
+    local btn = tile.ItemButton
+    local name = tile:GetName()
+    local money, alt = _G[name .. "MoneyFrame"], _G[name .. "AltCurrencyFrame"]
+    local canAfford = CanAffordMerchantItem(index)
+    tile.Name:SetText(info.name)
+    SetItemButtonCount(btn, info.stackCount)
+    SetItemButtonStock(btn, info.numAvailable)
+    SetItemButtonTexture(btn, info.texture)
+    btn.name, btn.texture = info.name, info.texture
+    btn.link = GetMerchantItemLink(index)
+    if info.hasExtendedCost and info.price <= 0 then
+        btn.price, btn.extendedCost = nil, true
+        EUI_MerchantFrame_UpdateAltCurrency(index, slot, canAfford, WIDE_PREFIX)
+        alt:ClearAllPoints()
+        alt:SetPoint("BOTTOMLEFT", name .. "NameFrame", "BOTTOMLEFT", 0, 31)
+        money:Hide()
+        alt:Show()
+    else
+        btn.price, btn.extendedCost = info.price, info.hasExtendedCost or nil
+        local altWidth = info.hasExtendedCost
+            and EUI_MerchantFrame_UpdateAltCurrency(index, slot, canAfford, WIDE_PREFIX) or 0
+        MoneyFrame_SetMaxDisplayWidth(money, WIDE_MONEY_W - altWidth)
+        MoneyFrame_Update(money:GetName(), info.price)
+        SetMoneyFrameColor(money:GetName(), canAfford == false and "gray" or nil)
+        if info.hasExtendedCost then
+            alt:ClearAllPoints()
+            alt:SetPoint("LEFT", money:GetName(), "RIGHT", -14, 0)
+            alt:Show()
+        else
+            alt:Hide()
+        end
+        money:Show()
+    end
+    if info.isQuestStartItem then
+        btn.IconQuestTexture:SetTexture(TEXTURE_ITEM_QUEST_BANG)
+        btn.IconQuestTexture:Show()
+    else
+        btn.IconQuestTexture:Hide()
+    end
+    MerchantFrameItem_UpdateQuality(tile, btn.link)
+    local itemID = GetMerchantItemID(index)
+    local isHeirloom = itemID and C_Heirloom.IsItemHeirloom(itemID)
+    local knownHeirloom = isHeirloom and C_Heirloom.PlayerHasHeirloom(itemID)
+    btn.showNonrefundablePrompt = not C_MerchantFrame.IsMerchantItemRefundable(index)
+    local tintRed = not info.isPurchasable or (not info.isUsable and not isHeirloom)
+    SetItemButtonDesaturated(btn, knownHeirloom)
+    local r, g, b = 1, 1, 1
+    if info.numAvailable == 0 or knownHeirloom then
+        r, g, b = 0.5, tintRed and 0 or 0.5, tintRed and 0 or 0.5
+    elseif tintRed then
+        r, g, b = 0.9, 0, 0
+    end
+    SetItemButtonTextureVertexColor(btn, r, g, b)
+    SetItemButtonNormalTextureVertexColor(btn, r, g, b)
+
+    local known = EllesmereUIDB.merchantHighlightKnown and MerchantItemKnown(index)
+    local mark = (known or GetFFD(tile).known) and WideKnownMark(tile)
+    if mark then
+        mark[1]:SetShown(known)
+        mark[2]:SetShown(known)
+    end
+    return true
+end
+
+-- One buyback slot on a tile, as MerchantFrame_UpdateBuybackInfo does it.
+local function WideFillBuyback(tile, index)
+    local name, texture, price, quantity, numAvailable, isUsable, isBound = GetBuybackItemInfo(index)
+    if not name then return false end
+    local btn = tile.ItemButton
+    local tileName = tile:GetName()
+    tile.Name:SetText(name)
+    SetItemButtonTexture(btn, texture)
+    SetItemButtonCount(btn, quantity)
+    SetItemButtonStock(btn, numAvailable)
+    btn.price, btn.extendedCost = price, nil
+    btn.name, btn.texture, btn.link = name, texture, GetBuybackItemLink(index)
+    btn.IconQuestTexture:Hide()
+    MerchantFrameItem_UpdateQuality(tile, btn.link, isBound)
+    local money = _G[tileName .. "MoneyFrame"]
+    MoneyFrame_SetMaxDisplayWidth(money, WIDE_MONEY_W)
+    MoneyFrame_Update(money:GetName(), price)
+    SetMoneyFrameColor(money:GetName(), GetMoney() < price and "gray" or nil)
+    money:Show()
+    _G[tileName .. "AltCurrencyFrame"]:Hide()
+    SetItemButtonDesaturated(btn, false)
+    local c = isUsable and 1 or 0.9
+    SetItemButtonTextureVertexColor(btn, c, isUsable and 1 or 0, isUsable and 1 or 0)
+    SetItemButtonNormalTextureVertexColor(btn, c, isUsable and 1 or 0, isUsable and 1 or 0)
+    local mark = GetFFD(tile).known
+    if mark then mark[1]:Hide(); mark[2]:Hide() end
+    return true
+end
+
+local function UpdateWideMerchant()
+    local f = _G.MerchantFrame
+    local isBuyback = f.selectedTab == 2
+    local numItems = isBuyback and GetNumBuybackItems() or GetMerchantNumItems()
+    local pages = isBuyback and 1 or math.max(1, math.ceil(numItems / WIDE_PER_PAGE))
+    if wide.page > pages then wide.page = pages end
+    local first = isBuyback and 0 or (wide.page - 1) * WIDE_PER_PAGE
+    for slot = 1, WIDE_PER_PAGE do
+        local tile = wide.tiles[slot]
+        local index = first + slot
+        local btn = tile.ItemButton
+        local filled = index <= numItems
+            and (isBuyback and WideFillBuyback(tile, index) or (not isBuyback and WideFillMerchant(tile, slot, index)))
+        if filled then
+            btn.hasItem = true
+            btn:SetID(index)
+            btn:Show()
+            tile:Show()
+            SkinMerchantTile(tile)
+        else
+            btn.price, btn.hasItem, btn.name = nil, nil, nil
+            tile:Hide()
+        end
+    end
+    wide.prev:SetEnabled(wide.page > 1)
+    wide.next:SetEnabled(wide.page < pages)
+    local paged = pages > 1
+    wide.prev:SetShown(paged)
+    wide.next:SetShown(paged)
+    wide.pageText:SetShown(paged)
+    wide.pageText:SetFormattedText(MERCHANT_PAGE_NUMBER, wide.page, pages)
+    wide.known:SetShown(not isBuyback)
+    wide.known.icon:SetDesaturated(not EllesmereUIDB.merchantHighlightKnown)
+    wide.known.icon:SetAlpha(EllesmereUIDB.merchantHighlightKnown and 1 or 0.5)
+end
+
+local function WideTurnPage(delta)
+    wide.page = wide.page + delta
+    UpdateWideMerchant()
+end
+
+-- Built once, on the first wide pass.
+local function BuildWideMerchant(f)
+    f:SetWidth(f:GetWidth() + WIDE_EXTRA_W)
+    for slot = 1, WIDE_PER_PAGE do
+        local tile = CreateFrame("Frame", WIDE_PREFIX .. slot, f, "MerchantItemTemplate")
+        if slot == 1 then
+            tile:SetPoint("TOPLEFT", f, "TOPLEFT", 11, -72)
+        elseif slot % WIDE_COLS == 1 then
+            tile:SetPoint("TOPLEFT", wide.tiles[slot - WIDE_COLS], "BOTTOMLEFT", 0, -8)
+        else
+            tile:SetPoint("TOPLEFT", wide.tiles[slot - 1], "TOPRIGHT", 12, 0)
+        end
+        SkinMerchantTile(tile)
+        LiftMerchantCurrency(_G[WIDE_PREFIX .. slot .. "MoneyFrame"])
+        LiftMerchantCurrency(_G[WIDE_PREFIX .. slot .. "AltCurrencyFrame"])
+        wide.tiles[slot] = tile
+    end
+
+    local prev = CreateFrame("Button", nil, f)
+    prev:SetSize(32, 32)
+    prev:SetPoint("CENTER", f, "BOTTOMLEFT", 25, 96)
+    prev:SetScript("OnClick", function() WideTurnPage(-1) end)
+    WSkin.PageButton(prev, "<", 13)
+    local nxt = CreateFrame("Button", nil, f)
+    nxt:SetSize(32, 32)
+    nxt:SetPoint("CENTER", f, "BOTTOMRIGHT", -25, 96)
+    nxt:SetScript("OnClick", function() WideTurnPage(1) end)
+    WSkin.PageButton(nxt, ">", 13)
+    local pageText = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    pageText:SetPoint("BOTTOM", f, "BOTTOM", 0, 88)
+    WSkin.Font(pageText); WSkin.White(pageText)
+    wide.prev, wide.next, wide.pageText = prev, nxt, pageText
+    -- The mouse wheel turns pages, as on Blizzard's grid.
+    f:HookScript("OnMouseWheel", function(_, delta)
+        if delta > 0 and prev:IsShown() and prev:IsEnabled() then WideTurnPage(-1)
+        elseif delta < 0 and nxt:IsShown() and nxt:IsEnabled() then WideTurnPage(1) end
+    end)
+
+    local known = CreateFrame("Button", nil, f)
+    known:SetSize(22, 22)
+    if f.FilterDropdown then
+        known:SetPoint("RIGHT", f.FilterDropdown, "LEFT", -8, 0)
+    else
+        known:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, -32)
+    end
+    known.icon = known:CreateTexture(nil, "ARTWORK")
+    known.icon:SetAllPoints()
+    known.icon:SetAtlas("groupfinder-icon-greencheckmark")
+    known:SetScript("OnClick", function(self)
+        EllesmereUIDB.merchantHighlightKnown = not EllesmereUIDB.merchantHighlightKnown
+        UpdateWideMerchant()
+        self:GetScript("OnEnter")(self)
+    end)
+    known:SetScript("OnEnter", function(self)
+        EllesmereUI.ShowWidgetTooltip(self, EllesmereUIDB.merchantHighlightKnown
+            and EllesmereUI.L("Known items are marked. Click to stop marking them.")
+            or EllesmereUI.L("Click to mark the items you already know."))
+    end)
+    known:SetScript("OnLeave", function() EllesmereUI.HideWidgetTooltip() end)
+    wide.known = known
+    wide.built = true
+end
+
 local _merchantHooked = false
 local function Skin_Merchant()
     local f = _G.MerchantFrame
@@ -7917,6 +8167,13 @@ local function Skin_Merchant()
             f.wSkinScrollFrame = sf
             f.wSkinScrollChild = child
         end
+    elseif EllesmereUIDB.merchantWide then
+        HideNativeMerchantGrid()
+        if not wide.built then BuildWideMerchant(f) end
+        SkinMerchantTile(_G.MerchantBuyBackItem)
+        -- Each opening starts on the first page.
+        wide.page = 1
+        UpdateWideMerchant()
     else
         -- Item tiles (10 merchant, buyback page reuses up to 12) plus the most-recent-buyback slot on the merchant tab.
         for i = 1, 12 do SkinMerchantTile(_G["MerchantItem" .. i]) end
@@ -7971,6 +8228,9 @@ local function Skin_Merchant()
                 if f:IsVisible() then
                     if EllesmereUIDB.merchantShowAsList and f.wSkinScrollFrame then
                         UpdateCustomMerchantList(f.wSkinScrollFrame, f.wSkinScrollChild)
+                    elseif wide.built and EllesmereUIDB.merchantWide then
+                        UpdateWideMerchant()
+                        SkinMerchantTile(_G.MerchantBuyBackItem)
                     else
                         for i = 1, 12 do SkinMerchantTile(_G["MerchantItem" .. i]) end
                         SkinMerchantTile(_G.MerchantBuyBackItem)
@@ -8007,9 +8267,14 @@ local function UpdateMerchantItemLevels()
     local show = EllesmereUIDB and EllesmereUIDB.merchantShowItemLevel == true
     local onSellTab = (f.selectedTab or 1) == 1
     local numItems
+    -- The wide merchant's tiles (only once built: the toggle needs a reload).
+    local isWide = not EllesmereUIDB.merchantShowAsList and EllesmereUIDB.merchantWide
+        and _G.EUI_MerchantWideItem1 ~= nil
     if EllesmereUIDB.merchantShowAsList then
         -- GetNumBuybackItems is irrelevant: text only shows on the sell tab.
         numItems = GetMerchantNumItems()
+    elseif isWide then
+        numItems = 20
     else
         numItems = 12
     end
@@ -8018,6 +8283,8 @@ local function UpdateMerchantItemLevels()
         local btn
         if EllesmereUIDB.merchantShowAsList then
             btn = _G["EUI_MerchantItem" .. i .. "ItemButton"]
+        elseif isWide then
+            btn = _G["EUI_MerchantWideItem" .. i .. "ItemButton"]
         else
             btn = _G["MerchantItem" .. i .. "ItemButton"]
         end
