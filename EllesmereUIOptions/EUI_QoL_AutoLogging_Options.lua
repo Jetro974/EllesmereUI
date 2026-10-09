@@ -70,6 +70,12 @@ local function ApplyMailbox()
     if _G._EUI_ApplyMailbox then _G._EUI_ApplyMailbox() end
 end
 
+local function PetCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.petSummon = EllesmereUIDB.petSummon or {}
+    return EllesmereUIDB.petSummon
+end
+
 -- Built as the tail of the Quality of Life page (chained from BuildQoLPage),
 -- not as its own tab. Lays out from yOffset and returns the height used,
 -- like every other section builder.
@@ -194,6 +200,54 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
 
     _, h = W:Spacer(parent, y, 20); y = y - h
     end -- not IS_FOREVER
+
+    ---------------------------------------------------------------------------
+    --  COMPANION PETS (runtime in EllesmereUIQoL_PetSummon.lua)
+    ---------------------------------------------------------------------------
+    _, h = W:SectionHeader(parent, "COMPANION PETS", y); y = y - h
+
+    local function PetOff() return PetCfg().enabled ~= true end
+    local function ApplyPet()
+        if _G._EUI_ApplyPetSummon then _G._EUI_ApplyPetSummon() end
+    end
+
+    _, h = W:DualRow(parent, y,
+        { type    = "toggle",
+          text    = "Auto Summon Pet",
+          tooltip = "Summons a companion pet again a moment after the game takes it away (death, loading screen, taxi, vehicle...). A pet you dismiss yourself stays dismissed. Never in combat, PvP, stealth or while mounted.",
+          -- Off by default.
+          getValue = function() return PetCfg().enabled == true end,
+          setValue = function(v)
+              PetCfg().enabled = v
+              ApplyPet()
+              EllesmereUI:RefreshPage()
+          end },
+        { type    = "dropdown",
+          text    = "Pet to Summon",
+          tooltip = "Random Favorite picks among all pets while none is a favorite, like the journal's random pet button. Random Pet picks among the whole collection, new pets included.",
+          values  = { last = "Last Summoned", favorite = "Random Favorite", random = "Random Pet" },
+          order   = { "last", "favorite", "random" },
+          disabled = PetOff,
+          disabledTooltip = "Auto Summon Pet",
+          getValue = function()
+              local m = PetCfg().mode
+              return (m == "favorite" or m == "random") and m or "last"
+          end,
+          setValue = function(v) PetCfg().mode = v; ApplyPet() end }
+    ); y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type    = "toggle",
+          text    = "Summon in Dungeons and Raids",
+          tooltip = "Also summons the pet inside dungeons, raids and scenarios.",
+          disabled = PetOff,
+          disabledTooltip = "Auto Summon Pet",
+          getValue = function() return PetCfg().instances == true end,
+          setValue = function(v) PetCfg().instances = v; ApplyPet() end },
+        EllesmereUI.BlankRowCfg()
+    ); y = y - h
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
 
     ---------------------------------------------------------------------------
     --  AUTO COMBAT LOGGING

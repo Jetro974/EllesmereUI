@@ -5619,3 +5619,15 @@ L["%d more mail waits on the server."] = "%d courrier(s) de plus attend(ent) sur
 L["Click to take the gold of every mail (COD mail excluded)."] = "Cliquez pour récupérer l'or de tous les courriers (contre-remboursement exclu)."
 L["Collected %s from %d mail."] = "%s récupéré(s) dans %d courrier(s)."
 L["%d mail with gold or items expires within %d days (soonest: %s)."] = "%d courrier(s) avec de l'or ou des objets expire(nt) dans moins de %d jours (le plus proche : %s)."
+
+-- Auto Summon Pet (EllesmereUIQoL_PetSummon.lua)
+L["COMPANION PETS"] = "MASCOTTES"
+L["Auto Summon Pet"] = "Invocation auto de mascotte"
+L["Summons a companion pet again a moment after the game takes it away (death, loading screen, taxi, vehicle...). A pet you dismiss yourself stays dismissed. Never in combat, PvP, stealth or while mounted."] = "Réinvoque une mascotte peu après que le jeu l'a retirée (mort, écran de chargement, taxi, véhicule...). Une mascotte que vous renvoyez vous-même reste renvoyée. Jamais en combat, en JcJ, camouflé ou sur une monture."
+L["Pet to Summon"] = "Mascotte à invoquer"
+L["Last Summoned"] = "Dernière invoquée"
+L["Random Favorite"] = "Favorite au hasard"
+L["Summon in Dungeons and Raids"] = "Invoquer en donjon et en raid"
+L["Also summons the pet inside dungeons, raids and scenarios."] = "Invoque aussi la mascotte dans les donjons, les raids et les scénarios."
+L["Random Pet"] = "Mascotte au hasard"
+L["Random Favorite picks among all pets while none is a favorite, like the journal's random pet button. Random Pet picks among the whole collection, new pets included."] = "Favorite au hasard pioche parmi toutes les mascottes tant qu'aucune n'est en favori, comme le bouton de mascotte aléatoire du journal. Mascotte au hasard pioche dans toute la collection, nouvelles mascottes comprises."
