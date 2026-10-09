@@ -5611,3 +5611,4 @@ L["Shows dungeon and raid entrances on the world map; hover one for its name."] 
 L["Boat to %s"] = "Bateau vers %s"
 L["Zeppelin to %s"] = "Zeppelin vers %s"
 L["Tram to %s"] = "Tram vers %s"
+L["%d transports"] = "%d transports"

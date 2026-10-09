@@ -34,6 +34,7 @@ local KIND_ATLAS = {
 local data, provider, layer, waiter
 local added = false
 local pins, used = {}, 0
+local shownKey  -- what the pins show (map and toggles); nil when cleared
 
 local function AnyOn()
     return F.Get("transports") or F.Get("exits") or F.Get("instances")
@@ -50,6 +51,7 @@ end
 local function Clear()
     for i = 1, used do pins[i]:Hide() end
     used = 0
+    shownKey = nil
 end
 
 -- The next pin from our pool: hover only, clicks go through to the map.
@@ -62,6 +64,8 @@ local function NextPin()
         p:SetMouseClickEnabled(false)
         p.tex = p:CreateTexture(nil, "ARTWORK")
         p.tex:SetAllPoints()
+        p.count = p:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        p.count:SetPoint("BOTTOMRIGHT", 4, -2)
         p:SetScript("OnEnter", PinOnEnter)
         p:SetScript("OnLeave", PinOnLeave)
         pins[used] = p
@@ -69,19 +73,33 @@ local function NextPin()
     return p
 end
 
--- A pin at (x, y) of the canvas (0..1), kept the same size on screen at any zoom.
-local function Place(x, y, atlas, size, tip, rotation)
+-- Pins are scaled against the canvas, so they keep one size on screen at any
+-- zoom; their offsets are in their own (scaled) units.
+local function Anchor(p)
     local canvas = layer:GetParent()
     local w, h = canvas:GetSize()
-    local s = size / canvas:GetScale()
-    local p = NextPin()
-    p:SetSize(s, s)
+    local cs = canvas:GetScale()
+    p:SetScale(1 / cs)
     p:ClearAllPoints()
-    p:SetPoint("CENTER", canvas, "TOPLEFT", x * w, -y * h)
+    p:SetPoint("CENTER", canvas, "TOPLEFT", p.x * w * cs, -p.y * h * cs)
+end
+
+-- A pin at (x, y) of the canvas (0..1); count > 1 shows as a badge.
+local function Place(x, y, atlas, size, tip, rotation, count)
+    local p = NextPin()
+    p.x, p.y = x, y
+    p:SetSize(size, size)
+    Anchor(p)
     p.tex:SetAtlas(atlas)
     p.tex:SetRotation(rotation or 0)
+    p.count:SetText(count and count > 1 and count or "")
     p.tip = tip
     p:Show()
+end
+
+-- A zoom: the same pins, rescaled (rebuilding them would drop the tooltip).
+local function Rescale()
+    for i = 1, used do Anchor(pins[i]) end
 end
 
 local function ZoneName(uiMapID)
@@ -144,8 +162,16 @@ local function TransportGroups(zone)
         end
         if g then
             g.tip = g.tip .. "\n" .. TransportTip(t)
+            g.count = g.count + 1
         else
-            groups[#groups + 1] = { x = t[1], y = t[2], atlas = KIND_ATLAS[t[3]], tip = TransportTip(t) }
+            groups[#groups + 1] = { x = t[1], y = t[2], atlas = KIND_ATLAS[t[3]], tip = TransportTip(t), count = 1 }
+        end
+    end
+    -- A shared pin says how many it holds before listing them.
+    for i = 1, #groups do
+        local g = groups[i]
+        if g.count > 1 then
+            g.tip = "|cffffd100" .. EllesmereUI.Lf("%d transports", g.count) .. "|r\n" .. g.tip
         end
     end
     transportGroups[zone] = groups
@@ -158,7 +184,7 @@ local function DrawZone(zone, shown, isZone)
         for i = 1, #groups do
             local g = groups[i]
             local x, y = Project(zone, shown, g.x / 100, g.y / 100)
-            if x then Place(x, y, g.atlas, PIN_SIZE, g.tip) end
+            if x then Place(x, y, g.atlas, PIN_SIZE, g.tip, nil, g.count) end
         end
     end
     if F.Get("instances") then
@@ -184,9 +210,19 @@ local function DrawZone(zone, shown, isZone)
     end
 end
 
-local function Refresh()
-    Clear()
+-- The map redraws its providers often (shows, quest and area updates): the
+-- pins are rebuilt only when the map or the toggles changed, so a hovered
+-- pin keeps its tooltip.
+local function Refresh(force)
     local mapID = WorldMapFrame:GetMapID()
+    local key = mapID and (mapID .. (F.Get("transports") and "t" or "")
+        .. (F.Get("instances") and "i" or "") .. (F.Get("exits") and "e" or ""))
+    if key and key == shownKey and force ~= true then
+        Rescale()
+        return
+    end
+    Clear()
+    shownKey = key
     local info = mapID and C_Map.GetMapInfo(mapID)
     if not info then return end
     if info.mapType == Enum.UIMapType.Continent then
@@ -206,13 +242,15 @@ local function Build()
 
     layer = CreateFrame("Frame", nil, WorldMapFrame.ScrollContainer.Child)
     layer:SetAllPoints()
-    layer:SetFrameLevel(WorldMapFrame:GetPinFrameLevelsManager():GetValidFrameLevel("PIN_FRAME_LEVEL_DUNGEON_ENTRANCE"))
+    -- Above the map's own points of interest (a city's pin must not take the
+    -- mouse from a dock or a tower beside it).
+    layer:SetFrameLevel(WorldMapFrame:GetPinFrameLevelsManager():GetValidFrameLevel("PIN_FRAME_LEVEL_MAP_LINK"))
 
     provider = CreateFromMixins(MapCanvasDataProviderMixin)
-    provider.OnMapChanged = Refresh
-    provider.RefreshAllData = Refresh
+    provider.OnMapChanged = function() Refresh() end
+    provider.RefreshAllData = function() Refresh() end
     provider.RemoveAllData = Clear
-    provider.OnCanvasScaleChanged = Refresh
+    provider.OnCanvasScaleChanged = Rescale
     provider.OnGlobalAlphaChanged = function(self) layer:SetAlpha(self:GetMap():GetGlobalAlpha()) end
 end
 
@@ -246,7 +284,7 @@ local function Apply()
         WorldMapFrame:AddDataProvider(provider)
         added = true
     end
-    if WorldMapFrame:IsShown() then Refresh() end
+    if WorldMapFrame:IsShown() then Refresh(true) end
 end
 
 -- Options-page entry points.
