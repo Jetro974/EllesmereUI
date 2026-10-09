@@ -17,7 +17,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --                   in the bags. Retail has no pole in the main hand, so it
 --                   never shows there.
 --  Fishing Log      Fishing loot counted per zone; /euifish prints it with
---                   the fishing skill.
+--                   the fishing skill, and a minimap icon sums up the zone
+--                   in its tooltip.
 --
 --  A session starts with a Fishing channel and ends when the player moves,
 --  enters combat or changes zone. Fishing is one spell by name on every
@@ -259,6 +260,69 @@ local function PrintLog()
     end
 end
 
+-- The minimap icon's tooltip: the skill, then the most caught items of the
+-- zone the player is in, then the total.
+local MAX_TIP_CATCHES = 8
+local function LogTip()
+    local lines = {}
+    local name, rank, maxRank = FishingSkill()
+    lines[1] = name and (name .. " " .. rank .. "/" .. maxRank) or EllesmereUI.L("Fishing Log")
+    local log = FishCfg().catches
+    local mapID = C_Map.GetBestMapForUnit("player")
+    local items = log and mapID and log.zones[mapID]
+    if items then
+        local info = C_Map.GetMapInfo(mapID)
+        lines[#lines + 1] = " "
+        lines[#lines + 1] = "|cffffd100" .. (info and info.name or "?") .. "|r"
+        local ids = {}
+        for id in pairs(items) do ids[#ids + 1] = id end
+        table.sort(ids, function(a, b) return items[a] > items[b] end)
+        for i = 1, math.min(#ids, MAX_TIP_CATCHES) do
+            local id = ids[i]
+            lines[#lines + 1] = ("|T%s:14|t %s x%d"):format(C_Item.GetItemIconByID(id) or 134400,
+                C_Item.GetItemNameByID(id) or ("item:" .. id), items[id])
+        end
+    end
+    lines[#lines + 1] = " "
+    lines[#lines + 1] = EllesmereUI.Lf("%1$d fish and items caught.", log and log.total or 0)
+    lines[#lines + 1] = EllesmereUI.L("Click to print the full log in chat.")
+    return table.concat(lines, "\n")
+end
+
+-- A fishing icon on the minimap while the Fishing Log is on, styled like
+-- EllesmereUI's own minimap button.
+local minimapButton
+local function SyncMinimapButton()
+    local on = On("log")
+    if on and not minimapButton then
+        local b = CreateFrame("Button", "EllesmereUIFishingLogButton", Minimap)
+        b:SetSize(32, 32)
+        b:SetFrameStrata("MEDIUM")
+        b:SetFrameLevel(8)
+        b:SetPoint("BOTTOMLEFT", Minimap, "BOTTOMLEFT", 0, 0)
+        local bg = b:CreateTexture(nil, "BACKGROUND")
+        bg:SetSize(25, 25)
+        bg:SetPoint("CENTER")
+        bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
+        bg:SetVertexColor(0, 0, 0, 1)
+        local icon = b:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(17, 17)
+        icon:SetPoint("CENTER")
+        icon:SetTexture("Interface\\Icons\\Trade_Fishing")
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        local border = b:CreateTexture(nil, "OVERLAY")
+        border:SetSize(53, 53)
+        border:SetPoint("TOPLEFT")
+        border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+        b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+        b:SetScript("OnEnter", function(self) EllesmereUI.ShowWidgetTooltip(self, LogTip()) end)
+        b:SetScript("OnLeave", function() EllesmereUI.HideWidgetTooltip() end)
+        b:SetScript("OnClick", function() PrintLog() end)
+        minimapButton = b
+    end
+    if minimapButton then minimapButton:SetShown(on) end
+end
+
 SLASH_EUIFISH1 = "/euifish"
 SlashCmdList["EUIFISH"] = function(msg)
     if strtrim(msg or ""):lower() == "reset" then
@@ -331,6 +395,7 @@ local function ApplyFishing()
     pendingApply = false
     local key = FishCfg().key
     if castButton then ClearOverrideBindings(castButton) end
+    SyncMinimapButton()
     if not AnyOn() then
         EndSession()
         ev:UnregisterAllEvents()

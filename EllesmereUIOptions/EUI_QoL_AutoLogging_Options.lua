@@ -283,7 +283,7 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
     local fishKeyRow
     fishKeyRow, h = W:DualRow(parent, y,
         FishToggle("Fishing Log",
-            "Records what you fish, per zone. Type /euifish to see it with your fishing skill, /euifish reset to clear it.",
+            "Records what you fish, per zone. A fishing icon on the minimap shows your catches in the zone when hovered and prints the whole log when clicked; /euifish does the same, /euifish reset clears it.",
             "log"),
         { type="label", text="Fishing Key",
           tooltip="Casts your fishing line. On WoW Forever without a fishing pole in hand, the first press equips the best pole in your bags and the next one casts." }
