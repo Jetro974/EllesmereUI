@@ -222,7 +222,9 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
         travelToggle("Show Instance Entrances",
             "Shows dungeon and raid entrances on the world map; hover one for its name.",
             "instances"),
-        BLANK()
+        travelToggle("Show Flight Points",
+            "Shows the flight masters on the world map, those you have not found yet included; hover one for its name.",
+            "flights")
     );  y = y - h
 
     ---------------------------------------------------------------------------
