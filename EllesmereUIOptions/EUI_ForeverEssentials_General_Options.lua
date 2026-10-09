@@ -201,9 +201,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
               EllesmereUI:RefreshPage()
           end },
         { type = "toggle", text = "Show Fishing Skill",
-          tooltip = "Adds the zone's fishing skill under its levels: from the skill fish start to bite to the one where none get away, colored by your own skill.",
-          disabled = function() return not ZL.Get("enabled") end,
-          disabledTooltip = "Show Zone Levels",
+          tooltip = "Shows in the world map's corner the fishing skill of the zone you hover, or of the zone the map shows: from the skill fish start to bite to the one where none get away, colored by your own skill. ~ marks an estimate for zones the original game did not have.",
           getValue = function() return ZL.Get("fishing") end,
           setValue = function(v)
               ZL.Cfg().fishing = v
