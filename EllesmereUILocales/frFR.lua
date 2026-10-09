@@ -5667,3 +5667,8 @@ L["Shows under the zone name on the world map the fishing skill of the zone you 
 L["Fishing Key"] = "Touche de pêche"
 L["Casts your fishing line. On WoW Forever without a fishing pole in hand, the first press equips the best pole in your bags and the next one casts."] = "Lance votre ligne. Sur WoW Forever sans canne en main, le premier appui équipe la meilleure canne de vos sacs et le suivant lance la ligne."
 L["Left-click to set a keybind.\nRight-click to unbind."] = "Clic gauche pour définir un raccourci.\nClic droit pour le retirer."
+L["Wide Window"] = "Fenêtre large"
+L["Doubles the merchant window's width to show 20 items per page, with a button in its header that marks the items you already know."] = "Double la largeur de la fenêtre du marchand pour afficher 20 objets par page, avec un bouton dans son en-tête qui marque les objets que vous connaissez déjà."
+L["The merchant Wide Window setting requires a UI reload to fully apply."] = "Le réglage Fenêtre large du marchand nécessite un rechargement de l'interface pour s'appliquer entièrement."
+L["Known items are marked. Click to stop marking them."] = "Les objets connus sont marqués. Cliquez pour ne plus les marquer."
+L["Click to mark the items you already know."] = "Cliquez pour marquer les objets que vous connaissez déjà."
