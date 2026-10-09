@@ -1774,7 +1774,7 @@ initFrame:SetScript("OnEvent", function(self)
         ); y = y - h
 
         _, h = W:DualRow(parent, y,
-            { type="toggle", text="Mark Owned Items",
+            { type="toggle", text="Flag/Hide Owned Items",
               tooltip="In the wide window, tints red the items you already know, have learned or have collected (recipes, mounts, pets, toys...), and adds a button at the top right that hides them.",
               disabled=function() return not (EllesmereUIDB and EllesmereUIDB.merchantWide == true) end,
               disabledTooltip="Wide Window",

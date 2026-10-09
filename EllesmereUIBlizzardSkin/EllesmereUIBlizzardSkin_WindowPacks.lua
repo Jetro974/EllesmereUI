@@ -7894,7 +7894,7 @@ end
 --  hidden (HideNativeMerchantGrid) and 20 tiles of ours, built from
 --  MerchantItemTemplate (Blizzard's own click, tooltip and confirm handlers,
 --  which read the slot index from the button ID), fill pages of 20. The
---  buyback tab shows its 12 items on the same tiles. With Mark Owned Items
+--  buyback tab shows its 12 items on the same tiles. With Flag/Hide Owned Items
 --  (EllesmereUIDB.merchantMarkOwned), items the player already
 --  knows or owns are marked, and a header button hides them from the grid
 --  (EllesmereUIDB.merchantHideKnown).
@@ -7998,7 +7998,9 @@ local function WideFillMerchant(tile, slot, index)
     local isHeirloom = itemID and C_Heirloom.IsItemHeirloom(itemID)
     local knownHeirloom = isHeirloom and C_Heirloom.PlayerHasHeirloom(itemID)
     btn.showNonrefundablePrompt = not C_MerchantFrame.IsMerchantItemRefundable(index)
-    local tintRed = not info.isPurchasable or (not info.isUsable and not isHeirloom)
+    -- An owned item (Flag/Hide Owned Items) reads red like one the player cannot use.
+    local known = EllesmereUIDB.merchantMarkOwned and MerchantItemKnown(index)
+    local tintRed = not info.isPurchasable or (not info.isUsable and not isHeirloom) or known
     SetItemButtonDesaturated(btn, knownHeirloom)
     local r, g, b = 1, 1, 1
     if info.numAvailable == 0 or knownHeirloom then
@@ -8009,7 +8011,6 @@ local function WideFillMerchant(tile, slot, index)
     SetItemButtonTextureVertexColor(btn, r, g, b)
     SetItemButtonNormalTextureVertexColor(btn, r, g, b)
 
-    local known = EllesmereUIDB.merchantMarkOwned and MerchantItemKnown(index)
     local mark = (known or GetFFD(tile).known) and WideKnownMark(tile)
     if mark then
         mark:SetShown(known)
@@ -8186,7 +8187,7 @@ end
 -- Runs whatever the merchant window's style (reskinned or Blizzard's): built
 -- on the first opening, then refreshed with Blizzard's own updates (page,
 -- tab, purchases). Nothing is registered while the setting is off.
--- Options entry point: Mark Owned Items applies to an open window at once.
+-- Options entry point: Flag/Hide Owned Items applies to an open window at once.
 EllesmereUI._Merchant_RefreshWide = function()
     if wide.built and _G.MerchantFrame:IsVisible() then UpdateWideMerchant() end
 end
