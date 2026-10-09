@@ -1746,8 +1746,11 @@ initFrame:SetScript("OnEvent", function(self)
               end },
             { type="toggle", text="Wide Window",
               tooltip="Doubles the merchant window's width to show 20 items per page, with a button in its header that marks the items you already know.",
-              disabled=function() return EllesmereUIDB and EllesmereUIDB.merchantShowAsList == true end,
-              disabledTooltip="Show As List",
+              -- Locked only while Show As List actually runs (it needs the reskin).
+              disabled=function()
+                  return EllesmereUIDB and EllesmereUIDB.merchantShowAsList == true and not themedOff()
+              end,
+              disabledTooltip="Show As List", requireState="disabled",
               getValue=function()
                   return EllesmereUIDB and EllesmereUIDB.merchantWide == true
               end,

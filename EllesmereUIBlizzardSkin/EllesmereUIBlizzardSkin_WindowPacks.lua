@@ -8163,7 +8163,9 @@ wideDriver:RegisterEvent("PLAYER_LOGIN")
 wideDriver:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_LOGIN" then
         self:UnregisterEvent("PLAYER_LOGIN")
-        if not EllesmereUIDB.merchantWide or EllesmereUIDB.merchantShowAsList then return end
+        -- Show As List wins, but it only runs while the merchant reskin is on.
+        if not EllesmereUIDB.merchantWide
+            or (EllesmereUIDB.merchantShowAsList and WideThemed()) then return end
         self:RegisterEvent("MERCHANT_SHOW")
         hooksecurefunc("MerchantFrame_Update", function()
             if wide.built and _G.MerchantFrame:IsVisible() then UpdateWideMerchant() end
