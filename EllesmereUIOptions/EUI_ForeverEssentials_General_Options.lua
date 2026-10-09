@@ -201,20 +201,20 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
                   AC.Apply()
                   EllesmereUI:RefreshPage()
               end },
-            { type = "slider", text = "Low Ammo Warning", min = 0, max = 1000, step = 50,
+            { type = "slider", text = "Low Ammo Threshold", min = 0, max = 1000, step = 50,
               tooltip = "Under this many, the count turns orange; under half of it, red.",
               disabled = function() return not AC.Get("enabled") end,
               disabledTooltip = "Ammo Counter",
               getValue = function() return AC.Get("warn") end,
               setValue = function(v)
                   AC.Cfg().warn = v
-                  AC.Update()
+                  AC.Update(true)
               end }
         );  y = y - h
 
         _, h = W:DualRow(parent, y,
             { type = "toggle", text = "Low Ammo Alert",
-              tooltip = "Like Low Durability, shows a pulsing warning above the middle of the screen while your ammo is under the Low Ammo Warning. Hidden in combat.",
+              tooltip = "Like Low Durability, shows a pulsing warning above the middle of the screen while your ammo is under the Low Ammo Threshold. Hidden in combat.",
               disabled = function() return not AC.Get("enabled") end,
               disabledTooltip = "Ammo Counter",
               getValue = function() return AC.Get("alert") end,

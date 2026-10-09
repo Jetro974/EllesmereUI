@@ -69,11 +69,18 @@ local function SyncAlert(count)
     alert:Show()
 end
 
-local function Update()
+-- Bag events fire for any bag change, not only a shot: nothing is redrawn
+-- while the ammo and its count stay the same, unless force (a setting, or the
+-- end of combat bringing the alert back).
+local shownCount, shownTexture
+local function Update(force)
     if not frame then return end
     local count = GetInventoryItemCount("player", INVSLOT_AMMO) or 0
+    local texture = GetInventoryItemTexture("player", INVSLOT_AMMO) or NO_AMMO_ICON
+    if not force and count == shownCount and texture == shownTexture then return end
+    shownCount, shownTexture = count, texture
     SyncAlert(count)
-    frame.icon:SetTexture(GetInventoryItemTexture("player", INVSLOT_AMMO) or NO_AMMO_ICON)
+    frame.icon:SetTexture(texture)
     frame.icon:SetDesaturated(count == 0)
     local warn = Get("warn")
     if count < warn / 2 then
@@ -116,7 +123,7 @@ local function Build()
             if alert then alert:Hide() end
             return
         end
-        Update()
+        Update(event == "PLAYER_REGEN_ENABLED")
     end)
 end
 
@@ -138,7 +145,7 @@ local function Apply()
             events:UnregisterEvent("PLAYER_REGEN_DISABLED")
             events:UnregisterEvent("PLAYER_REGEN_ENABLED")
         end
-        Update()
+        Update(true)
     else
         events:UnregisterAllEvents()
         if alert then alert:Hide() end
