@@ -5599,3 +5599,8 @@ L["This bar sizes its blocks itself, so the width is not this block's to choose.
 L["How precise the coordinates read. More decimals make the block wider."] = "Précision d'affichage des coordonnées. Plus il y a de décimales, plus le bloc est large."
 L["Hide in Instance"] = "Masquer en instance"
 L["Removes the block from the bar in instanced content, where player coordinates are unavailable."] = "Retire le bloc de la barre dans le contenu instancié, où les coordonnées du joueur ne sont pas disponibles."
+L["AMMO"] = "MUNITIONS"
+L["Ammo Counter"] = "Compteur de munitions"
+L["Shows your equipped ammo and how many are left; move it in Unlock Mode."] = "Affiche vos munitions équipées et le nombre restant ; déplacez-le en mode Déverrouillage."
+L["Low Ammo Warning"] = "Alerte munitions basses"
+L["Under this many, the count turns orange; under a quarter of it, red."] = "En dessous de ce nombre, le compteur passe en orange ; en dessous du quart, en rouge."
