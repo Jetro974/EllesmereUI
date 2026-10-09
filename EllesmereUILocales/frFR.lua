@@ -5685,7 +5685,6 @@ L["In the wide window, tints red the items you already know, have learned or hav
 L["Hide Owned (%d)"] = "Masquer les acquis (%d)"
 L["Show Owned (%d)"] = "Afficher les acquis (%d)"
 L["Items you already know, have learned or have collected (recipes, mounts, pets, toys...) are tinted red. Click to hide them from the list, or to show them again."] = "Les objets que vous connaissez, avez appris ou collectionnés (recettes, montures, mascottes, jouets...) sont teintés en rouge. Cliquez pour les masquer de la liste, ou pour les afficher à nouveau."
-L["%d transports"] = "%d transports"
 L["Show Town Services"] = "Afficher les services des villes"
 L["Shows bankers, auctioneers, flight masters, mailboxes, innkeepers, repairs, stable masters, battlemasters and trainers on the world map. Each one appears once you have used it: the map learns where it stands. Pick which ones show with the cog."] = "Affiche sur la carte du monde les banquiers, commissaires-priseurs, maîtres de vol, boîtes aux lettres, aubergistes, réparateurs, maîtres des écuries, maîtres de guerre et entraîneurs. Chacun apparaît une fois que vous l'avez utilisé : la carte apprend où il se trouve. Choisissez lesquels afficher avec le rouage."
 L["Town Services"] = "Services des villes"

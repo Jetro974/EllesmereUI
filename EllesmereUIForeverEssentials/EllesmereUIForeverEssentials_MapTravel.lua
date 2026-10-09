@@ -210,18 +210,13 @@ local function TransportGroups(zone)
                 break
             end
         end
+        -- Each destination on its own line, led by its transport's icon.
+        local line = ("|A:%s:16:16|a %s"):format(KIND_ATLAS[t[3]], TransportTip(t))
         if g then
-            g.tip = g.tip .. "\n" .. TransportTip(t)
+            g.tip = g.tip .. "\n" .. line
             g.count = g.count + 1
         else
-            groups[#groups + 1] = { x = t[1], y = t[2], atlas = KIND_ATLAS[t[3]], tip = TransportTip(t), count = 1 }
-        end
-    end
-    -- A shared pin says how many it holds before listing them.
-    for i = 1, #groups do
-        local g = groups[i]
-        if g.count > 1 then
-            g.tip = "|cffffd100" .. EllesmereUI.Lf("%d transports", g.count) .. "|r\n" .. g.tip
+            groups[#groups + 1] = { x = t[1], y = t[2], atlas = KIND_ATLAS[t[3]], tip = line, count = 1 }
         end
     end
     transportGroups[zone] = groups
