@@ -1745,7 +1745,7 @@ initFrame:SetScript("OnEvent", function(self)
                   if EllesmereUI._Merchant_RefreshItemLevels then EllesmereUI._Merchant_RefreshItemLevels() end
               end },
             { type="toggle", text="Wide Window",
-              tooltip="Doubles the merchant window's width to show 20 items per page, with the items you already know or own marked, and a button in its header that hides them.",
+              tooltip="Doubles the merchant window's width to show 20 items per page.",
               -- Locked only while Show As List actually runs (it needs the reskin).
               disabled=function()
                   return EllesmereUIDB and EllesmereUIDB.merchantShowAsList == true and not themedOff()
@@ -1771,6 +1771,22 @@ initFrame:SetScript("OnEvent", function(self)
                       end,
                   })
               end }
+        ); y = y - h
+
+        _, h = W:DualRow(parent, y,
+            { type="toggle", text="Mark Owned Items",
+              tooltip="In the wide window, tints red the items you already know, have learned or have collected (recipes, mounts, pets, toys...), and adds a button at the top right that hides them.",
+              disabled=function() return not (EllesmereUIDB and EllesmereUIDB.merchantWide == true) end,
+              disabledTooltip="Wide Window",
+              getValue=function()
+                  return EllesmereUIDB and EllesmereUIDB.merchantMarkOwned == true
+              end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.merchantMarkOwned = v
+                  if EllesmereUI._Merchant_RefreshWide then EllesmereUI._Merchant_RefreshWide() end
+              end },
+            EllesmereUI.BlankRowCfg()
         ); y = y - h
 
         return y
@@ -4036,7 +4052,7 @@ initFrame:SetScript("OnEvent", function(self)
                     "charSheetSocketPanel", "charSheetIconZoom", "charSheetEnchantNames",
                     "charSheetEnchantSize", "inspectShowEnchants", "inspectShowItemLevel",
                     "inspectShowUpgradeTrack", "merchantShowAsList", "merchantListRowHeight",
-                    "merchantShowItemLevel", "merchantWide", "merchantHideKnown",
+                    "merchantShowItemLevel", "merchantWide", "merchantHideKnown", "merchantMarkOwned",
                     "tooltipItemLevel", "tooltipShowMode",
                     "tooltipShowModifier", "tooltipGrowthDirection", "tooltipBgColor",
                     "tooltipBgOpacity", "showSpellID", "spellIDModifier", "showIconID",
