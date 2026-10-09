@@ -6,7 +6,7 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  as the map does on its own wherever C_Map.GetMapLevels has data (it
 --  returns 0 on Forever), colored by the quest difficulty colors. A separate
 --  toggle shows the fishing skill of the hovered zone (else of the zone the
---  map shows) in the map's bottom right corner.
+--  map shows) in a box in the map's top left corner.
 --
 --  Taint: nothing of Blizzard's map is hooked or written to, only read. A frame
 --  of our own, child of the map's scroll container (so it only updates while
@@ -93,7 +93,8 @@ local FISHING_ICON = "|TInterface\Icons\Trade_Fishing:16|t"
 
 local UPDATE_INTERVAL = 0.15
 local TEXT_OFFSET_Y   = -50  -- just under the map's own area name
-local CORNER_OFFSET   = 10   -- the fishing line, in the map's bottom right corner
+local BOX_OFFSET      = 10   -- the fishing box, in the map's top left corner
+local BOX_PAD         = 6
 
 local watcher  -- ours; nil until a setting is first on
 
@@ -122,7 +123,7 @@ local function FishingSkill()
     return rank
 end
 
--- "Zone: min-reliable", colored by the player's skill: red below the base,
+-- "Fishing - Zone" over "min-reliable", colored by the player's skill: red below the base,
 -- yellow while fish still get away, green once nothing does. "~" marks an
 -- estimate.
 local function FishingText(zone)
@@ -135,8 +136,8 @@ local function FishingText(zone)
         color = skill < low and "|cffff4040" or skill < high and "|cffffd100" or "|cff40ff40"
     end
     local info = C_Map.GetMapInfo(zone)
-    return ("%s %s: %s%s%d-%d|r"):format(FISHING_ICON, info and info.name or "",
-        color, estimate and "~" or "", low, high)
+    return ("%s %s - %s\n%s%s%d-%d|r"):format(FISHING_ICON, EllesmereUI.L("Fishing"),
+        info and info.name or "", color, estimate and "~" or "", low, high)
 end
 
 -- The map's own format: the range is colored like a quest of the nearest level.
@@ -192,10 +193,12 @@ local function OnUpdate(self, elapsed)
 
     local fishing = F.Get("fishing") and FishingText(fishZone)
     if fishing then
-        self.fishing:SetText(fishing)
-        self.fishing:Show()
+        local box = self.fishBox
+        box.text:SetText(fishing)
+        box:SetSize(box.text:GetStringWidth() + BOX_PAD * 2, box.text:GetStringHeight() + BOX_PAD * 2)
+        box:Show()
     else
-        self.fishing:Hide()
+        self.fishBox:Hide()
     end
 end
 
@@ -209,9 +212,16 @@ local function Build()
     watcher.text = watcher:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     watcher.text:SetPoint("TOP", 0, TEXT_OFFSET_Y)
     watcher.text:Hide()
-    watcher.fishing = watcher:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    watcher.fishing:SetPoint("BOTTOMRIGHT", -CORNER_OFFSET, CORNER_OFFSET)
-    watcher.fishing:Hide()
+    local box = CreateFrame("Frame", nil, watcher)
+    box:SetPoint("TOPLEFT", BOX_OFFSET, -BOX_OFFSET)
+    local bg = box:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0, 0, 0, 0.65)
+    box.text = box:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    box.text:SetPoint("TOPLEFT", BOX_PAD, -BOX_PAD)
+    box.text:SetJustifyH("LEFT")
+    box:Hide()
+    watcher.fishBox = box
     watcher:SetScript("OnUpdate", OnUpdate)
 end
 
