@@ -210,19 +210,33 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         FishToggle("Fishing Sounds",
             "While you fish, mutes music and ambience and raises sound effects (also when the game is in the background) so the bobber splash stands out. Your sound settings come back when you move, enter combat or change zone.",
             "sound"),
-        FishToggle("Double-Click to Fish",
-            "Double right-click in the world to cast Fishing. On WoW Forever without a fishing pole in hand, it equips the best one in your bags first. Never in combat or while mounted.",
-            "doubleClick")
-    ); y = y - h
-
-    _, h = W:DualRow(parent, y,
         FishToggle("Lure Reminder",
             "While you fish with no lure on your pole, shows a button that applies the best lure in your bags. WoW Forever only: retail lures work differently.",
-            "lure"),
+            "lure")
+    ); y = y - h
+
+    -- Fishing Log | Fishing Key (keybind)
+    local fishKeyRow
+    fishKeyRow, h = W:DualRow(parent, y,
         FishToggle("Fishing Log",
             "Records what you fish, per zone. Type /euifish to see it with your fishing skill, /euifish reset to clear it.",
-            "log")
+            "log"),
+        { type="label", text="Fishing Key" }
     ); y = y - h
+    if not EllesmereUI._prebuilding then
+        local rgn = fishKeyRow._rightRegion
+        local kbBtn, refresh = EllesmereUI.BuildKeybindButton(rgn, {
+            w = 140, h = 30, font = 13,
+            get = function() return FishCfg().key end,
+            set = function(v)
+                FishCfg().key = v
+                if _G._EUI_ApplyFishing then _G._EUI_ApplyFishing() end
+            end,
+            tooltip = "Casts Fishing. On WoW Forever without a fishing pole in hand, it equips the best one in your bags instead.\n\nLeft-click to set a keybind.\nRight-click to unbind.",
+        })
+        PP.Point(kbBtn, "RIGHT", rgn, "RIGHT", -20, 0)
+        EllesmereUI.RegisterWidgetRefresh(refresh)
+    end
 
     _, h = W:Spacer(parent, y, 20); y = y - h
 
