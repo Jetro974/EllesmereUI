@@ -71,17 +71,18 @@ return {
         [1451] = { {82.0,18.0,1449} },
         [1452] = { {28.0,34.0,1448} },
     },
-    -- uiMapID = { { x, y, instance mapID, isRaid }, ... }: the instances in the
+    -- uiMapID = { { x, y, instance mapID, isRaid, entrance }, ... }: the instances in the
     -- client's own dungeon list (LFGDungeons) that have an entrance point,
     -- dungeons only: no raid is open at WoW Forever's launch (isRaid stays for
-    -- when they are).
+    -- when they are). Secondary entrances and wing names are placed by hand
+    -- (the game gives one point per instance).
     instances = {
         [1413] = { {47.7,35.0,43}, {42.3,89.9,47}, {50.9,92.9,129} },  -- The Barrens
-        [1418] = { {35.2,10.3,70} },                                  -- Badlands
-        [1420] = { {85.1,31.4,189} },                                 -- Tirisfal Glades
+        [1418] = { {35.2,10.3,70,nil,"Main Entrance"}, {65.4,43.6,70,nil,"Back Entrance"} },  -- Badlands
+        [1420] = { {85.1,31.4,189,nil,"Graveyard, Library, Armory, Cathedral"} },  -- Tirisfal Glades
         [1421] = { {44.7,67.8,33} },                                  -- Silverpine Forest
         [1422] = { {69.1,73.0,289} },                                 -- Western Plaguelands
-        [1423] = { {26.1,10.4,329} },                                 -- Eastern Plaguelands
+        [1423] = { {26.1,10.4,329,nil,"Main Gate"}, {43.6,19.0,329,nil,"Service Entrance"} },  -- Eastern Plaguelands
         [1426] = { {17.7,39.2,90} },                                  -- Dun Morogh
         [1427] = { {40.8,95.6,229}, {27.1,72.5,230} },                -- Searing Gorge
         [1428] = { {33.0,25.2,229}, {22.6,7.5,230} },                 -- Burning Steppes
@@ -89,7 +90,7 @@ return {
         [1436] = { {42.5,71.7,36} },                                  -- Westfall
         [1440] = { {16.5,11.0,48} },                                  -- Ashenvale
         [1443] = { {29.1,62.9,349} },                                 -- Desolace
-        [1444] = { {62.0,33.3,429} },                                 -- Feralas
+        [1444] = { {62.5,24.9,429,nil,"North"}, {65.0,29.8,429,nil,"East"}, {60.3,30.3,429,nil,"West"} },  -- Feralas
         [1446] = { {38.7,19.9,209} },                                 -- Tanaris
         [1453] = { {50.4,66.2,34} },                                  -- Stormwind City
         [1454] = { {53.0,48.9,389} },                                 -- Orgrimmar

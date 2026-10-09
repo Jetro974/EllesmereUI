@@ -116,8 +116,11 @@ local function TransportTip(t)
     return EllesmereUI.Lf("Tram to %s", where)
 end
 
+-- The instance's name, the entrance or wings it opens on, then its kind.
 local function InstanceTip(i)
-    return GetRealZoneText(i[3]) .. "\n" .. (i[4] and EllesmereUI.L("Raid") or EllesmereUI.L("Dungeon"))
+    local tip = GetRealZoneText(i[3])
+    if i[5] then tip = tip .. "\n|cffffffff" .. EllesmereUI.L(i[5]) .. "|r" end
+    return tip .. "\n" .. (i[4] and EllesmereUI.L("Raid") or EllesmereUI.L("Dungeon"))
 end
 
 -- Where a zone point lands on the shown map: the zone itself, or a map that
