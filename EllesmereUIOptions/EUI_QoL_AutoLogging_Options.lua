@@ -285,7 +285,8 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         FishToggle("Fishing Log",
             "Records what you fish, per zone. Type /euifish to see it with your fishing skill, /euifish reset to clear it.",
             "log"),
-        { type="label", text="Fishing Key" }
+        { type="label", text="Fishing Key",
+          tooltip="Casts your fishing line. On WoW Forever without a fishing pole in hand, the first press equips the best pole in your bags and the next one casts." }
     ); y = y - h
     if not EllesmereUI._prebuilding then
         local rgn = fishKeyRow._rightRegion
@@ -296,7 +297,7 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
                 FishCfg().key = v
                 if _G._EUI_ApplyFishing then _G._EUI_ApplyFishing() end
             end,
-            tooltip = "Casts Fishing. On WoW Forever without a fishing pole in hand, it equips the best one in your bags instead.\n\nLeft-click to set a keybind.\nRight-click to unbind.",
+            tooltip = "Left-click to set a keybind.\nRight-click to unbind.",
         })
         PP.Point(kbBtn, "RIGHT", rgn, "RIGHT", -20, 0)
         EllesmereUI.RegisterWidgetRefresh(refresh)
