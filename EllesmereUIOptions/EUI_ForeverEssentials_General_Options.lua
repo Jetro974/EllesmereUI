@@ -232,6 +232,33 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
         BLANK()
     );  y = y - h
 
+    -- Hunters only: no ammo counter is built for other classes.
+    local AC = EllesmereUI._AmmoCounter
+    if AC and AC.isHunter then
+        _, h = W:Spacer(parent, y, 20);  y = y - h
+        _, h = W:SectionHeader(parent, "AMMO", y);  y = y - h
+
+        _, h = W:DualRow(parent, y,
+            { type = "toggle", text = "Ammo Counter",
+              tooltip = "Shows your equipped ammo and how many are left; move it in Unlock Mode.",
+              getValue = function() return AC.Get("enabled") end,
+              setValue = function(v)
+                  AC.Cfg().enabled = v
+                  AC.Apply()
+                  EllesmereUI:RefreshPage()
+              end },
+            { type = "slider", text = "Low Ammo Warning", min = 0, max = 1000, step = 50,
+              tooltip = "Under this many, the count turns orange; under a quarter of it, red.",
+              disabled = function() return not AC.Get("enabled") end,
+              disabledTooltip = "Ammo Counter",
+              getValue = function() return AC.Get("warn") end,
+              setValue = function(v)
+                  AC.Cfg().warn = v
+                  AC.Update()
+              end }
+        );  y = y - h
+    end
+
     ---------------------------------------------------------------------------
     --  NAME FORMAT (while a module with a Name Format is on)
     ---------------------------------------------------------------------------

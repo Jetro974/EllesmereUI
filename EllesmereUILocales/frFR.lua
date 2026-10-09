@@ -5672,3 +5672,8 @@ L["Doubles the merchant window's width to show 20 items per page, with a button 
 L["The merchant Wide Window setting requires a UI reload to fully apply."] = "Le réglage Fenêtre large du marchand nécessite un rechargement de l'interface pour s'appliquer entièrement."
 L["Known items are marked. Click to stop marking them."] = "Les objets connus sont marqués. Cliquez pour ne plus les marquer."
 L["Click to mark the items you already know."] = "Cliquez pour marquer les objets que vous connaissez déjà."
+L["AMMO"] = "MUNITIONS"
+L["Ammo Counter"] = "Compteur de munitions"
+L["Shows your equipped ammo and how many are left; move it in Unlock Mode."] = "Affiche vos munitions équipées et le nombre restant ; déplacez-le en mode Déverrouillage."
+L["Low Ammo Warning"] = "Alerte munitions basses"
+L["Under this many, the count turns orange; under a quarter of it, red."] = "En dessous de ce nombre, le compteur passe en orange ; en dessous du quart, en rouge."
