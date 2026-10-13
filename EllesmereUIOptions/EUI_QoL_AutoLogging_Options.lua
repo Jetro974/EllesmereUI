@@ -73,6 +73,12 @@ local function SetWay(key, value)
     EllesmereUIDB.waypointCmd[key] = value
 end
 
+local function FishCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.fishing = EllesmereUIDB.fishing or {}
+    return EllesmereUIDB.fishing
+end
+
 -- Built as the tail of the Quality of Life page (chained from BuildQoLPage),
 -- not as its own tab. Lays out from yOffset and returns the height used,
 -- like every other section builder.
@@ -242,6 +248,63 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
               end },
         },
     })
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
+
+    ---------------------------------------------------------------------------
+    --  FISHING (One-Button Fishing, runtime in EllesmereUIQoL_Fishing.lua)
+    ---------------------------------------------------------------------------
+    _, h = W:SectionHeader(parent, "FISHING", y); y = y - h
+
+    local function ApplyFishing()
+        if _G._EUI_ApplyFishing then _G._EUI_ApplyFishing() end
+    end
+    local function NoFishKey() return FishCfg().key == nil end
+
+    -- Fishing Key (keybind) | Reel In With the Key
+    local fishKeyRow
+    fishKeyRow, h = W:DualRow(parent, y,
+        { type="label", text="Fishing Key",
+          tooltip="One key for the whole loop: casts your line, then reels it in once the bobber bites. On WoW Forever, it first equips the best fishing pole in your bags if you hold none." },
+        { type    = "toggle",
+          text    = "Reel In With the Key",
+          tooltip = "While your line is in the water and the bobber is on screen, the Fishing Key reels it in; the line out, the key casts again. Turns on soft interact while you fish, and puts your settings back after.",
+          disabled = NoFishKey,
+          disabledTooltip = "Fishing Key",
+          -- On by default.
+          getValue = function() return FishCfg().reel ~= false end,
+          setValue = function(v) FishCfg().reel = v; ApplyFishing() end }
+    ); y = y - h
+    if not EllesmereUI._prebuilding then
+        local rgn = fishKeyRow._leftRegion
+        local kbBtn, refresh = EllesmereUI.BuildKeybindButton(rgn, {
+            w = 140, h = 30, font = 13,
+            get = function() return FishCfg().key end,
+            set = function(v)
+                FishCfg().key = v
+                ApplyFishing()
+                EllesmereUI:RefreshPage()
+            end,
+            tooltip = "Left-click to set a keybind.\nRight-click to unbind.",
+        })
+        PP.Point(kbBtn, "RIGHT", rgn, "RIGHT", -20, 0)
+        EllesmereUI.RegisterWidgetRefresh(refresh)
+    end
+
+    -- Lures are weapon enchants on the pole on WoW Forever only.
+    if EllesmereUI.IS_FOREVER then
+        _, h = W:DualRow(parent, y,
+            { type    = "toggle",
+              text    = "Apply Lure With the Key",
+              tooltip = "When your fishing pole has no lure, the Fishing Key first applies the best lure in your bags; the next press casts.",
+              disabled = NoFishKey,
+              disabledTooltip = "Fishing Key",
+              -- On by default.
+              getValue = function() return FishCfg().lure ~= false end,
+              setValue = function(v) FishCfg().lure = v; ApplyFishing() end },
+            EllesmereUI.BlankRowCfg()
+        ); y = y - h
+    end
 
     _, h = W:Spacer(parent, y, 20); y = y - h
 

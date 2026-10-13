@@ -5823,3 +5823,12 @@ L["Reveal Unexplored Areas Settings"] = "Réglages : Révéler les zones inexplo
 L["Shows the parts of the world map you have not explored yet. Use the cog to pick their color."] = "Affiche les parties de la carte du monde que vous n'avez pas encore explorées. Le rouage permet de choisir leur couleur."
 L["Unexplored Color"] = "Couleur des zones inexplorées"
 L["Tints the areas you have not explored yet. White shows them as they are."] = "Teinte les zones que vous n'avez pas encore explorées. Le blanc les affiche telles quelles."
+
+-- One-Button Fishing (EllesmereUIQoL_Fishing.lua)
+L["FISHING"] = "PÊCHE"
+L["Fishing Key"] = "Touche de pêche"
+L["One key for the whole loop: casts your line, then reels it in once the bobber bites. On WoW Forever, it first equips the best fishing pole in your bags if you hold none."] = "Une seule touche pour tout : elle lance votre ligne, puis la ramène quand ça mord. Sur WoW Forever, elle équipe d'abord la meilleure canne à pêche de vos sacs si vous n'en tenez pas."
+L["Reel In With the Key"] = "Ferrer avec la touche"
+L["While your line is in the water and the bobber is on screen, the Fishing Key reels it in; the line out, the key casts again. Turns on soft interact while you fish, and puts your settings back after."] = "Tant que votre ligne est à l'eau et que le bouchon est à l'écran, la touche de pêche la ramène ; la ligne sortie, la touche relance. Active l'interaction douce pendant que vous pêchez, puis remet vos réglages."
+L["Apply Lure With the Key"] = "Poser un appât avec la touche"
+L["When your fishing pole has no lure, the Fishing Key first applies the best lure in your bags; the next press casts."] = "Quand votre canne n'a pas d'appât, la touche de pêche pose d'abord le meilleur appât de vos sacs ; l'appui suivant lance la ligne."
