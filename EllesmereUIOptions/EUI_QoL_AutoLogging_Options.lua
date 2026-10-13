@@ -60,6 +60,21 @@ local function TeleCfg()
     return EllesmereUIDB.teleportPrompt
 end
 
+local function PetCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.petSummon = EllesmereUIDB.petSummon or {}
+    return EllesmereUIDB.petSummon
+end
+
+-- This character's pet settings (keyed by player GUID), created on write.
+local function PetCharCfg()
+    local cfg, guid = PetCfg(), UnitGUID("player")
+    if not guid then return {} end
+    cfg.chars = cfg.chars or {}
+    cfg.chars[guid] = cfg.chars[guid] or {}
+    return cfg.chars[guid]
+end
+
 -- Read-only: the /way table appears on the first write, so viewing the page
 -- saves nothing.
 local NO_WAY_CFG = {}
@@ -197,6 +212,44 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
 
     _, h = W:Spacer(parent, y, 20); y = y - h
     end -- not IS_FOREVER
+
+    ---------------------------------------------------------------------------
+    --  COMPANION PETS (runtime in EllesmereUIQoL_PetSummon.lua)
+    ---------------------------------------------------------------------------
+    if C_PetJournal then
+    _, h = W:SectionHeader(parent, "COMPANION PETS", y); y = y - h
+
+    local function PetOff() return PetCfg().enabled ~= true end
+
+    _, h = W:DualRow(parent, y,
+        { type    = "toggle",
+          text    = "Auto Summon Pet",
+          tooltip = "Summons a random favorite pet again a moment after the game takes yours away (death, loading screen, taxi, vehicle...), or any random pet while you have no favorite. A pet you dismiss yourself stays dismissed. Never in combat, dungeons, raids, PvP, stealth or while mounted.",
+          -- Off by default.
+          getValue = function() return PetCfg().enabled == true end,
+          setValue = function(v)
+              PetCfg().enabled = v
+              if _G._EUI_ApplyPetSummon then _G._EUI_ApplyPetSummon() end
+              EllesmereUI:RefreshPage()
+          end },
+        { type    = "toggle",
+          text    = "Favorites per Character",
+          tooltip = "This character summons among its own favorites instead of your account's. Right-click a pet in the Pet Journal and check Favorite for This Character; a blue star marks it in the list. While this character has none, your account's favorites are used. Saved for this character only.",
+          disabled = PetOff,
+          disabledTooltip = "Auto Summon Pet",
+          -- Off by default; read without creating this character's table.
+          getValue = function()
+              local chars, guid = PetCfg().chars, UnitGUID("player")
+              return chars ~= nil and guid ~= nil and chars[guid] ~= nil and chars[guid].own == true
+          end,
+          setValue = function(v)
+              PetCharCfg().own = v or nil
+              if _G._EUI_RefreshPetJournal then _G._EUI_RefreshPetJournal() end
+          end }
+    ); y = y - h
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
+    end -- C_PetJournal
 
     ---------------------------------------------------------------------------
     --  WAYPOINT COMMAND (/way, runtime in EllesmereUIQoL_Waypoint.lua)

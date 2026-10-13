@@ -5823,3 +5823,11 @@ L["Reveal Unexplored Areas Settings"] = "Réglages : Révéler les zones inexplo
 L["Shows the parts of the world map you have not explored yet. Use the cog to pick their color."] = "Affiche les parties de la carte du monde que vous n'avez pas encore explorées. Le rouage permet de choisir leur couleur."
 L["Unexplored Color"] = "Couleur des zones inexplorées"
 L["Tints the areas you have not explored yet. White shows them as they are."] = "Teinte les zones que vous n'avez pas encore explorées. Le blanc les affiche telles quelles."
+
+-- Auto Summon Pet (EllesmereUIQoL_PetSummon.lua)
+L["COMPANION PETS"] = "MASCOTTES"
+L["Auto Summon Pet"] = "Invocation auto de mascotte"
+L["Summons a random favorite pet again a moment after the game takes yours away (death, loading screen, taxi, vehicle...), or any random pet while you have no favorite. A pet you dismiss yourself stays dismissed. Never in combat, dungeons, raids, PvP, stealth or while mounted."] = "Réinvoque une mascotte favorite au hasard peu après que le jeu a retiré la vôtre (mort, écran de chargement, taxi, véhicule...), ou n'importe quelle mascotte au hasard si vous n'avez aucune favorite. Une mascotte que vous renvoyez vous-même reste renvoyée. Jamais en combat, en donjon, en raid, en JcJ, camouflé ou sur une monture."
+L["Favorites per Character"] = "Favorites par personnage"
+L["This character summons among its own favorites instead of your account's. Right-click a pet in the Pet Journal and check Favorite for This Character; a blue star marks it in the list. While this character has none, your account's favorites are used. Saved for this character only."] = "Ce personnage invoque parmi ses propres favorites au lieu de celles du compte. Clic droit sur une mascotte dans le journal des mascottes, puis cochez Favorite de ce personnage ; une étoile bleue la signale dans la liste. Tant que ce personnage n'en a aucune, les favorites du compte sont utilisées. Réglage propre à ce personnage."
+L["Favorite for This Character"] = "Favorite de ce personnage"
