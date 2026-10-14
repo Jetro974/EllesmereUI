@@ -399,7 +399,8 @@ end
 
 -- A level up waits for the game's level-up toast.
 local pending, hooked
-local FALLBACK = 8   -- seconds before it shows on its own
+local FALLBACK = 8      -- seconds before it shows on its own
+local AFTER_GAME = 0.15  -- seconds after the game's toast starts fading in
 
 local function ShowPending()
     local p = pending
@@ -408,14 +409,14 @@ local function ShowPending()
 end
 
 -- The game's toast fades in after its show animation's start delay (read,
--- never changed): ours waits as long, once.
+-- never changed): ours waits as long, once, and a beat more (AFTER_GAME).
 local function OnGameToast(manager)
     local shown = pending and manager.currentDisplayingToast
     local info = shown and shown.toastInfo
     if not (info and info.eventType == Enum.EventToastEventType.LevelUp) then return end
     local anim = shown.showAnim and shown.showAnim.anim1
     local p = pending
-    C_Timer.After(anim and anim:GetStartDelay() or 0, function()
+    C_Timer.After((anim and anim:GetStartDelay() or 0) + AFTER_GAME, function()
         if pending == p then ShowPending() end
     end)
 end
