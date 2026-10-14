@@ -2,10 +2,10 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -------------------------------------------------------------------------------
 --  EUI_ForeverEssentials_Training_Options.lua
 --  Builds the Training page of Forever Essentials: the Training Planner's
---  list of what a class trainer teaches, by level, with each ability's cost.
---  The player's own class also shows what this character has trained and
---  what it can train now; another class recorded on the account can be
---  picked.
+--  list of what a class trainer teaches, by level, with each ability's cost
+--  once a trainer of that class was visited. The player's own class also
+--  shows what this character has trained and what it can train now; any
+--  other class can be picked.
 -------------------------------------------------------------------------------
 local ROW_H = 26
 local ICON = 20
@@ -13,7 +13,7 @@ local ICON = 20
 local shownClass  -- the class the list shows; the player's own until picked
 
 local function Coins(copper)
-    return copper > 0 and C_CurrencyInfo.GetCoinTextureString(copper) or ""
+    return copper and copper > 0 and C_CurrencyInfo.GetCoinTextureString(copper) or ""
 end
 
 local function ClassName(class)
@@ -27,7 +27,7 @@ local function RowEnter(row)
     local tip = e.name
     if e.rank then tip = tip .. " |cffaaaaaa(" .. e.rank .. ")|r" end
     tip = tip .. "\n" .. EllesmereUI.Lf("Level %d", e.level)
-    if e.cost > 0 then tip = tip .. "\n" .. Coins(e.cost) end
+    if e.cost and e.cost > 0 then tip = tip .. "\n" .. Coins(e.cost) end
     EllesmereUI.ShowWidgetTooltip(row, tip)
 end
 
@@ -120,7 +120,7 @@ _G._EUI_BuildForeverTrainingPage = function(pageName, parent, yOffset)
         local _, btn = EllesmereUI.BuildActivationOverlay(cover, {
             fontPath = fontPath, width = parent:GetWidth(),
             title = EllesmereUI.L("Training Planner"),
-            text = EllesmereUI.L("Lists what your class trainer teaches, by level, with each ability's cost: what you can train now and what comes next. Each visit to a trainer fills it, for every class you play."),
+            text = EllesmereUI.L("Lists what each class trainer teaches, by level: what you can train now and what comes next. Each visit to your class trainer adds the costs."),
             buttonLabel = EllesmereUI.L("Enable Training Planner"),
         })
         btn:SetScript("OnClick", function()
@@ -145,7 +145,7 @@ _G._EUI_BuildForeverTrainingPage = function(pageName, parent, yOffset)
     _, h = W:SectionHeader(parent, "TRAINING PLANNER", y);  y = y - h
     _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Training Planner",
-          tooltip = "Records what your class trainer teaches at each visit.",
+          tooltip = "Lists what each class trainer teaches; visits to your trainer add the costs.",
           getValue = function() return TP.Get("enabled") end,
           setValue = function(v)
               TP.Cfg().enabled = v
@@ -154,8 +154,7 @@ _G._EUI_BuildForeverTrainingPage = function(pageName, parent, yOffset)
               EllesmereUI:RefreshPage(true)
           end },
         { type = "dropdown", text = "Class", values = values, order = classes,
-          tooltip = "The classes of your characters that have visited their trainer.",
-          disabled = function() return #classes < 2 end, disabledTooltip = "Training Planner",
+          tooltip = "The class whose abilities the list shows.",
           getValue = function() return shownClass end,
           setValue = function(v)
               shownClass = v
@@ -164,9 +163,13 @@ _G._EUI_BuildForeverTrainingPage = function(pageName, parent, yOffset)
     );  y = y - h
 
     local list = shownClass and TP.List(shownClass) or {}
-    if #list == 0 then
-        y = y - Note(parent, y, EllesmereUI.L("Visit your class trainer: the list fills with everything it teaches, up to the last level."), fontPath)
-        return math.abs(y)
+    if #list == 0 then return math.abs(y) end
+    local costs = false
+    for _, e in ipairs(list) do
+        if e.cost then costs = true break end
+    end
+    if not costs then
+        y = y - Note(parent, y, EllesmereUI.L("Costs show once a character of this class visits its trainer."), fontPath)
     end
 
     -- Own class: what can be trained now, and its cost.
@@ -176,7 +179,7 @@ _G._EUI_BuildForeverTrainingPage = function(pageName, parent, yOffset)
         for _, e in ipairs(list) do
             if not e.known and e.level <= playerLevel then
                 count = count + 1
-                cost = cost + e.cost
+                cost = cost + (e.cost or 0)
             end
         end
         local text = count > 0 and EllesmereUI.Lf("Trainable now: %d (%s)", count, Coins(cost))
@@ -188,7 +191,7 @@ _G._EUI_BuildForeverTrainingPage = function(pageName, parent, yOffset)
     while list[i] do
         local level, total, j = list[i].level, 0, i
         while list[j] and list[j].level == level do
-            if not list[j].known then total = total + list[j].cost end
+            if not list[j].known then total = total + (list[j].cost or 0) end
             j = j + 1
         end
         y = y - LevelHeader(parent, y, level, total, fontPath)

@@ -33,6 +33,7 @@ EllesmereUIForeverEssentials_ThreatFeed.lua
 EllesmereUIForeverEssentials_LootFeed.lua
 
 # Training (training planner)
+EllesmereUIForeverEssentials_TrainerData.lua
 EllesmereUIForeverEssentials_Training.lua
 
 # Macros (macro manager)

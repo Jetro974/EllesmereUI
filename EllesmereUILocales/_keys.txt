@@ -320,6 +320,7 @@ Copy all shared settings from %1$s to %2$s?
 Copy from %1$s Buff Manager
 Corner options place the bar flush with that corner of the target and set its grow direction to keep it there as bars change size.
 Cosmetic
+Costs show once a character of this class visits its trainer.
 Could not build the export string.
 Could not equip gear set %s.
 Could not load talent loadout %s.
@@ -645,7 +646,7 @@ Leveling in: %s (%s XP/Hour)
 Link copied - paste it into your browser
 Linked by Anchor/Width/Height Matching to: %1$s. These export together.
 Linked by Anchor/Width/Height Matching to: %1$s. These import together.
-Lists what your class trainer teaches, by level, with each ability's cost: what you can train now and what comes next. Each visit to a trainer fills it, for every class you play.
+Lists what each class trainer teaches, by level: what you can train now and what comes next. Each visit to your class trainer adds the costs.
 Loading houses...
 Loading item data...
 Loading talent loadout %1$s (%2$s).
@@ -1196,7 +1197,6 @@ Value
 View EUI Legends
 View Houses
 Visit
-Visit your class trainer: the list fills with everything it teaches, up to the last level.
 W Match
 W Matched
 WARNING: Frame positions may be off.
