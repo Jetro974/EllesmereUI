@@ -28,7 +28,11 @@ initFrame:SetScript("OnEvent", function(self)
         title       = "Forever Essentials",
         description = "Essential tools for WoW Forever.",
         pages       = { PAGE_GENERAL, PAGE_TRAVEL, PAGE_THREAT, PAGE_LOOT, PAGE_MACROS },
+<<<<<<< HEAD
         searchTerms = { "flight timer", "flight path", "threat", "threat meter", "aggro", "loot", "loot feed", "reputation", "currency", "uprank", "spell rank", "junk", "junk items", "macro", "macros", "macro manager", "simplified stats", "item stats", "stat colors", "tooltip stats", "world map", "map", "reveal", "unexplored", "fog of war", "training", "trainer", "roadmap", "class roadmap" },
+=======
+        searchTerms = { "flight timer", "flight path", "threat", "threat meter", "aggro", "loot", "loot feed", "reputation", "currency", "uprank", "spell rank", "junk", "junk items", "macro", "macros", "macro manager", "simplified stats", "item stats", "stat colors", "tooltip stats", "world map", "map", "reveal", "unexplored", "fog of war", "training", "trainer", "level up", "toast" },
+>>>>>>> c0afdb6a (Forever Essentials: Level Up Toast)
         buildPage   = function(pageName, parent, yOffset)
             if pageName == PAGE_GENERAL and _G._EUI_BuildForeverGeneralPage then
                 return _G._EUI_BuildForeverGeneralPage(pageName, parent, yOffset)
@@ -67,11 +71,13 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.macroManager = nil
                 -- The recorded trainer costs are game data: only the switch resets.
                 if EllesmereUIDB.trainingPlanner then EllesmereUIDB.trainingPlanner.enabled = nil end
+                EllesmereUIDB.levelUpToast = nil
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_FlightTimer = nil
                     EllesmereUIDB.unlockAnchors.EUI_ThreatMeter = nil
                     EllesmereUIDB.unlockAnchors.EUI_LootFeed = nil
                     EllesmereUIDB.unlockAnchors.EUI_JunkList = nil
+                    EllesmereUIDB.unlockAnchors.EUI_LevelUpToast = nil
                 end
             end
             local FT = EllesmereUI._FlightTimer
@@ -95,6 +101,7 @@ initFrame:SetScript("OnEvent", function(self)
             if EllesmereUI._SpellUprank then EllesmereUI._SpellUprank.Apply() end
             if EllesmereUI._JunkItems then EllesmereUI._JunkItems.Apply() end
             if EllesmereUI._TrainingPlanner then EllesmereUI._TrainingPlanner.Apply() end
+            if EllesmereUI._LevelUpToast then EllesmereUI._LevelUpToast.Apply() end
             EllesmereUI:InvalidatePageCache()
         end,
     })

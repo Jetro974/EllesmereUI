@@ -1,0 +1,421 @@
+if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
+if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
+-------------------------------------------------------------------------------
+--  EllesmereUIForeverEssentials_LevelUp.lua  (WoW Forever only)
+--  Level Up Toast: on level up, a toast in the loot feed's EUI look (accent
+--  bar on a fading dark plate) that completes the game's own level-up toast
+--  rather than repeating it: the level in large accent digits, the health,
+--  power and stats gained ("Health: +52"), new talent points, what the new
+--  level brings to learn as icons (the game's own level-up list,
+--  C_EventToastManager, without its "you have reached" header) and, last, the
+--  time the last level took. It sits under the game's toast by default.
+--  It slides in with an accent sheen, fades out after a while, and hovering
+--  holds it. Unlock mode places and sizes it. Everything moves through
+--  animation groups on frames of our own.
+-------------------------------------------------------------------------------
+local _, module = ...
+
+-- Settings live in EllesmereUIDB.levelUpToast; unset keys read these.
+local F = module.Feature("levelUpToast", { enabled = false, width = 340, duration = 10 },
+    { point = "TOP", relPoint = "TOP", x = 0, y = -340 })
+local Get, Enabled = F.Get, F.Enabled
+
+local BAR = 3          -- the accent bar on the left edge
+local NUMBER_W = 58    -- the level digits' column
+local PAD = 12
+local ICON = 26        -- an ability's icon
+local ROW_H = 17       -- a stat line
+local BASE_H = 64      -- the plate's height before its lines
+local FADE_IN, FADE_OUT, SLIDE = 0.35, 0.8, 10
+
+-- PLAYER_LEVEL_UP payload: the stat deltas' positions and their names.
+local STATS = {
+    { 6, "SPELL_STAT1_NAME" },  -- strength
+    { 7, "SPELL_STAT2_NAME" },  -- agility
+    { 8, "SPELL_STAT3_NAME" },  -- stamina
+    { 9, "SPELL_STAT4_NAME" },  -- intellect
+}
+
+local anchor, toast, events
+
+local function Accent()
+    local c = EllesmereUI.ELLESMERE_GREEN
+    if c then return c.r, c.g, c.b end
+    return 0.05, 0.82, 0.62
+end
+
+local function Font(fs, size)
+    EllesmereUI.ApplyModuleFont(fs, nil, size, "essentials")
+end
+
+local function Text(parent, size)
+    local fs = parent:CreateFontString(nil, "OVERLAY")
+    fs:SetJustifyH("LEFT")
+    fs:SetWordWrap(false)
+    Font(fs, size)
+    return fs
+end
+
+-- Waits Duration, fades out, hides; hovering holds it.
+local function ArmFade()
+    if toast.show:IsPlaying() then return end
+    toast.fade:Stop()
+    toast:SetAlpha(1)
+    if not toast:IsMouseOver() then toast.fade:Play() end
+end
+
+-- An ability's tooltip: the spell's own.
+local function AbilityEnter(b)
+    toast.fade:Stop()
+    toast:SetAlpha(1)
+    GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+    GameTooltip:SetSpellByID(b.spellID)
+    GameTooltip:Show()
+end
+
+local function AbilityLeave(b)
+    if GameTooltip:IsOwned(b) then GameTooltip:Hide() end
+    ArmFade()
+end
+
+local function AbilityIcon(i)
+    local b = toast.icons[i]
+    if b then return b end
+    b = CreateFrame("Frame", nil, toast)
+    b:SetSize(ICON, ICON)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    EllesmereUI.PP.CreateBorder(b, 0, 0, 0, 1, 1, "OVERLAY", 1)
+    b:EnableMouseMotion(true)
+    b:SetScript("OnEnter", AbilityEnter)
+    b:SetScript("OnLeave", AbilityLeave)
+    toast.icons[i] = b
+    return b
+end
+
+-- A stat line of the two-column list.
+local function Cell(i)
+    local fs = toast.cells[i]
+    if not fs then
+        fs = Text(toast, 12)
+        toast.cells[i] = fs
+    end
+    return fs
+end
+
+local function Anim(g, kind, order, secs, smoothing)
+    local a = g:CreateAnimation(kind)
+    a:SetOrder(order)
+    a:SetDuration(secs)
+    if smoothing then a:SetSmoothing(smoothing) end
+    return a
+end
+
+-- The accent follows the theme: painted again at each show.
+local function Paint()
+    local r, g, b = Accent()
+    toast.bar:SetColorTexture(r, g, b, 1)
+    toast.rule:SetGradient("HORIZONTAL", CreateColor(r, g, b, 0.9), CreateColor(r, g, b, 0))
+    toast.sheen:SetGradient("HORIZONTAL", CreateColor(r, g, b, 0), CreateColor(r, g, b, 0.35))
+    toast.number:SetTextColor(r, g, b)
+    toast.levelLabel:SetTextColor(r, g, b, 0.8)
+end
+
+local function ApplyStyle()
+    if not anchor then return end
+    anchor:SetSize(Get("width"), BASE_H)
+    toast:SetWidth(Get("width"))
+end
+
+local function Build()
+    if anchor then return end
+    anchor = CreateFrame("Frame", nil, UIParent)
+    anchor:SetFrameStrata("MEDIUM")
+    F.Place(anchor)
+
+    -- The plate hangs from the anchor's top and grows down with its lines.
+    toast = CreateFrame("Frame", nil, anchor)
+    toast:SetPoint("TOP")
+    toast:SetClipsChildren(true)
+    toast:Hide()
+    local bg = toast:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(1, 1, 1, 1)
+    bg:SetGradient("HORIZONTAL", CreateColor(0.05, 0.05, 0.05, 0.92), CreateColor(0.05, 0.05, 0.05, 0.35))
+    toast.bar = toast:CreateTexture(nil, "ARTWORK")
+    toast.bar:SetPoint("TOPLEFT")
+    toast.bar:SetPoint("BOTTOMLEFT")
+    toast.bar:SetWidth(BAR)
+    toast.rule = toast:CreateTexture(nil, "ARTWORK")
+    toast.rule:SetColorTexture(1, 1, 1, 1)
+    toast.rule:SetPoint("TOPLEFT", BAR, 0)
+    toast.rule:SetPoint("TOPRIGHT")
+    toast.rule:SetHeight(1)
+    -- The sheen sweeps across once as the toast comes in.
+    toast.sheen = toast:CreateTexture(nil, "ARTWORK", nil, 1)
+    toast.sheen:SetColorTexture(1, 1, 1, 1)
+    toast.sheen:SetPoint("TOPRIGHT", toast, "TOPLEFT")
+    toast.sheen:SetPoint("BOTTOMRIGHT", toast, "BOTTOMLEFT")
+    toast.sheen:SetWidth(80)
+    toast.sheen:SetBlendMode("ADD")
+
+    -- "Lvl" over the level, in the left column.
+    toast.levelLabel = toast:CreateFontString(nil, "OVERLAY")
+    Font(toast.levelLabel, 11)
+    toast.levelLabel:SetJustifyH("CENTER")
+    toast.levelLabel:SetPoint("TOPLEFT", BAR, -PAD)
+    toast.levelLabel:SetWidth(NUMBER_W)
+    toast.levelLabel:SetText(EllesmereUI.L("Lvl"))
+    toast.number = toast:CreateFontString(nil, "OVERLAY")
+    Font(toast.number, 30)
+    toast.number:SetJustifyH("CENTER")
+    toast.number:SetPoint("TOP", toast.levelLabel, "BOTTOM", 0, -1)
+    toast.number:SetWidth(NUMBER_W)
+    toast.cells, toast.icons = {}, {}
+    toast.talents = Text(toast, 12)
+    toast.learn = Text(toast, 12)
+    toast.learn:SetTextColor(1, 1, 1)
+    toast.learn:SetText(EllesmereUI.L("To learn at this level:"))
+    toast.time = Text(toast, 11)
+    toast.time:SetTextColor(0.7, 0.7, 0.7)
+
+    toast:EnableMouseMotion(true)
+    toast:SetScript("OnEnter", function()
+        if not toast.show:IsPlaying() then
+            toast.fade:Stop()
+            toast:SetAlpha(1)
+        end
+    end)
+    toast:SetScript("OnLeave", ArmFade)
+
+    -- In: up SLIDE px at once, then down into place while it fades in.
+    toast.show = toast:CreateAnimationGroup()
+    Anim(toast.show, "Translation", 1, 0):SetOffset(0, SLIDE)
+    local drop = Anim(toast.show, "Translation", 2, FADE_IN, "OUT")
+    drop:SetOffset(0, -SLIDE)
+    local appear = Anim(toast.show, "Alpha", 2, FADE_IN, "OUT")
+    appear:SetFromAlpha(0)
+    appear:SetToAlpha(1)
+    toast.show:SetScript("OnFinished", ArmFade)
+    toast.sweep = toast.sheen:CreateAnimationGroup()
+    toast.sweep.move = Anim(toast.sweep, "Translation", 1, 0.9, "IN_OUT")
+    toast.sweep:SetScript("OnFinished", function() toast.sheen:Hide() end)
+    toast.fade = toast:CreateAnimationGroup()
+    toast.fade.alpha = Anim(toast.fade, "Alpha", 1, FADE_OUT, "IN_OUT")
+    toast.fade.alpha:SetFromAlpha(1)
+    toast.fade.alpha:SetToAlpha(0)
+    toast.fade:SetScript("OnFinished", function() toast:Hide() end)
+    ApplyStyle()
+end
+
+-- What the class trainer teaches at level and the player does not know yet,
+-- from the trainer data (TrainerData.lua): neither the game's level-up
+-- display nor Forever's spellbook lists it.
+local function LevelAbilities(level)
+    local out = {}
+    local _, class = UnitClass("player")
+    local spells = module.TrainerSpells(class)[level] or {}
+    for i = 1, #spells do
+        local id = spells[i]
+        if not IsPlayerSpell(id) then
+            out[#out + 1] = { icon = C_Spell.GetSpellTexture(id), spellID = id }
+        end
+    end
+    return out
+end
+
+-- What the level brought, top to bottom: health, power and stats on two
+-- columns ("Health: +52"); talent points; what it brings to learn as icons;
+-- the time the last level took (timeLevel, timeSecs; nil: not known).
+local function Show(level, timeLevel, timeSecs, health, power, talents, ...)
+    Build()
+    Paint()
+    local hex = EllesmereUI.HexColor(Accent())
+    local deltas = { ... }
+    local stats = {}
+    if health > 0 then stats[#stats + 1] = { HEALTH, health } end
+    local _, token = UnitPowerType("player")
+    if power > 0 then stats[#stats + 1] = { _G[token] or token, power } end
+    for i = 1, #STATS do
+        local d = deltas[STATS[i][1] - 5]
+        if d and d > 0 then stats[#stats + 1] = { _G[STATS[i][2]], d } end
+    end
+
+    toast.number:SetText(level)
+    local left = BAR + NUMBER_W
+    local colW = (Get("width") - left - PAD) / 2
+    local y = PAD
+    for i = 1, #stats do
+        local fs, col = Cell(i), (i - 1) % 2
+        fs:SetText(EllesmereUI.Lf("%1$s: %2$s", stats[i][1], ("%s+%d|r"):format(hex, stats[i][2])))
+        fs:SetWidth(colW - 6)
+        fs:ClearAllPoints()
+        fs:SetPoint("TOPLEFT", left + col * colW, -(y + math.floor((i - 1) / 2) * ROW_H))
+        fs:Show()
+    end
+    for i = #stats + 1, #toast.cells do toast.cells[i]:Hide() end
+    y = y + math.ceil(#stats / 2) * ROW_H
+
+    toast.talents:SetShown(talents > 0)
+    if talents > 0 then
+        y = y + 2
+        toast.talents:SetText(EllesmereUI.Lf("%1$s: %2$s", EllesmereUI.L("Talent points"), ("%s+%d|r"):format(hex, talents)))
+        toast.talents:ClearAllPoints()
+        toast.talents:SetPoint("TOPLEFT", left, -y)
+        y = y + ROW_H
+    end
+
+    local abilities = LevelAbilities(level)
+    toast.learn:SetShown(#abilities > 0)
+    if #abilities > 0 then
+        y = y + 4
+        toast.learn:ClearAllPoints()
+        toast.learn:SetPoint("TOPLEFT", left, -y)
+        y = y + ROW_H + 2
+        local perRow = math.max(1, math.floor((Get("width") - left - PAD + 4) / (ICON + 4)))
+        for i = 1, #abilities do
+            local a, b = abilities[i], AbilityIcon(i)
+            b.icon:SetTexture(a.icon)
+            b.spellID = a.spellID
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", left + ((i - 1) % perRow) * (ICON + 4), -(y + math.floor((i - 1) / perRow) * (ICON + 4)))
+            b:Show()
+        end
+        y = y + math.ceil(#abilities / perRow) * (ICON + 4)
+    end
+    for i = #abilities + 1, #toast.icons do toast.icons[i]:Hide() end
+
+    local showTime = timeSecs and SecondsToTime
+    toast.time:SetShown(showTime and true or false)
+    if showTime then
+        y = y + 4
+        toast.time:SetText(EllesmereUI.Lf("Time at level %d: %s", timeLevel, SecondsToTime(math.floor(timeSecs), true)))
+        toast.time:ClearAllPoints()
+        toast.time:SetPoint("TOPLEFT", left, -y)
+        y = y + ROW_H
+    end
+    toast:SetHeight(math.max(BASE_H, y + PAD))
+
+    toast.fade.alpha:SetStartDelay(Get("duration"))
+    toast.fade:Stop()
+    toast:SetAlpha(0)
+    toast:Show()
+    toast.show:Play()
+    toast.sweep.move:SetOffset(Get("width") + 80, 0)
+    toast.sheen:Show()
+    toast.sweep:Stop()
+    toast.sweep:Play()
+end
+
+-------------------------------------------------------------------------------
+--  Time at a level, per character: chars[player GUID] = { level, seconds, full }.
+--  Counted on events only: the session's time goes into the record at logout
+--  and level up. full: counted since the level began, or set by the game's
+--  own /played (TIME_PLAYED_MSG, never requested here: it prints in chat).
+--  While not full, the toast shows no time.
+-------------------------------------------------------------------------------
+local sessionStart  -- GetTime() the running count started from; nil: not counting
+
+local function Record(create)
+    local guid = UnitGUID("player")
+    if not guid then return nil end
+    local cfg = create and F.Cfg() or F.Read()
+    if create then
+        cfg.chars = cfg.chars or {}
+        cfg.chars[guid] = cfg.chars[guid] or {}
+    end
+    return cfg.chars and cfg.chars[guid]
+end
+
+-- Seconds at a level so far, or nil while not known.
+local function LevelSeconds(level)
+    local t = Record()
+    if not (t and t.full and t.level == level and sessionStart) then return nil end
+    return (t.seconds or 0) + (GetTime() - sessionStart)
+end
+
+-- A record that is not about this level starts again, not full: its start
+-- was not seen.
+local function StartCounting()
+    sessionStart = GetTime()
+    local t, level = Record(true), UnitLevel("player")
+    if t.level ~= level then t.level, t.seconds, t.full = level, 0, false end
+end
+
+-- Off: the gap will not be counted, so the record stops being full.
+local function StopCounting()
+    local t = Record()
+    if t then t.full = false end
+    sessionStart = nil
+end
+
+-- The payload after the level: health, power, talents, PvP talent slots, then
+-- the stat deltas; Show skips the PvP slots.
+local function ShowPayload(level, timeLevel, timeSecs, health, power, talents, _, ...)
+    Show(level, timeLevel, timeSecs, health, power, talents, ...)
+end
+
+local function OnEvent(_, event, ...)
+    if event == "PLAYER_LEVEL_UP" then
+        local level = ...
+        local secs = LevelSeconds(level - 1)
+        local t = Record(true)
+        t.level, t.seconds, t.full = level, 0, true
+        sessionStart = GetTime()
+        ShowPayload(level, level - 1, secs, select(2, ...))
+    elseif event == "TIME_PLAYED_MSG" then
+        local _, levelTime = ...
+        local t = Record(true)
+        t.level, t.seconds, t.full = UnitLevel("player"), levelTime, true
+        sessionStart = GetTime()
+    elseif event == "PLAYER_LOGOUT" then
+        local t = Record()
+        if t and sessionStart then t.seconds = (t.seconds or 0) + (GetTime() - sessionStart) end
+    end
+end
+
+local function Apply()
+    if not Enabled() then
+        if events then events:UnregisterAllEvents() end
+        if sessionStart then StopCounting() end
+        if toast then toast:Hide() end
+        return
+    end
+    Build()
+    if not events then
+        events = CreateFrame("Frame")
+        events:SetScript("OnEvent", OnEvent)
+    end
+    events:RegisterEvent("PLAYER_LEVEL_UP")
+    events:RegisterEvent("TIME_PLAYED_MSG")
+    events:RegisterEvent("PLAYER_LOGOUT")
+    if not sessionStart then StartCounting() end
+end
+
+-- Options-page entry points.
+EllesmereUI._LevelUpToast = {
+    Get = Get,
+    Cfg = F.Cfg,
+    Apply = Apply,
+    -- A sample: the next level that brings something to learn (else the
+    -- next one), with typical gains and the time so far at the current one.
+    Preview = function()
+        local level = UnitLevel("player")
+        local shown = level + 1
+        for l = level + 1, GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or 60 do
+            if #LevelAbilities(l) > 0 then shown = l break end
+        end
+        Show(shown, level, LevelSeconds(level), 52, 38, 1, 1, 0, 2, 1)
+    end,
+}
+
+F.Start(Apply, {
+    key = "EUI_LevelUpToast", label = "Level Up Toast", order = 733, minWidth = 280,
+    frame = function(build)
+        if build then Build() end
+        return anchor
+    end,
+    height = function() return BASE_H end,
+    applyStyle = ApplyStyle,
+})

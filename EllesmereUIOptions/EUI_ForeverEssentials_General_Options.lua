@@ -310,6 +310,28 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
     end
 
     ---------------------------------------------------------------------------
+    --  LEVEL UP (EllesmereUIForeverEssentials_LevelUp.lua)
+    ---------------------------------------------------------------------------
+    local LU = EllesmereUI._LevelUpToast
+    _, h = W:Spacer(parent, y, 20);  y = y - h
+    _, h = W:SectionHeader(parent, "LEVEL UP", y);  y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Level Up Toast",
+          tooltip = "Shows a toast when you level up: your new level, the health, power and stats you gained, new talent points, the time the last level took and what the new one brings to learn. Place it in unlock mode.",
+          getValue = function() return LU.Get("enabled") end,
+          setValue = function(v)
+              LU.Cfg().enabled = v
+              LU.Apply()
+              EllesmereUI:RefreshPage()  -- the sample button's disabled state
+          end },
+        { type = "labeledButton", text = "Preview", buttonText = "Show Sample",
+          tooltip = "Shows a sample toast for your next level.",
+          disabled = function() return not LU.Get("enabled") end, disabledTooltip = "Level Up Toast",
+          onClick = function() LU.Preview() end }
+    );  y = y - h
+
+    ---------------------------------------------------------------------------
     --  CLASS ROADMAP (EllesmereUIForeverEssentials_Training.lua)
     ---------------------------------------------------------------------------
     local TP = EllesmereUI._TrainingPlanner
