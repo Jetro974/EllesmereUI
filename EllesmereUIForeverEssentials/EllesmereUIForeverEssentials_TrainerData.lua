@@ -325,12 +325,3 @@ function module.TrainerSpells(class)
     byClass[class] = out
     return out
 end
-
--- The classes the data covers.
-function module.TrainerClasses()
-    data = data or Data()
-    local out = {}
-    for class in pairs(data) do out[#out + 1] = class end
-    table.sort(out)
-    return out
-end
