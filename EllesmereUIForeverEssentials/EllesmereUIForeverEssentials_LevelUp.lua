@@ -73,12 +73,19 @@ local function ArmFade()
     if not Hovered() then toast.fade:Play() end
 end
 
--- An ability's tooltip: the spell's own.
+-- An ability's tooltip: the spell's own, with what the trainer asks for it
+-- once the Training Planner recorded it.
 local function AbilityEnter(b)
     toast.fade:Stop()
     toast:SetAlpha(1)
     GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
     GameTooltip:SetSpellByID(b.spellID)
+    local planner = EllesmereUI._TrainingPlanner
+    local cost = planner and planner.Cost(b.spellID)
+    if cost and cost > 0 then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(COSTS_LABEL .. " " .. C_CurrencyInfo.GetCoinTextureString(cost), 1, 1, 1)
+    end
     GameTooltip:Show()
 end
 
