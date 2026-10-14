@@ -9,7 +9,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  class trainer teaches at the new level as icons (TrainerData.lua) and,
 --  last, the time the last level took. It sits under the game's toast by
 --  default and shows with it: a read-only hook on the game's toast display
---  releases it, with a one-shot fallback should the game's never come.
+--  releases it as the game's fades in, with a one-shot fallback should the
+--  game's never come.
 --  It slides in with an accent sheen, fades out after a while, and hovering
 --  holds it. Unlock mode places and sizes it. Show in Chat also writes it
 --  to the chat, the abilities as spell links. Everything moves through
@@ -406,10 +407,17 @@ local function ShowPending()
     if p then ShowPayload(unpack(p, 1, p.n)) end
 end
 
+-- The game's toast fades in after its show animation's start delay (read,
+-- never changed): ours waits as long, once.
 local function OnGameToast(manager)
     local shown = pending and manager.currentDisplayingToast
     local info = shown and shown.toastInfo
-    if info and info.eventType == Enum.EventToastEventType.LevelUp then ShowPending() end
+    if not (info and info.eventType == Enum.EventToastEventType.LevelUp) then return end
+    local anim = shown.showAnim and shown.showAnim.anim1
+    local p = pending
+    C_Timer.After(anim and anim:GetStartDelay() or 0, function()
+        if pending == p then ShowPending() end
+    end)
 end
 
 local function OnEvent(_, event, ...)
