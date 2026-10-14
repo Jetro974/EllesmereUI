@@ -16,7 +16,7 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.levelUpToast; unset keys read these.
-local F = module.Feature("levelUpToast", { enabled = false, width = 340, duration = 10 },
+local F = module.Feature("levelUpToast", { enabled = false, width = 340, duration = 6 },
     { point = "TOP", relPoint = "TOP", x = 0, y = -340 })
 local Get, Enabled = F.Get, F.Enabled
 
