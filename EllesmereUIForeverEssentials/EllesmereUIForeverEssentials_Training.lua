@@ -6,7 +6,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  trainer teaches from level 1 to the last, from the trainer data
 --  (TrainerData.lua), with each ability's cost. The player's class shows
 --  what is trained (grey), what can be trained now (green) and what comes
---  next; a class picker shows any other class. Costs are not in the
+--  next; a class picker shows any other class. Weapon skills come first,
+--  with the cities whose weapon master teaches them. Costs are not in the
 --  client's data: each visit to a class trainer records them for the
 --  account, under the visitor's class.
 --
@@ -116,13 +117,31 @@ local function Accent()
     return 0.05, 0.82, 0.62
 end
 
--- A row's tooltip: the spell's own, with its cost when recorded.
+local function CityName(map)
+    local info = C_Map.GetMapInfo(map)
+    return info and info.name or ""
+end
+
+-- A row's tooltip: the spell's own, with its cost when recorded, or for a
+-- weapon skill the weapon masters of both factions.
 local function RowEnter(row)
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetSpellByID(row.spellID)
     if row.cost and row.cost > 0 then
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(COSTS_LABEL .. " " .. Coins(row.cost), 1, 1, 1)
+    end
+    if row.masters then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(EllesmereUI.L("Weapon Masters"), 1, 0.82, 0)
+        for _, faction in ipairs({ "Alliance", "Horde" }) do
+            for _, m in ipairs(row.masters) do
+                if m.faction == faction then
+                    GameTooltip:AddDoubleLine(m.name, CityName(m.map) .. " (" .. _G["FACTION_" .. faction:upper()] .. ")",
+                        1, 1, 1, 0.7, 0.7, 0.7)
+                end
+            end
+        end
     end
     GameTooltip:Show()
 end
@@ -197,40 +216,68 @@ local function Refresh()
     end
 
     local y, nRows, nHeaders, i = 0, 0, 0, 1
+    local function PlaceHeader(text)
+        nHeaders = nHeaders + 1
+        local h = Header(nHeaders)
+        h:ClearAllPoints()
+        h:SetPoint("BOTTOMLEFT", panel.content, "TOPLEFT", 0, -(y + HEADER_H - 6))
+        h:SetText(text)
+        h:Show()
+        y = y + HEADER_H
+    end
+    local function PlaceRow(e, color, right, masters)
+        nRows = nRows + 1
+        local row = Row(nRows)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, -y)
+        row:SetPoint("RIGHT", panel.content, "RIGHT")
+        row.spellID, row.cost, row.masters = e.spellID, not e.known and e.cost or nil, masters
+        row.icon:SetTexture(e.icon)
+        row.icon:SetDesaturated(e.known or false)
+        row.name:SetText(e.rank and (e.name .. " |cffaaaaaa(" .. e.rank .. ")|r") or e.name)
+        row.name:SetTextColor(color[1], color[2], color[3])
+        row.cost:SetText(right)
+        row:Show()
+        y = y + ROW_H
+    end
+    local GREY, GREEN, WHITE = { 0.5, 0.5, 0.5 }, { 0.25, 1, 0.25 }, { 1, 1, 1 }
+
+    -- Weapon skills, with the cities of the player's faction that teach them.
+    local weapons = module.WeaponSkills(shownClass)
+    if #weapons > 0 then
+        PlaceHeader(EllesmereUI.L("Weapon Skills"))
+        local faction = UnitFactionGroup("player")
+        for _, w in ipairs(weapons) do
+            local name = C_Spell.GetSpellName(w.spellID)
+            if name then
+                local cities, seen = {}, {}
+                for _, m in ipairs(w.masters) do
+                    if m.faction == faction and not seen[m.map] then
+                        seen[m.map] = true
+                        cities[#cities + 1] = CityName(m.map)
+                    end
+                end
+                local known = own and IsPlayerSpell(w.spellID)
+                PlaceRow({ spellID = w.spellID, name = name, icon = C_Spell.GetSpellTexture(w.spellID), known = known },
+                    known and GREY or WHITE, known and "" or "|cffaaaaaa" .. table.concat(cities, ", ") .. "|r", w.masters)
+            else
+                C_Spell.RequestLoadSpellData(w.spellID)
+                panel.missing = true
+            end
+        end
+    end
+
     while list[i] do
         local level, sum, j = list[i].level, 0, i
         while list[j] and list[j].level == level do
             if not list[j].known then sum = sum + (list[j].cost or 0) end
             j = j + 1
         end
-        nHeaders = nHeaders + 1
-        local h = Header(nHeaders)
-        h:ClearAllPoints()
-        h:SetPoint("BOTTOMLEFT", panel.content, "TOPLEFT", 0, -(y + HEADER_H - 6))
-        h:SetText(EllesmereUI.Lf("Level %d", level) .. (sum > 0 and ("   |cffffffff" .. Coins(sum) .. "|r") or ""))
-        h:Show()
-        y = y + HEADER_H
+        PlaceHeader(EllesmereUI.Lf("Level %d", level) .. (sum > 0 and ("   |cffffffff" .. Coins(sum) .. "|r") or ""))
         for k = i, j - 1 do
             local e = list[k]
-            nRows = nRows + 1
-            local row = Row(nRows)
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", 0, -y)
-            row:SetPoint("RIGHT", panel.content, "RIGHT")
-            row.spellID, row.cost = e.spellID, e.cost
-            row.icon:SetTexture(e.icon)
-            row.icon:SetDesaturated(e.known or false)
-            row.name:SetText(e.rank and (e.name .. " |cffaaaaaa(" .. e.rank .. ")|r") or e.name)
-            if e.known then
-                row.name:SetTextColor(0.5, 0.5, 0.5)
-            elseif own and e.level <= playerLevel then
-                row.name:SetTextColor(0.25, 1, 0.25)
-            else
-                row.name:SetTextColor(1, 1, 1)
-            end
-            row.cost:SetText(e.known and "" or Coins(e.cost))
-            row:Show()
-            y = y + ROW_H
+            local color = e.known and GREY or (own and e.level <= playerLevel) and GREEN or WHITE
+            PlaceRow(e, color, e.known and "" or Coins(e.cost))
         end
         i = j
     end

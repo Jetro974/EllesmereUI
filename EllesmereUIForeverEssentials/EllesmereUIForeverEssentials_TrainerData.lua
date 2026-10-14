@@ -335,3 +335,58 @@ function module.TrainerSpells(class)
     byClass[class] = out
     return out
 end
+
+-------------------------------------------------------------------------------
+--  Weapon skills: what each class can learn (SkillRaceClassInfo, same build)
+--  and the weapon masters who teach it. The masters' lists live on the
+--  server: these are the cities' weapon masters as the game has always had
+--  them. map is the city's uiMapID (its name comes from the game).
+-------------------------------------------------------------------------------
+local SWORDS, SWORDS2, AXES, AXES2, MACES, MACES2 = 201, 202, 196, 197, 198, 199
+local POLEARMS, STAVES, DAGGERS, FIST = 200, 227, 1180, 15590
+local BOWS, CROSSBOWS, GUNS, THROWN = 264, 5011, 266, 2567
+
+local WEAPONS = {
+    DRUID = { DAGGERS, FIST, MACES, MACES2, POLEARMS, STAVES },
+    HUNTER = { AXES, AXES2, BOWS, CROSSBOWS, DAGGERS, FIST, GUNS, POLEARMS, STAVES, SWORDS, SWORDS2, THROWN },
+    MAGE = { DAGGERS, STAVES, SWORDS },
+    PALADIN = { AXES, AXES2, MACES, MACES2, POLEARMS, SWORDS, SWORDS2 },
+    PRIEST = { DAGGERS, MACES, STAVES },
+    ROGUE = { AXES, BOWS, CROSSBOWS, DAGGERS, FIST, GUNS, MACES, SWORDS, THROWN },
+    SHAMAN = { AXES, AXES2, DAGGERS, FIST, MACES, MACES2, STAVES },
+    WARLOCK = { DAGGERS, STAVES, SWORDS },
+    WARRIOR = { AXES, AXES2, BOWS, CROSSBOWS, DAGGERS, FIST, GUNS, MACES, MACES2, POLEARMS, STAVES,
+        SWORDS, SWORDS2, THROWN },
+}
+
+local MASTERS = {
+    { name = "Woo Ping", map = 1453, faction = "Alliance",
+      teaches = { CROSSBOWS, DAGGERS, POLEARMS, STAVES, SWORDS, SWORDS2 } },
+    { name = "Bixi Wobblebonk", map = 1455, faction = "Alliance",
+      teaches = { CROSSBOWS, DAGGERS, THROWN } },
+    { name = "Buliwyf Stonehand", map = 1455, faction = "Alliance",
+      teaches = { AXES, AXES2, FIST, GUNS, MACES, MACES2 } },
+    { name = "Ilyenia Moonfire", map = 1457, faction = "Alliance",
+      teaches = { BOWS, DAGGERS, FIST, STAVES, THROWN } },
+    { name = "Hanashi", map = 1454, faction = "Horde",
+      teaches = { AXES, AXES2, BOWS, STAVES, THROWN } },
+    { name = "Sayoc", map = 1454, faction = "Horde",
+      teaches = { AXES, AXES2, BOWS, DAGGERS, FIST, THROWN } },
+    { name = "Ansekhwa", map = 1456, faction = "Horde",
+      teaches = { GUNS, MACES, MACES2, STAVES } },
+    { name = "Archibald", map = 1458, faction = "Horde",
+      teaches = { CROSSBOWS, DAGGERS, POLEARMS, SWORDS, SWORDS2 } },
+}
+
+-- module.WeaponSkills(class) = { { spellID, masters = { master, ... } }, ... }
+function module.WeaponSkills(class)
+    local out = {}
+    for _, id in ipairs(WEAPONS[class] or {}) do
+        local masters = {}
+        for _, m in ipairs(MASTERS) do
+            if tContains(m.teaches, id) then masters[#masters + 1] = m end
+        end
+        out[#out + 1] = { spellID = id, masters = masters }
+    end
+    return out
+end
