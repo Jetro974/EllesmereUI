@@ -34,3 +34,6 @@ EllesmereUIForeverEssentials_LootFeed.lua
 
 # Macros (macro manager)
 EllesmereUIForeverEssentials_MacroManager.lua
+
+# Talents (talent planner)
+EllesmereUIForeverEssentials_TalentPlanner.lua
