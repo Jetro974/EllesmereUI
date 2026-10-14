@@ -159,36 +159,87 @@ local function Release(set)
 end
 
 -------------------------------------------------------------------------------
---  Bobber Indicator: while the line is in the water, whether the key reels in
+--  Bobber Indicator: while the line is in the water, an icon with a green
+--  border when the key reels in, red when the bobber is not targeted; the key
+--  sits on it and the full sentence is its tooltip. Placed in Unlock Mode.
 -------------------------------------------------------------------------------
+local INDICATOR_SIZE = 40
+local DEFAULT_INDICATOR_POS = { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 }
+
+local function IndicatorTip()
+    if reeling then return EllesmereUI.Lf("Bobber found: %s reels in", GetBindingText(FishCfg().key)) end
+    return EllesmereUI.L("Bobber not found: keep it on screen")
+end
+
+local function PlaceIndicator()
+    if not indicator then return end
+    local pos = FishCfg().indicatorPos or DEFAULT_INDICATOR_POS
+    indicator:ClearAllPoints()
+    indicator:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, pos.x or 0, pos.y or 0)
+end
+
+local function BuildIndicator()
+    if indicator then return end
+    local PP = EllesmereUI.PP
+    indicator = CreateFrame("Frame", nil, UIParent)
+    indicator:SetSize(INDICATOR_SIZE, INDICATOR_SIZE)
+    indicator:SetFrameStrata("HIGH")
+    -- Hover for the sentence; clicks go through to the world.
+    indicator:SetMouseMotionEnabled(true)
+    indicator:SetMouseClickEnabled(false)
+    indicator:Hide()
+    local icon = indicator:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints()
+    icon:SetTexture("Interface\Icons\Trade_Fishing")
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    indicator.icon = icon
+    PP.CreateBorder(indicator, 1, 0.2, 0.2, 1, 2, "OVERLAY", 2)
+    -- The key, clipped to the icon's width.
+    local key = indicator:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    key:SetPoint("BOTTOM", 0, 3)
+    key:SetWidth(INDICATOR_SIZE - 4)
+    key:SetWordWrap(false)
+    indicator.key = key
+    indicator:SetScript("OnEnter", function(self) EllesmereUI.ShowWidgetTooltip(self, IndicatorTip()) end)
+    indicator:SetScript("OnLeave", function() EllesmereUI.HideWidgetTooltip() end)
+    PlaceIndicator()
+
+    EllesmereUI:RegisterUnlockElements({ EllesmereUI.MakeUnlockElement({
+        key = "EUI_FishingBobber", label = "Bobber Indicator", group = "Quality of Life", order = 735,
+        noResize = true,
+        isHidden = function() return not IndicatorOn() end,
+        getFrame = function() return indicator end,
+        getSize  = function() return INDICATOR_SIZE, INDICATOR_SIZE end,
+        savePos = function(_, point, relPoint, x, y)
+            if not point then return end
+            FishCfg().indicatorPos = { point = point, relPoint = relPoint or point, x = x, y = y }
+            if not EllesmereUI._unlockActive then PlaceIndicator() end
+        end,
+        loadPos = function()
+            local pos = FishCfg().indicatorPos
+            return pos and { point = pos.point, relPoint = pos.relPoint, x = pos.x, y = pos.y } or nil
+        end,
+        clearPos = function()
+            FishCfg().indicatorPos = nil
+            PlaceIndicator()
+        end,
+        applyPos = PlaceIndicator,
+    }) }, "EllesmereUIQoL")
+end
+
 local function UpdateIndicator()
     if not (lineOut and IndicatorOn()) then
         if indicator then indicator:Hide() end
         return
     end
-    if not indicator then
-        indicator = CreateFrame("Frame", nil, UIParent)
-        indicator:SetSize(300, 24)
-        indicator:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
-        indicator:SetFrameStrata("HIGH")
-        indicator.icon = indicator:CreateTexture(nil, "ARTWORK")
-        indicator.icon:SetSize(20, 20)
-        indicator.icon:SetTexture("Interface\\Icons\\Trade_Fishing")
-        indicator.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        indicator.text = indicator:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        indicator.text:SetPoint("CENTER", 12, 0)
-        indicator.icon:SetPoint("RIGHT", indicator.text, "LEFT", -6, 0)
-    end
-    if reeling then
-        indicator.text:SetText(EllesmereUI.Lf("Bobber found: %s reels in", GetBindingText(FishCfg().key)))
-        indicator.text:SetTextColor(0.3, 1, 0.4)
-        indicator.icon:SetDesaturated(false)
-    else
-        indicator.text:SetText(EllesmereUI.L("Bobber not found: keep it on screen"))
-        indicator.text:SetTextColor(1, 0.6, 0.2)
-        indicator.icon:SetDesaturated(true)
-    end
+    BuildIndicator()
+    local r, g, b = 1, 0.2, 0.2
+    if reeling then r, g, b = 0.2, 1, 0.3 end
+    EllesmereUI.PP.SetBorderColor(indicator, r, g, b, 1)
+    indicator.icon:SetDesaturated(not reeling)
+    indicator.key:SetText(GetBindingText(FishCfg().key, true))
     indicator:Show()
+    if indicator:IsMouseOver() then EllesmereUI.ShowWidgetTooltip(indicator, IndicatorTip()) end
 end
 
 -------------------------------------------------------------------------------
@@ -378,6 +429,7 @@ local function ApplyFishing()
     end
     BuildButton()
     ResolveFishing()
+    if IndicatorOn() then BuildIndicator() end  -- placed in Unlock Mode before the first cast
     for i = 1, #FEATURE_EVENTS do ev:RegisterEvent(FEATURE_EVENTS[i]) end
     ev:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
     ev:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")

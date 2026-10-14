@@ -325,7 +325,7 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
                 "While your line is in the water and the bobber is on screen, the Fishing Key reels it in; the line out, the key casts again. Turns on soft interact while you fish, and puts your settings back after.",
                 "reel"),
             CogToggle("Bobber Indicator",
-                "While your line is in the water, shows under your character whether the bobber is targeted: green, the key reels in; orange, keep the bobber on screen.",
+                "While your line is in the water, an icon shows whether the bobber is targeted: green, the key reels in; red, keep the bobber on screen. Hover it for details; place it in Unlock Mode.",
                 "indicator"),
         }
         -- Lures are weapon enchants on the pole on WoW Forever only.
@@ -334,9 +334,12 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
                 "When your fishing pole has no lure, the Fishing Key first applies the best lure in your bags; the next press casts.",
                 "lure")
         end
+        -- A label half has no control: the cog sits left of the keybind
+        -- button, which also bounds the label.
         EllesmereUI.BuildInlineCog(rgn, {
             title = "Fishing Key",
             rows = rows,
+            anchorTo = kbBtn,
             disabled = function() return FishCfg().key == nil end,
             disabledTooltip = "Fishing Key",
         })
