@@ -323,12 +323,21 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
           setValue = function(v)
               LU.Cfg().enabled = v
               LU.Apply()
-              EllesmereUI:RefreshPage()  -- the sample button's disabled state
+              EllesmereUI:RefreshPage()  -- the sample button's and chat's disabled state
           end },
         { type = "labeledButton", text = "Preview", buttonText = "Show Sample",
           tooltip = "Shows a sample toast for the last level.",
           disabled = function() return not LU.Get("enabled") end, disabledTooltip = "Level Up Toast",
           onClick = function() LU.Preview() end }
+    );  y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Show in Chat",
+          tooltip = "Also writes the toast to the chat, the abilities to learn as spell links.",
+          disabled = function() return not LU.Get("enabled") end, disabledTooltip = "Level Up Toast",
+          getValue = function() return LU.Get("chat") end,
+          setValue = function(v) LU.Cfg().chat = v or nil end },
+        EllesmereUI.BlankRowCfg()
     );  y = y - h
 
     ---------------------------------------------------------------------------

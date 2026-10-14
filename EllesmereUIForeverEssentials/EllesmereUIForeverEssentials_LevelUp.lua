@@ -5,18 +5,20 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  Level Up Toast: on level up, a toast in the loot feed's EUI look (accent
 --  bar on a fading dark plate) that completes the game's own level-up toast
 --  rather than repeating it: the level in large accent digits, the health,
---  power and stats gained ("Health: +52"), new talent points, what the new
---  level brings to learn as icons (the game's own level-up list,
---  C_EventToastManager, without its "you have reached" header) and, last, the
---  time the last level took. It sits under the game's toast by default.
+--  power and stats gained ("Health: +52"), new talent points, what the
+--  class trainer teaches at the new level as icons (TrainerData.lua) and,
+--  last, the time the last level took. It sits under the game's toast by
+--  default and shows with it: a read-only hook on the game's toast display
+--  releases it, with a one-shot fallback should the game's never come.
 --  It slides in with an accent sheen, fades out after a while, and hovering
---  holds it. Unlock mode places and sizes it. Everything moves through
+--  holds it. Unlock mode places and sizes it. Show in Chat also writes it
+--  to the chat, the abilities as spell links. Everything moves through
 --  animation groups on frames of our own.
 -------------------------------------------------------------------------------
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.levelUpToast; unset keys read these.
-local F = module.Feature("levelUpToast", { enabled = false, width = 340, duration = 6 },
+local F = module.Feature("levelUpToast", { enabled = false, chat = false, width = 340, duration = 6 },
     { point = "TOP", relPoint = "TOP", x = 0, y = -340 })
 local Get, Enabled = F.Get, F.Enabled
 
@@ -232,6 +234,29 @@ local function LevelAbilities(level)
     return out
 end
 
+-- The toast's lines in the chat.
+local function ToChat(level, timeLevel, timeSecs, stats, talents, abilities, hex)
+    local brand = EllesmereUI.COLOR_CODES.BRAND .. "EllesmereUI:|r "
+    local parts = {}
+    for i = 1, #stats do
+        parts[#parts + 1] = EllesmereUI.Lf("%1$s: %2$s", stats[i][1], ("%s+%d|r"):format(hex, stats[i][2]))
+    end
+    if talents > 0 then
+        parts[#parts + 1] = EllesmereUI.Lf("%1$s: %2$s", EllesmereUI.L("Talent points"), ("%s+%d|r"):format(hex, talents))
+    end
+    EllesmereUI.Print(brand .. hex .. EllesmereUI.Lf("Level %d", level) .. "|r  " .. table.concat(parts, ", "))
+    if #abilities > 0 then
+        local links = {}
+        for i = 1, #abilities do
+            links[#links + 1] = C_Spell.GetSpellLink(abilities[i].spellID) or ""
+        end
+        EllesmereUI.Print(brand .. EllesmereUI.L("To learn at this level:") .. " " .. table.concat(links, " "))
+    end
+    if timeSecs and SecondsToTime then
+        EllesmereUI.Print(brand .. EllesmereUI.Lf("Time at level %d: %s", timeLevel, SecondsToTime(math.floor(timeSecs), true)))
+    end
+end
+
 -- What the level brought, top to bottom: health, power and stats on two
 -- columns ("Health: +52"); talent points; what it brings to learn as icons;
 -- the time the last level took (timeLevel, timeSecs; nil: not known).
@@ -303,6 +328,7 @@ local function Show(level, timeLevel, timeSecs, health, power, talents, ...)
         y = y + ROW_H
     end
     toast:SetHeight(math.max(BASE_H, y + PAD))
+    if Get("chat") then ToChat(level, timeLevel, timeSecs, stats, talents, abilities, hex) end
 
     toast.fade.alpha:SetStartDelay(Get("duration"))
     toast.fade:Stop()
@@ -363,6 +389,22 @@ local function ShowPayload(level, timeLevel, timeSecs, health, power, talents, _
     Show(level, timeLevel, timeSecs, health, power, talents, ...)
 end
 
+-- A level up waits for the game's level-up toast.
+local pending, hooked
+local FALLBACK = 8   -- seconds before it shows on its own
+
+local function ShowPending()
+    local p = pending
+    pending = nil
+    if p then ShowPayload(unpack(p, 1, p.n)) end
+end
+
+local function OnGameToast(manager)
+    local shown = pending and manager.currentDisplayingToast
+    local info = shown and shown.toastInfo
+    if info and info.eventType == Enum.EventToastEventType.LevelUp then ShowPending() end
+end
+
 local function OnEvent(_, event, ...)
     if event == "PLAYER_LEVEL_UP" then
         local level = ...
@@ -370,7 +412,16 @@ local function OnEvent(_, event, ...)
         local t = Record(true)
         t.level, t.seconds, t.full = level, 0, true
         sessionStart = GetTime()
-        ShowPayload(level, level - 1, secs, select(2, ...))
+        local p = { level, level - 1, secs, select(2, ...) }
+        p.n = select("#", ...) + 2
+        pending = p
+        if not hooked then
+            hooked = true
+            hooksecurefunc(EventToastManagerFrame, "DisplayToast", OnGameToast)
+        end
+        C_Timer.After(FALLBACK, function()
+            if pending == p then ShowPending() end
+        end)
     elseif event == "TIME_PLAYED_MSG" then
         local _, levelTime = ...
         local t = Record(true)
@@ -385,6 +436,7 @@ end
 local function Apply()
     if not Enabled() then
         if events then events:UnregisterAllEvents() end
+        pending = nil
         if sessionStart then StopCounting() end
         if toast then toast:Hide() end
         return
