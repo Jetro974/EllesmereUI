@@ -164,8 +164,7 @@ end
 --  sits on it and the full sentence is its tooltip. Placed in Unlock Mode.
 -------------------------------------------------------------------------------
 local INDICATOR_SIZE = 40
-local BOBBER_ICON = 1369786  -- inv_g_fishingbobber_05, the duck bobber
-local FALLBACK_ICON = "Interface\\Icons\\Trade_Fishing"
+local ICON = "Interface\\Icons\\Trade_Fishing"  -- the Fishing profession
 local DEFAULT_INDICATOR_POS = { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 }
 
 local function IndicatorTip()
@@ -192,7 +191,7 @@ local function BuildIndicator()
     indicator:Hide()
     local icon = indicator:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints()
-    if not icon:SetTexture(BOBBER_ICON) then icon:SetTexture(FALLBACK_ICON) end
+    icon:SetTexture(ICON)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     indicator.icon = icon
     PP.CreateBorder(indicator, 1, 0.2, 0.2, 1, 2, "OVERLAY", 2)
