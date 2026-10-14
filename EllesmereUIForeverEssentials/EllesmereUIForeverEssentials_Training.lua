@@ -2,7 +2,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
 --  EllesmereUIForeverEssentials_Training.lua  (WoW Forever only)
---  Training Planner: a panel beside the spellbook listing what a class
+--  Class Roadmap: a panel beside the spellbook listing what a class
 --  trainer teaches from level 1 to the last, from the trainer data
 --  (TrainerData.lua), with each ability's cost. The player's class shows
 --  what is trained (grey), what can be trained now (green) and what comes
@@ -476,7 +476,7 @@ local function Build()
     Font(title, 15)
     title:SetTextColor(r, g, b)
     title:SetPoint("TOPLEFT", PAD, -PAD)
-    title:SetText(EllesmereUI.L("Training Planner"))
+    title:SetText(EllesmereUI.L("Class Roadmap"))
     -- The class picker, top right: the class's name and an arrow.
     panel.class = CreateFrame("Button", nil, panel)
     panel.class:SetHeight(18)
