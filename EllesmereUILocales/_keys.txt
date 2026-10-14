@@ -1142,7 +1142,7 @@ Time at level %d: %s
 Time this level: %s
 Time this session: %s
 To keep its settings safe, EllesmereUI now gives other addons their own section in the panel instead of letting them change its pages. The addons below haven't caught up yet, so those changes are hidden until they're updated. Everything else works as usual.
-To learn at this level:
+To learn now (%d):
 To remove the pin, ctrl-click it on the world map.
 Toggle On/Off Keybind
 Too long: %1$d / %2$d characters.

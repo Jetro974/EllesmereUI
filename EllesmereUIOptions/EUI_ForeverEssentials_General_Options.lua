@@ -318,7 +318,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
 
     _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Level Up Toast",
-          tooltip = "Shows a toast when you level up: your new level, the health, power and stats you gained, new talent points, the time the last level took and what the new one brings to learn. Place it in unlock mode.",
+          tooltip = "Shows a toast when you level up: your new level, the health, power and stats you gained, new talent points, the time the last level took and what you can train now. Place it in unlock mode.",
           getValue = function() return LU.Get("enabled") end,
           setValue = function(v)
               LU.Cfg().enabled = v
