@@ -70,7 +70,7 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.junkListExcluded = nil
                 EllesmereUIDB.simplifiedStats = nil
                 EllesmereUIDB.macroManager = nil
-                -- The recorded trainer lists are game data: only the switch resets.
+                -- The recorded trainer costs are game data: only the switch resets.
                 if EllesmereUIDB.trainingPlanner then EllesmereUIDB.trainingPlanner.enabled = nil end
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_FlightTimer = nil
