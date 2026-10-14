@@ -13,12 +13,10 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  pet's right-click menu in the Pet Journal and marked with a blue star in
 --  its list. While it has none, the account's favorites are used.
 --
---  Summoning is plain API, refused in combat only; it goes to the server, so
---  no Blizzard code runs inside our call. A pet that goes away while no load,
---  death, taxi, vehicle, mount or stealth explains it was put away by the
---  player (action bar, menu or journal), as are the two dismiss calls read
---  from hooksecurefunc. Events and hooks only
---  exist once the feature has been on.
+--  Summoning is plain API, refused in combat only. A pet that goes away with
+--  no load, death, taxi, vehicle, mount or stealth to explain it was put away
+--  by the player, as are the two dismiss calls read from hooksecurefunc.
+--  Events and hooks only exist once the feature has been on.
 -------------------------------------------------------------------------------
 local ns = select(2, ...)
 local DELAY = 2  -- seconds after a trigger: lets a load, landing or resurrection settle
@@ -81,9 +79,8 @@ local timer
 local hooked = false
 local userDismissed = false  -- the player put the pet away themselves
 local current          -- the pet we last saw out (nil: none)
-local lastLoad = 0     -- GetTime() of the last loading screen
+local loading = false  -- from leaving the world until the summon after the load
 local GONE_DELAY = 0.5 -- seconds before reading why the pet went away
-local LOAD_GRACE = 10  -- a pet gone this long after a load went with it
 
 local function CanSummonNow()
     if UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
@@ -100,14 +97,17 @@ local Queue
 -- waits for its end on the combat queue.
 local function Summon()
     timer = nil
+    loading = false
     if not IsEnabled() or userDismissed or C_PetJournal.GetSummonedPetGUID() then return end
     if InCombatLockdown() then
         ns.CombatQueue.Defer("PetSummon", Queue)
         return
     end
     if not CanSummonNow() then return end
+    -- A cast or a channel (a fishing line): again once it stops.
     if UnitCastingInfo("player") or UnitChannelInfo("player") then
-        Queue()
+        ev:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "player")
+        ev:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
         return
     end
     local own = OwnFavorites()
@@ -124,8 +124,8 @@ Queue = function()
     timer = C_Timer.NewTimer(DELAY, Summon)
 end
 
--- After which a missing pet may come back. The loads count from the moment
--- the player leaves the world.
+-- After which a missing pet may come back. A load counts from the moment the
+-- player leaves the world.
 local EVENTS = {
     "COMPANION_UPDATE", "PLAYER_LEAVING_WORLD", "PLAYER_ENTERING_WORLD", "PLAYER_ALIVE",
     "PLAYER_UNGHOST", "PLAYER_CONTROL_GAINED", "UNIT_EXITED_VEHICLE",
@@ -135,7 +135,7 @@ local EVENTS = {
 -- The game took the pet away (a load, death, taxi, vehicle, mount or
 -- stealth); anything else that put it away was the player.
 local function GameTookIt()
-    return GetTime() - lastLoad < LOAD_GRACE or UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
+    return loading or UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
         or UnitInVehicle("player") or IsMounted() or IsStealthed()
 end
 
@@ -164,10 +164,11 @@ ev:SetScript("OnEvent", function(_, event, arg1)
         end
         return
     elseif event == "PLAYER_LEAVING_WORLD" then
-        lastLoad = GetTime()
+        loading = true
         return
-    elseif event == "PLAYER_ENTERING_WORLD" then
-        lastLoad = GetTime()
+    elseif event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_CHANNEL_STOP" then
+        ev:UnregisterEvent("UNIT_SPELLCAST_STOP")
+        ev:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
     elseif event == "UNIT_EXITED_VEHICLE" and arg1 ~= "player" then
         return
     end
@@ -188,23 +189,29 @@ end
 -------------------------------------------------------------------------------
 local function ShowsOwn() return IsEnabled() and OwnOn() end
 
--- The blue star on a list button, beside the journal's own.
+-- The blue star on a list button, beside the journal's own; kept in a weak
+-- table, nothing is stored on the journal's buttons.
+local stars = setmetatable({}, { __mode = "k" })
 local function MarkListButton(button)
     local drag = button and button.dragButton
     if not drag then return end
     local on = ShowsOwn() and IsOwnFavorite(button.petID)
-    if on and not drag._euiCharStar then
-        local star = drag:CreateTexture(nil, "OVERLAY", nil, 2)
+    local star = stars[drag]
+    if on and not star then
+        star = drag:CreateTexture(nil, "OVERLAY", nil, 2)
         star:SetAtlas(STAR, true)
         star:SetVertexColor(0.45, 0.8, 1)
         star:SetPoint("TOPRIGHT", 8, 8)
-        drag._euiCharStar = star
+        stars[drag] = star
     end
-    if drag._euiCharStar then drag._euiCharStar:SetShown(on) end
+    if star then star:SetShown(on) end
 end
 
+-- The stars of the buttons on screen, read from the list without asking the
+-- journal to rebuild it.
 local function RefreshJournal()
-    if PetJournal_UpdatePetList and PetJournal and PetJournal:IsShown() then PetJournal_UpdatePetList() end
+    local scroll = PetJournal and PetJournal:IsShown() and PetJournal.ScrollBox
+    if scroll and scroll.ForEachFrame then scroll:ForEachFrame(MarkListButton) end
 end
 
 -- A pet's right-click menu. The owner is its list button or the pet card,
@@ -260,6 +267,8 @@ local function ApplyPetSummon()
         if on then ev:RegisterEvent(EVENTS[i]) else ev:UnregisterEvent(EVENTS[i]) end
     end
     if not on then
+        ev:UnregisterEvent("UNIT_SPELLCAST_STOP")
+        ev:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
         if timer then timer:Cancel(); timer = nil end
         return
     end
