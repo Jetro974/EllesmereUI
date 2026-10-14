@@ -170,10 +170,12 @@ local function RefreshJournal()
     if PetJournal_UpdatePetList and PetJournal and PetJournal:IsShown() then PetJournal_UpdatePetList() end
 end
 
--- A pet's right-click menu (its list button or its card): owner.petID is
--- the owned pet's GUID.
+-- A pet's right-click menu. The owner is its list button or the pet card,
+-- whose petID is the owned pet's GUID, or the list button's icon, whose
+-- parent holds it (PetJournal_ShowPetDropdown; the menu passes no context).
 local function AddMenuEntry(owner, root)
-    local petGUID = owner and owner.petID
+    local petGUID = owner and (owner.petID or (owner.GetParent and owner:GetParent()
+        and owner:GetParent().petID))
     if not (petGUID and ShowsOwn()) then return end
     root:CreateDivider()
     root:CreateCheckbox(EllesmereUI.L("Favorite for This Character"),
