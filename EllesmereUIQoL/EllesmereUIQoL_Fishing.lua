@@ -165,7 +165,7 @@ end
 -------------------------------------------------------------------------------
 local INDICATOR_SIZE = 40
 local BOBBER_ICON = 1369786  -- inv_g_fishingbobber_05, the duck bobber
-local FALLBACK_ICON = "Interface\Icons\Trade_Fishing"
+local FALLBACK_ICON = "Interface\\Icons\\Trade_Fishing"
 local DEFAULT_INDICATOR_POS = { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 }
 
 local function IndicatorTip()
