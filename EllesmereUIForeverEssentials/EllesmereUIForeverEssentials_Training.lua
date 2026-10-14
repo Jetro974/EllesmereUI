@@ -2,12 +2,13 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
 --  EllesmereUIForeverEssentials_Training.lua  (WoW Forever only)
---  Training Planner: a panel beside the spellbook listing what the class
---  trainer still has to teach, by level, from the trainer data
---  (TrainerData.lua): what can be trained now (green) and what comes next,
---  with each ability's cost. Costs are not in the client's data: each visit
---  to a class trainer records them for the account, under the visitor's
---  class.
+--  Training Planner: a panel beside the spellbook listing what a class
+--  trainer teaches from level 1 to the last, from the trainer data
+--  (TrainerData.lua), with each ability's cost. The player's class shows
+--  what is trained (grey), what can be trained now (green) and what comes
+--  next; a class picker shows any other class. Costs are not in the
+--  client's data: each visit to a class trainer records them for the
+--  account, under the visitor's class.
 --
 --  The panel is a frame of our own anchored to the spellbook's side; the
 --  spellbook's OnShow/OnHide (HookScript) show and hide it. Nothing of
@@ -26,8 +27,13 @@ local ROW_H = 24
 local HEADER_H = 26
 local TOP = 62         -- the title and summary above the list
 
-local events, waiter, hooked, panel
+local events, waiter, hooked, panel, shownClass, reloading
 local rows, headers = {}, {}
+
+local function PlayerClass()
+    local _, class = UnitClass("player")
+    return class
+end
 
 local function Key(name, rank)
     return rank and (name .. "|" .. rank) or name
@@ -42,9 +48,10 @@ local function Coins(copper)
     return copper and copper > 0 and C_CurrencyInfo.GetCoinTextureString(copper) or ""
 end
 
--- What the player's trainer asks for spellID; nil until a visit recorded it.
-local function Cost(spellID)
-    local _, class = UnitClass("player")
+-- What class's trainer asks for spellID (the player's class by default);
+-- nil until a visit recorded it.
+local function Cost(spellID, class)
+    class = class or PlayerClass()
     local all = F.Get("costs")
     local costs = all and all[class]
     local name = costs and C_Spell.GetSpellName(spellID)
@@ -68,17 +75,23 @@ local function Capture()
     end
 end
 
--- The abilities the player has not trained yet, by level then name.
-local function Upcoming()
-    local out = {}
-    local _, class = UnitClass("player")
+-- class's abilities by level then name; known is set for the player's own
+-- class. A spell whose data the client has not loaded yet is asked for and
+-- left out; missing tells the caller to look again once it comes.
+local function List(class)
+    local out, missing = {}, false
+    local own = class == PlayerClass()
     for level, spells in pairs(module.TrainerSpells(class)) do
         for i = 1, #spells do
             local id = spells[i]
-            local name = not IsPlayerSpell(id) and C_Spell.GetSpellName(id)
+            local name = C_Spell.GetSpellName(id)
             if name then
                 out[#out + 1] = { spellID = id, name = name, rank = Rank(id), level = level,
-                    icon = C_Spell.GetSpellTexture(id), cost = Cost(id) }
+                    icon = C_Spell.GetSpellTexture(id), cost = Cost(id, class),
+                    known = own and IsPlayerSpell(id) or nil }
+            else
+                C_Spell.RequestLoadSpellData(id)
+                missing = true
             end
         end
     end
@@ -87,7 +100,7 @@ local function Upcoming()
         if a.name ~= b.name then return a.name < b.name end
         return (a.rank or "") < (b.rank or "")
     end)
-    return out
+    return out, missing
 end
 
 -------------------------------------------------------------------------------
@@ -153,25 +166,41 @@ local function Header(i)
     return fs
 end
 
+local function ClassName(class)
+    local name = LOCALIZED_CLASS_NAMES_MALE[class] or class
+    local c = C_ClassColor.GetClassColor(class)
+    return c and c:WrapTextInColorCode(name) or name
+end
+
 local function Refresh()
     if not (panel and panel:IsShown()) then return end
-    local list = Upcoming()
+    shownClass = shownClass or PlayerClass()
+    panel.class.text:SetText(ClassName(shownClass))
+    panel.class:SetWidth(panel.class.text:GetStringWidth() + 18)
+    local list, missing = List(shownClass)
+    panel.missing = missing
     local playerLevel = UnitLevel("player")
+    local own = shownClass == PlayerClass()
     local count, total = 0, 0
     for _, e in ipairs(list) do
-        if e.level <= playerLevel then
+        if own and not e.known and e.level <= playerLevel then
             count = count + 1
             total = total + (e.cost or 0)
         end
     end
-    panel.summary:SetText(count > 0 and EllesmereUI.Lf("Trainable now: %d (%s)", count, Coins(total))
-        or EllesmereUI.L("Nothing to train at your level."))
+    if not own then
+        panel.summary:SetText("")
+    elseif count > 0 then
+        panel.summary:SetText(EllesmereUI.Lf("Trainable now: %d (%s)", count, Coins(total)))
+    else
+        panel.summary:SetText(EllesmereUI.L("Nothing to train at your level."))
+    end
 
     local y, nRows, nHeaders, i = 0, 0, 0, 1
     while list[i] do
         local level, sum, j = list[i].level, 0, i
         while list[j] and list[j].level == level do
-            sum = sum + (list[j].cost or 0)
+            if not list[j].known then sum = sum + (list[j].cost or 0) end
             j = j + 1
         end
         nHeaders = nHeaders + 1
@@ -190,13 +219,16 @@ local function Refresh()
             row:SetPoint("RIGHT", panel.content, "RIGHT")
             row.spellID, row.cost = e.spellID, e.cost
             row.icon:SetTexture(e.icon)
+            row.icon:SetDesaturated(e.known or false)
             row.name:SetText(e.rank and (e.name .. " |cffaaaaaa(" .. e.rank .. ")|r") or e.name)
-            if e.level <= playerLevel then
+            if e.known then
+                row.name:SetTextColor(0.5, 0.5, 0.5)
+            elseif own and e.level <= playerLevel then
                 row.name:SetTextColor(0.25, 1, 0.25)
             else
                 row.name:SetTextColor(1, 1, 1)
             end
-            row.cost:SetText(Coins(e.cost))
+            row.cost:SetText(e.known and "" or Coins(e.cost))
             row:Show()
             y = y + ROW_H
         end
@@ -207,6 +239,31 @@ local function Refresh()
     panel.content:SetHeight(math.max(1, y))
     local scroll = panel.scroll
     scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - scroll:GetHeight())))
+end
+
+-- Spell data asked for comes one spell at a time: one look again for the lot.
+local function OnSpellData()
+    if reloading or not panel.missing then return end
+    reloading = true
+    C_Timer.After(0.2, function()
+        reloading = false
+        Refresh()
+    end)
+end
+
+local function ClassMenu(button)
+    MenuUtil.CreateContextMenu(button, function(_, root)
+        root:CreateTitle(EllesmereUI.L("Class"))
+        for _, class in ipairs(CLASS_SORT_ORDER) do
+            if next(module.TrainerSpells(class)) then
+                root:CreateRadio(ClassName(class), function() return shownClass == class end, function()
+                    shownClass = class
+                    panel.scroll:SetVerticalScroll(0)
+                    Refresh()
+                end)
+            end
+        end
+    end)
 end
 
 local function OnScroll(scroll, delta)
@@ -239,6 +296,18 @@ local function Build()
     title:SetTextColor(r, g, b)
     title:SetPoint("TOPLEFT", PAD, -PAD)
     title:SetText(EllesmereUI.L("Training Planner"))
+    -- The class picker, top right: the class's name and an arrow.
+    panel.class = CreateFrame("Button", nil, panel)
+    panel.class:SetHeight(18)
+    panel.class:SetPoint("TOPRIGHT", -PAD, -PAD + 1)
+    panel.class.text = panel.class:CreateFontString(nil, "OVERLAY")
+    Font(panel.class.text, 12)
+    panel.class.text:SetPoint("LEFT")
+    local arrow = panel.class:CreateTexture(nil, "ARTWORK")
+    arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+    arrow:SetSize(14, 14)
+    arrow:SetPoint("RIGHT", 0, -3)
+    panel.class:SetScript("OnClick", ClassMenu)
     panel.summary = panel:CreateFontString(nil, "OVERLAY")
     Font(panel.summary, 12)
     panel.summary:SetTextColor(1, 1, 1, 0.8)
@@ -260,12 +329,15 @@ local function Build()
     panel:SetScript("OnShow", function(self)
         self:RegisterEvent("SPELLS_CHANGED")
         self:RegisterEvent("PLAYER_LEVEL_UP")
+        self:RegisterEvent("SPELL_DATA_LOAD_RESULT")
         Refresh()
     end)
     panel:SetScript("OnHide", function(self)
         self:UnregisterAllEvents()
     end)
-    panel:SetScript("OnEvent", Refresh)
+    panel:SetScript("OnEvent", function(_, event)
+        if event == "SPELL_DATA_LOAD_RESULT" then OnSpellData() else Refresh() end
+    end)
 end
 
 local function ShowPanel()
