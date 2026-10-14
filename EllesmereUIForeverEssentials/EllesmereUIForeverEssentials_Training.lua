@@ -89,6 +89,18 @@ local function List(class)
     return out
 end
 
+-- What the player's trainer asks for spellID; nil until a visit recorded it.
+local function Cost(spellID)
+    local _, class = UnitClass("player")
+    local all = F.Get("costs")
+    local costs = all and all[class]
+    local name = costs and C_Spell.GetSpellName(spellID)
+    if not name then return end
+    local rank = C_Spell.GetSpellSubtext(spellID)
+    if rank == "" then rank = nil end
+    return costs[Key(name, rank)]
+end
+
 -- Options-page entry points.
 EllesmereUI._TrainingPlanner = {
     Get = F.Get,
@@ -96,6 +108,7 @@ EllesmereUI._TrainingPlanner = {
     Apply = Apply,
     Classes = Classes,
     List = List,
+    Cost = Cost,
 }
 
 F.Start(Apply)
