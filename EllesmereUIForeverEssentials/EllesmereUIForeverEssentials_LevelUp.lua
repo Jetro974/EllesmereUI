@@ -19,7 +19,9 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.levelUpToast; unset keys read these.
-local F = module.Feature("levelUpToast", { enabled = false, chat = false, width = 340, duration = 6 },
+-- gains, abilities, time: which parts the toast (and the chat) shows.
+local F = module.Feature("levelUpToast", { enabled = false, chat = false, width = 340, duration = 6,
+    gains = true, abilities = true, time = true },
     { point = "TOP", relPoint = "TOP", x = 0, y = -340 })
 local Get, Enabled = F.Get, F.Enabled
 
@@ -281,13 +283,18 @@ local function Show(level, timeLevel, timeSecs, health, power, talents, ...)
     local hex = EllesmereUI.HexColor(Accent())
     local deltas = { ... }
     local stats = {}
-    if health > 0 then stats[#stats + 1] = { HEALTH, health } end
-    local _, token = UnitPowerType("player")
-    if power > 0 then stats[#stats + 1] = { _G[token] or token, power } end
-    for i = 1, #STATS do
-        local d = deltas[STATS[i][1] - 5]
-        if d and d > 0 then stats[#stats + 1] = { _G[STATS[i][2]], d } end
+    if Get("gains") then
+        if health > 0 then stats[#stats + 1] = { HEALTH, health } end
+        local _, token = UnitPowerType("player")
+        if power > 0 then stats[#stats + 1] = { _G[token] or token, power } end
+        for i = 1, #STATS do
+            local d = deltas[STATS[i][1] - 5]
+            if d and d > 0 then stats[#stats + 1] = { _G[STATS[i][2]], d } end
+        end
+    else
+        talents = 0
     end
+    if not Get("time") then timeSecs = nil end
 
     toast.number:SetText(level)
     local left = BAR + NUMBER_W
@@ -313,7 +320,7 @@ local function Show(level, timeLevel, timeSecs, health, power, talents, ...)
         y = y + ROW_H
     end
 
-    local abilities = LevelAbilities(level, sampleOnly)
+    local abilities = Get("abilities") and LevelAbilities(level, sampleOnly) or {}
     local shown = 0
     toast.learn:SetShown(#abilities > 0)
     if #abilities > 0 then

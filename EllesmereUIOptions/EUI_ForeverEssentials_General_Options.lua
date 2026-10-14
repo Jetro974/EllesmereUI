@@ -316,7 +316,8 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
     _, h = W:Spacer(parent, y, 20);  y = y - h
     _, h = W:SectionHeader(parent, "LEVEL UP", y);  y = y - h
 
-    _, h = W:DualRow(parent, y,
+    local luRow
+    luRow, h = W:DualRow(parent, y,
         { type = "toggle", text = "Level Up Toast",
           tooltip = "Shows a toast when you level up: your new level, the health, power and stats you gained, new talent points, the time the last level took and what you can train now. Place it in unlock mode.",
           getValue = function() return LU.Get("enabled") end,
@@ -330,6 +331,23 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
           disabled = function() return not LU.Get("enabled") end, disabledTooltip = "Level Up Toast",
           onClick = function() LU.Preview() end }
     );  y = y - h
+    do
+        local function partRow(label, tooltip, key)
+            return { type = "toggle", label = label, tooltip = tooltip,
+                get = function() return LU.Get(key) end,
+                set = function(v) LU.Cfg()[key] = v end }
+        end
+        EllesmereUI.BuildInlineCog(luRow._leftRegion, {
+            title = "Level Up Toast",
+            rows = {
+                partRow("Stat Gains", "The health, power, stats and talent points the level brought.", "gains"),
+                partRow("Abilities to Learn", "What you can train now, as icons.", "abilities"),
+                partRow("Time at Level", "How long the last level took.", "time"),
+            },
+            disabled = function() return not LU.Get("enabled") end,
+            disabledTooltip = "Level Up Toast",
+        })
+    end
 
     _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Show in Chat",
