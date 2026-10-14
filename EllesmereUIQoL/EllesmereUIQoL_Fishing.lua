@@ -2,12 +2,12 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -------------------------------------------------------------------------------
 --  EllesmereUIQoL_Fishing.lua
 --  Fishing helpers, each its own setting (all off by default):
---  Fishing Key      one key casts; on WoW Forever it first equips a pole and
---                   applies a lure (cog). With Reel In (cog), once soft
---                   interact targets the bobber the key reels the line in;
+--  Fishing Key      one key casts; it first equips a pole when none is and,
+--                   on WoW Forever, applies a lure (cog). With Reel In (cog),
+--                   once soft interact targets the bobber the key reels in;
 --                   the Bobber Indicator (cog) shows whether it does.
---  Double-Click     WoW Forever, a pole in hand: a quick second right-click
---                   on the world casts (its own Apply Lure in its cog).
+--  Double-Click     a pole equipped: a quick second right-click on the world
+--                   casts (WoW Forever: its own Apply Lure in its cog).
 --  Fishing Sounds   music and ambience down, effects up, for the session.
 --
 --  Every action is a real key press or click on a secure button, bound out
@@ -59,9 +59,9 @@ local function KeyOn() return FishCfg().key ~= nil end
 local function ReelOn() return KeyOn() and FishCfg().reel ~= false end            -- default ON
 local function IndicatorOn() return ReelOn() and FishCfg().indicator ~= false end -- default ON
 local function SoundOn() return FishCfg().sound == true end                        -- default OFF
--- WoW Forever only: lures on the pole and the pole in the main hand.
+-- WoW Forever only: lures on the pole in the main hand.
 local function LureOn() return EllesmereUI.IS_FOREVER and FishCfg().lure ~= false end
-local function DoubleClickOn() return EllesmereUI.IS_FOREVER and FishCfg().doubleClick == true end
+local function DoubleClickOn() return FishCfg().doubleClick == true end
 local function ClickLureOn() return EllesmereUI.IS_FOREVER and FishCfg().clickLure == true end -- default OFF
 local function AnyOn() return KeyOn() or DoubleClickOn() or SoundOn() end
 
@@ -90,14 +90,20 @@ local function ResolveFishing()
     end
 end
 
+-- A fishing pole: a weapon on WoW Forever, a profession tool on retail.
 local function IsPole(id)
     local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(id)
-    return classID == Enum.ItemClass.Weapon and subClassID == Enum.ItemWeaponSubclass.Fishingpole
+    if classID == Enum.ItemClass.Weapon then return subClassID == Enum.ItemWeaponSubclass.Fishingpole end
+    return Enum.ItemProfessionSubclass ~= nil and classID == Enum.ItemClass.Profession
+        and subClassID == Enum.ItemProfessionSubclass.Fishing
 end
 
--- A fishing pole in the main hand (WoW Forever; retail keeps it elsewhere).
-local function PoleInMainHand()
-    local id = GetInventoryItemID("player", INVSLOT_MAINHAND)
+-- Where the pole goes: the main hand on WoW Forever, the fishing tool slot on
+-- retail (FishingToolSlot in Blizzard_ProfessionsCrafting).
+local POLE_SLOT = EllesmereUI.IS_FOREVER and INVSLOT_MAINHAND or 28
+
+local function PoleEquipped()
+    local id = GetInventoryItemID("player", POLE_SLOT)
     return id ~= nil and IsPole(id)
 end
 
@@ -254,21 +260,19 @@ local function UpdateCastButton(viaClick)
         ns.CombatQueue.Defer("FishingButton", UpdateCastButton)
         return
     end
-    if EllesmereUI.IS_FOREVER then
-        if not PoleInMainHand() then
-            local pole = PoleInBags()
-            if pole then
-                castButton:SetAttribute("type", "item")
-                castButton:SetAttribute("item", "item:" .. pole)
-                return
-            end
-        elseif (viaClick and ClickLureOn() or not viaClick and LureOn()) and not GetWeaponEnchantInfo() then
-            local lure = BestLure()
-            if lure then
-                castButton:SetAttribute("type", "macro")
-                castButton:SetAttribute("macrotext", "/use item:" .. lure .. "\n/use " .. INVSLOT_MAINHAND)
-                return
-            end
+    if not PoleEquipped() then
+        local pole = PoleInBags()
+        if pole then
+            castButton:SetAttribute("type", "item")
+            castButton:SetAttribute("item", "item:" .. pole)
+            return
+        end
+    elseif (viaClick and ClickLureOn() or not viaClick and LureOn()) and not GetWeaponEnchantInfo() then
+        local lure = BestLure()
+        if lure then
+            castButton:SetAttribute("type", "macro")
+            castButton:SetAttribute("macrotext", "/use item:" .. lure .. "\n/use " .. INVSLOT_MAINHAND)
+            return
         end
     end
     castButton:SetAttribute("type", "spell")
@@ -352,7 +356,7 @@ local function OnWorldMouseDown(_, button)
     local double = now - lastRightClick < DOUBLE_CLICK_DELAY
     lastRightClick = double and 0 or now
     if not double or not castButton or InCombatLockdown() or UnitChannelInfo("player")
-       or UnitExists("mouseover") or not PoleInMainHand() then
+       or UnitExists("mouseover") or not PoleEquipped() then
         return
     end
     UpdateCastButton(true)

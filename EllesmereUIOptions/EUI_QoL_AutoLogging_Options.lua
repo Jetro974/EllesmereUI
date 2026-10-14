@@ -270,20 +270,19 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         "sound")
 
     -- Fishing Key (keybind, its options in the cog) | Double-Click to Cast
-    -- (WoW Forever: a pole in the main hand) or Fishing Sounds
     local fishKeyRow
     fishKeyRow, h = W:DualRow(parent, y,
         { type="label", text="Fishing Key",
-          tooltip="One key for the whole loop: casts your line, then reels it in once the bobber bites. On WoW Forever, it first equips the best fishing pole in your bags if you hold none. Use the cog to reel in, show the bobber indicator and apply lures." },
-        EllesmereUI.IS_FOREVER and { type = "toggle", text = "Double-Click to Cast",
-          tooltip = "With a fishing pole in hand, a quick double right-click on the world casts your line (applying a lure first if its cog's option is on). Never on a character, in combat or while your line is in the water: right-click the bobber to reel in.",
+          tooltip="One key for the whole loop: casts your line, then reels it in once the bobber bites. With no fishing pole equipped, it first equips the best one in your bags. Use the cog to reel in, show the bobber indicator and, on WoW Forever, apply lures." },
+        { type = "toggle", text = "Double-Click to Cast",
+          tooltip = "With a fishing pole equipped, a quick double right-click on the world casts your line (on WoW Forever, applying a lure first if its cog's option is on). Never on a character, in combat or while your line is in the water: right-click the bobber to reel in.",
           -- Off by default.
           getValue = function() return FishCfg().doubleClick == true end,
           setValue = function(v)
               FishCfg().doubleClick = v
               ApplyFishing()
               EllesmereUI:RefreshPage()  -- the cog's disabled state
-          end } or soundToggle
+          end }
     ); y = y - h
     -- The double-click's own Apply Lure (WoW Forever), off by default.
     if EllesmereUI.IS_FOREVER and not EllesmereUI._prebuilding then
@@ -345,9 +344,7 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         })
     end
 
-    if EllesmereUI.IS_FOREVER then
-        _, h = W:DualRow(parent, y, soundToggle, EllesmereUI.BlankRowCfg()); y = y - h
-    end
+    _, h = W:DualRow(parent, y, soundToggle, EllesmereUI.BlankRowCfg()); y = y - h
 
     _, h = W:Spacer(parent, y, 20); y = y - h
 
