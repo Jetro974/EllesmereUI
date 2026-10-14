@@ -6,7 +6,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  trainer teaches from level 1 to the last, from the trainer data
 --  (TrainerData.lua), with each ability's cost. The player's class shows
 --  what is trained (grey), what can be trained now (green) and what comes
---  next; a class picker shows any other class. Weapon skills come first,
+--  next, each group a section that folds (its state kept), the levels kept
+--  inside; a class picker shows any other class. Weapon skills come first,
 --  with the cities whose weapon master teaches them; a click on one writes
 --  its weapon masters' map links to the chat. Costs are not in the client's
 --  data: each visit to a class trainer or weapon master records them for the
@@ -22,6 +23,7 @@ local _, module = ...
 -- Settings live in EllesmereUIDB.trainingPlanner; unset keys read these.
 -- prices: classFile = { [spellID] = copper }
 -- unlisted: classFile = { [spellID] = level }, taught but not in the data
+-- collapsed: section key = true/false; unset, Already Trained is folded
 local F = module.Feature("trainingPlanner", { enabled = false })
 
 local PANEL_W = 290
@@ -29,10 +31,13 @@ local PAD = 12
 local ICON = 20
 local ROW_H = 24
 local HEADER_H = 26
+local SECTION_H = 28
+local PLUS = "Interface\\Buttons\\UI-PlusButton-Up"
+local MINUS = "Interface\\Buttons\\UI-MinusButton-Up"
 local TOP = 62         -- the title and summary above the list
 
 local events, waiter, hooked, panel, shownClass, reloading
-local rows, headers = {}, {}
+local rows, headers, sections = {}, {}, {}
 
 local function PlayerClass()
     local _, class = UnitClass("player")
@@ -224,13 +229,53 @@ local function Header(i)
     return fs
 end
 
+-- A folding section: unset, only Already Trained starts folded.
+local function Collapsed(key)
+    local all = F.Get("collapsed")
+    local v = all and all[key]
+    if v == nil then return key == "trained" end
+    return v
+end
+
+local Refresh
+
+local function SectionClick(button)
+    local cfg = F.Cfg()
+    cfg.collapsed = cfg.collapsed or {}
+    cfg.collapsed[button.key] = not Collapsed(button.key)
+    Refresh()
+end
+
+local function Section(i)
+    local b = sections[i]
+    if b then return b end
+    b = CreateFrame("Button", nil, panel.content)
+    b:SetHeight(SECTION_H - 6)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetSize(14, 14)
+    b.icon:SetPoint("LEFT")
+    b.text = b:CreateFontString(nil, "OVERLAY")
+    Font(b.text, 13)
+    b.text:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
+    b.text:SetPoint("RIGHT")
+    b.text:SetJustifyH("LEFT")
+    local line = b:CreateTexture(nil, "ARTWORK")
+    line:SetPoint("BOTTOMLEFT")
+    line:SetPoint("BOTTOMRIGHT")
+    line:SetHeight(1)
+    line:SetColorTexture(1, 1, 1, 0.12)
+    b:SetScript("OnClick", SectionClick)
+    sections[i] = b
+    return b
+end
+
 local function ClassName(class)
     local name = LOCALIZED_CLASS_NAMES_MALE[class] or class
     local c = C_ClassColor.GetClassColor(class)
     return c and c:WrapTextInColorCode(name) or name
 end
 
-local function Refresh()
+function Refresh()
     if not (panel and panel:IsShown()) then return end
     shownClass = shownClass or PlayerClass()
     panel.class.text:SetText(ClassName(shownClass))
@@ -254,7 +299,24 @@ local function Refresh()
         panel.summary:SetText(EllesmereUI.L("Nothing to train at your level."))
     end
 
-    local y, nRows, nHeaders, i = 0, 0, 0, 1
+    local y, nRows, nHeaders, nSections = 0, 0, 0, 0
+    local r, g, b = Accent()
+    -- A section's header; true when it is open.
+    local function PlaceSection(key, title, count, extra)
+        nSections = nSections + 1
+        local sec = Section(nSections)
+        sec.key = key
+        sec:ClearAllPoints()
+        sec:SetPoint("TOPLEFT", 0, -(y + 4))
+        sec:SetPoint("RIGHT", panel.content, "RIGHT")
+        local open = not Collapsed(key)
+        sec.icon:SetTexture(open and MINUS or PLUS)
+        sec.text:SetTextColor(r, g, b)
+        sec.text:SetText(title .. " |cffaaaaaa(" .. count .. ")|r" .. (extra or ""))
+        sec:Show()
+        y = y + SECTION_H
+        return open
+    end
     local function PlaceHeader(text)
         nHeaders = nHeaders + 1
         local h = Header(nHeaders)
@@ -284,8 +346,7 @@ local function Refresh()
 
     -- Weapon skills, with the cities of the player's faction that teach them.
     local weapons = module.WeaponSkills(shownClass)
-    if #weapons > 0 then
-        PlaceHeader(EllesmereUI.L("Weapon Skills"))
+    if #weapons > 0 and PlaceSection("weapons", EllesmereUI.L("Weapon Skills"), #weapons) then
         local faction = UnitFactionGroup("player")
         for _, w in ipairs(weapons) do
             local name = C_Spell.GetSpellName(w.spellID)
@@ -308,22 +369,47 @@ local function Refresh()
         end
     end
 
-    while list[i] do
-        local level, sum, j = list[i].level, 0, i
-        while list[j] and list[j].level == level do
-            if not list[j].known then sum = sum + (list[j].cost or 0) end
-            j = j + 1
+    -- entries (by level) under their level's line, in color; trained ones
+    -- without their cost.
+    local function PlaceLevels(entries, color)
+        local i = 1
+        while entries[i] do
+            local level, sum, j = entries[i].level, 0, i
+            while entries[j] and entries[j].level == level do
+                if not entries[j].known then sum = sum + (entries[j].cost or 0) end
+                j = j + 1
+            end
+            PlaceHeader(EllesmereUI.Lf("Level %d", level) .. (sum > 0 and ("   |cffffffff" .. Coins(sum) .. "|r") or ""))
+            for k = i, j - 1 do
+                local e = entries[k]
+                PlaceRow(e, color, e.known and "" or Coins(e.cost))
+            end
+            i = j
         end
-        PlaceHeader(EllesmereUI.Lf("Level %d", level) .. (sum > 0 and ("   |cffffffff" .. Coins(sum) .. "|r") or ""))
-        for k = i, j - 1 do
-            local e = list[k]
-            local color = e.known and GREY or (own and e.level <= playerLevel) and GREEN or WHITE
-            PlaceRow(e, color, e.known and "" or Coins(e.cost))
+    end
+
+    if own then
+        local trained, available, upcoming = {}, {}, {}
+        for _, e in ipairs(list) do
+            local into = e.known and trained or e.level <= playerLevel and available or upcoming
+            into[#into + 1] = e
         end
-        i = j
+        if #trained > 0 and PlaceSection("trained", EllesmereUI.L("Already Trained"), #trained) then
+            PlaceLevels(trained, GREY)
+        end
+        if #available > 0 and PlaceSection("available", EllesmereUI.L("Available Now"), #available,
+            total > 0 and ("   |cffffffff" .. Coins(total) .. "|r") or nil) then
+            PlaceLevels(available, GREEN)
+        end
+        if #upcoming > 0 and PlaceSection("upcoming", EllesmereUI.L("Upcoming Levels"), #upcoming) then
+            PlaceLevels(upcoming, WHITE)
+        end
+    elseif #list > 0 and PlaceSection("spells", EllesmereUI.L("Spells"), #list) then
+        PlaceLevels(list, WHITE)
     end
     for k = nRows + 1, #rows do rows[k]:Hide() end
     for k = nHeaders + 1, #headers do headers[k]:Hide() end
+    for k = nSections + 1, #sections do sections[k]:Hide() end
     panel.content:SetHeight(math.max(1, y))
     local scroll = panel.scroll
     scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - scroll:GetHeight())))
