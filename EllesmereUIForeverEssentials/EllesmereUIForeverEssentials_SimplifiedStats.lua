@@ -123,8 +123,8 @@ local function BuildStatRules()
     for _, h in ipairs({ { "+", "INCREASE" }, { "-", "DECREASE" } }) do
         for _, d in ipairs({ { "+", "INCREASE" }, { "-", "DECREASE" } }) do
             Rule("SPELL_HEALING_" .. h[2] .. "_DAMAGE_" .. d[2], {
-                { 2, d[1], "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT", SP },
                 { 1, h[1], "ITEM_MOD_SPELL_HEALING_DONE_SHORT", HEAL },
+                { 2, d[1], "ITEM_MOD_SPELL_DAMAGE_DONE_SHORT", SP },
             }, true)
         end
     end
