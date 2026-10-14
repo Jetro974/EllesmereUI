@@ -28,11 +28,7 @@ initFrame:SetScript("OnEvent", function(self)
         title       = "Forever Essentials",
         description = "Essential tools for WoW Forever.",
         pages       = { PAGE_GENERAL, PAGE_TRAVEL, PAGE_THREAT, PAGE_LOOT, PAGE_MACROS },
-<<<<<<< HEAD
-        searchTerms = { "flight timer", "flight path", "threat", "threat meter", "aggro", "loot", "loot feed", "reputation", "currency", "uprank", "spell rank", "junk", "junk items", "macro", "macros", "macro manager", "simplified stats", "item stats", "stat colors", "tooltip stats", "world map", "map", "reveal", "unexplored", "fog of war", "training", "trainer", "roadmap", "class roadmap" },
-=======
-        searchTerms = { "flight timer", "flight path", "threat", "threat meter", "aggro", "loot", "loot feed", "reputation", "currency", "uprank", "spell rank", "junk", "junk items", "macro", "macros", "macro manager", "simplified stats", "item stats", "stat colors", "tooltip stats", "world map", "map", "reveal", "unexplored", "fog of war", "training", "trainer", "level up", "toast" },
->>>>>>> c0afdb6a (Forever Essentials: Level Up Toast)
+        searchTerms = { "flight timer", "flight path", "threat", "threat meter", "aggro", "loot", "loot feed", "reputation", "currency", "uprank", "spell rank", "junk", "junk items", "macro", "macros", "macro manager", "simplified stats", "item stats", "stat colors", "tooltip stats", "world map", "map", "reveal", "unexplored", "fog of war", "training", "trainer", "roadmap", "class roadmap", "level up", "toast" },
         buildPage   = function(pageName, parent, yOffset)
             if pageName == PAGE_GENERAL and _G._EUI_BuildForeverGeneralPage then
                 return _G._EUI_BuildForeverGeneralPage(pageName, parent, yOffset)
