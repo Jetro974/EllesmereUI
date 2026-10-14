@@ -2,37 +2,18 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -------------------------------------------------------------------------------
 --  EllesmereUIQoL_Fishing.lua
 --  Fishing helpers, each its own setting (all off by default):
+--  Fishing Key      one key casts; on WoW Forever it first equips a pole and
+--                   applies a lure (cog). With Reel In (cog), once soft
+--                   interact targets the bobber the key reels the line in;
+--                   the Bobber Indicator (cog) shows whether it does.
+--  Double-Click     WoW Forever, a pole in hand: a quick second right-click
+--                   on the world casts (its own Apply Lure in its cog).
+--  Fishing Sounds   music and ambience down, effects up, for the session.
 --
---  Fishing Key      One key of the player's choice does the whole loop:
---                     - WoW Forever, no pole in the main hand: equips the
---                       best pole in the bags;
---                     - WoW Forever, a pole with no lure (Apply Lure, cog):
---                       applies the best lure in the bags;
---                     - otherwise: casts Fishing;
---                     - line in the water (Reel In, cog): once the game's
---                       soft interact targets the bobber, the key interacts
---                       with it, which reels the line in; the line out of
---                       the water, the key casts again. The Bobber Indicator
---                       (cog) shows on screen whether the bobber is targeted.
---  Double-Click     WoW Forever, a pole in the main hand: a quick second
---                   right-click on the world casts, on its release; its own
---                   Apply Lure (cog, off) puts a lure on first. Never on a
---                   unit, in combat or with the line in the water (a
---                   right-click on the bobber stays the game's).
---  Fishing Sounds   For the session, music and ambience go down, sound
---                   effects up, and sound keeps playing in the background.
---
---  Every action comes from a real key press or click: the key and the
---  double-click are override bindings on a secure button, changed out of
---  combat only. A session starts with a cast and ends when the player
---  moves, enters combat or leaves the world. CVars changed for it (soft
---  interact for Reel In, the sounds) are held (EllesmereUI.HoldCVar) and the
---  values from before saved, so a reload mid-session puts them back at the
---  next login. The bobber must stay on screen: looking away, soft interact
---  targets something else and the key casts again. Fishing is one spell by
---  name on every client (ranks on WoW Forever), so the channel is matched by
---  name. Events, frames, hooks and bindings only exist once a feature has
---  been on.
+--  Every action is a real key press or click on a secure button, bound out
+--  of combat only. A session starts with a cast and ends on moving, combat
+--  or a load; the CVars it changes go through EllesmereUI.HoldCVar, their
+--  values from before saved and put back at the next login after a reload.
 -------------------------------------------------------------------------------
 local ns = select(2, ...)
 local OWNER = "EllesmereUIQoL"
