@@ -275,10 +275,30 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
     fishKeyRow, h = W:DualRow(parent, y,
         { type="label", text="Fishing Key",
           tooltip="One key for the whole loop: casts your line, then reels it in once the bobber bites. On WoW Forever, it first equips the best fishing pole in your bags if you hold none. Use the cog to reel in, show the bobber indicator and apply lures." },
-        EllesmereUI.IS_FOREVER and FishToggle("Double-Click to Cast",
-            "With a fishing pole in hand, a quick double right-click on the world casts your line (applying a lure first if the cog's option is on). Never on a character, in combat or while your line is in the water: right-click the bobber to reel in.",
-            "doubleClick") or soundToggle
+        EllesmereUI.IS_FOREVER and { type = "toggle", text = "Double-Click to Cast",
+          tooltip = "With a fishing pole in hand, a quick double right-click on the world casts your line (applying a lure first if its cog's option is on). Never on a character, in combat or while your line is in the water: right-click the bobber to reel in.",
+          -- Off by default.
+          getValue = function() return FishCfg().doubleClick == true end,
+          setValue = function(v)
+              FishCfg().doubleClick = v
+              ApplyFishing()
+              EllesmereUI:RefreshPage()  -- the cog's disabled state
+          end } or soundToggle
     ); y = y - h
+    -- The double-click's own Apply Lure (WoW Forever), off by default.
+    if EllesmereUI.IS_FOREVER and not EllesmereUI._prebuilding then
+        EllesmereUI.BuildInlineCog(fishKeyRow._rightRegion, {
+            title = "Double-Click to Cast",
+            rows = {
+                { type = "toggle", label = "Apply Lure",
+                  tooltip = "When your fishing pole has no lure, a double-click first applies the best lure in your bags; the next one casts.",
+                  get = function() return FishCfg().clickLure == true end,
+                  set = function(v) FishCfg().clickLure = v; ApplyFishing() end },
+            },
+            disabled = function() return FishCfg().doubleClick ~= true end,
+            disabledTooltip = "Double-Click to Cast",
+        })
+    end
     if not EllesmereUI._prebuilding then
         local rgn = fishKeyRow._leftRegion
         local kbBtn, refresh = EllesmereUI.BuildKeybindButton(rgn, {
@@ -311,7 +331,7 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         -- Lures are weapon enchants on the pole on WoW Forever only.
         if EllesmereUI.IS_FOREVER then
             rows[#rows + 1] = CogToggle("Apply Lure",
-                "When your fishing pole has no lure, the Fishing Key or a double-click first applies the best lure in your bags; the next one casts.",
+                "When your fishing pole has no lure, the Fishing Key first applies the best lure in your bags; the next press casts.",
                 "lure")
         end
         EllesmereUI.BuildInlineCog(rgn, {

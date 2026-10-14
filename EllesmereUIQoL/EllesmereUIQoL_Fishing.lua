@@ -15,10 +15,10 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --                       the water, the key casts again. The Bobber Indicator
 --                       (cog) shows on screen whether the bobber is targeted.
 --  Double-Click     WoW Forever, a pole in the main hand: a quick second
---                   right-click on the world does what the key does (lure,
---                   then cast), on its release. Never on a unit, in combat
---                   or with the line in the water (a right-click on the
---                   bobber stays the game's).
+--                   right-click on the world casts, on its release; its own
+--                   Apply Lure (cog, off) puts a lure on first. Never on a
+--                   unit, in combat or with the line in the water (a
+--                   right-click on the bobber stays the game's).
 --  Fishing Sounds   For the session, music and ambience go down, sound
 --                   effects up, and sound keeps playing in the background.
 --
@@ -81,6 +81,7 @@ local function SoundOn() return FishCfg().sound == true end                     
 -- WoW Forever only: lures on the pole and the pole in the main hand.
 local function LureOn() return EllesmereUI.IS_FOREVER and FishCfg().lure ~= false end
 local function DoubleClickOn() return EllesmereUI.IS_FOREVER and FishCfg().doubleClick == true end
+local function ClickLureOn() return EllesmereUI.IS_FOREVER and FishCfg().clickLure == true end -- default OFF
 local function AnyOn() return KeyOn() or DoubleClickOn() or SoundOn() end
 
 local ev = CreateFrame("Frame")
@@ -212,8 +213,9 @@ end
 -------------------------------------------------------------------------------
 --  The key and the double-click
 -------------------------------------------------------------------------------
--- What the next press does. Out of combat only.
-local function UpdateCastButton()
+-- What the next press does (viaClick: the double-click's, which has its own
+-- Apply Lure). Out of combat only.
+local function UpdateCastButton(viaClick)
     if not castButton then return end
     if InCombatLockdown() then
         ns.CombatQueue.Defer("FishingButton", UpdateCastButton)
@@ -227,7 +229,7 @@ local function UpdateCastButton()
                 castButton:SetAttribute("item", "item:" .. pole)
                 return
             end
-        elseif LureOn() and not GetWeaponEnchantInfo() then
+        elseif (viaClick and ClickLureOn() or not viaClick and LureOn()) and not GetWeaponEnchantInfo() then
             local lure = BestLure()
             if lure then
                 castButton:SetAttribute("type", "macro")
@@ -264,6 +266,7 @@ local function Disarm()
     if clickArmed and not InCombatLockdown() then
         ClearOverrideBindings(clickOwner)
         clickArmed = false
+        UpdateCastButton()  -- back to what the key does
     end
 end
 
@@ -319,7 +322,7 @@ local function OnWorldMouseDown(_, button)
        or UnitExists("mouseover") or not PoleInMainHand() then
         return
     end
-    UpdateCastButton()
+    UpdateCastButton(true)
     SetOverrideBindingClick(clickOwner, true, "BUTTON2", BUTTON_NAME)
     clickArmed = true
     C_Timer.After(DISARM_DELAY, Disarm)
