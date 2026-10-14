@@ -35,6 +35,7 @@ local SECTION_H = 28
 local PLUS = "Interface\\Buttons\\UI-PlusButton-Up"
 local MINUS = "Interface\\Buttons\\UI-MinusButton-Up"
 local TOP = 62         -- the title and summary above the list
+local RIGHT_MAX = 110  -- the right column (cost, cities) at its widest
 
 local events, waiter, hooked, panel, shownClass, reloading
 local rows, headers, sections = {}, {}, {}
@@ -209,6 +210,8 @@ local function Row(i)
     row.cost = row:CreateFontString(nil, "OVERLAY")
     Font(row.cost, 11)
     row.cost:SetPoint("RIGHT")
+    row.cost:SetJustifyH("RIGHT")
+    row.cost:SetWordWrap(false)
     row.name = row:CreateFontString(nil, "OVERLAY")
     Font(row.name, 12)
     row.name:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
@@ -294,7 +297,8 @@ function Refresh()
     if not own then
         panel.summary:SetText("")
     elseif count > 0 then
-        panel.summary:SetText(EllesmereUI.Lf("Trainable now: %d (%s)", count, Coins(total)))
+        panel.summary:SetText(total > 0 and EllesmereUI.Lf("Trainable now: %d (%s)", count, Coins(total))
+            or EllesmereUI.Lf("Trainable now: %d", count))
     else
         panel.summary:SetText(EllesmereUI.L("Nothing to train at your level."))
     end
@@ -338,7 +342,10 @@ function Refresh()
         row.icon:SetDesaturated(e.known or false)
         row.name:SetText(e.rank and (e.name .. " |cffaaaaaa(" .. e.rank .. ")|r") or e.name)
         row.name:SetTextColor(color[1], color[2], color[3])
+        -- The right column keeps the name readable: past RIGHT_MAX it is cut.
+        row.cost:SetWidth(0)
         row.cost:SetText(right)
+        if row.cost:GetStringWidth() > RIGHT_MAX then row.cost:SetWidth(RIGHT_MAX) end
         row:Show()
         y = y + ROW_H
     end
