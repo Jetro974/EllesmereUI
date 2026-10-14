@@ -56,12 +56,19 @@ local function Text(parent, size)
     return fs
 end
 
+-- The mouse is on the toast or one of its icons, not just over its area
+-- (a window above it, the options panel, holds no hover).
+local function Hovered()
+    local focus = GetMouseFoci()[1]
+    return focus and (focus == toast or focus:GetParent() == toast)
+end
+
 -- Waits Duration, fades out, hides; hovering holds it.
 local function ArmFade()
     if toast.show:IsPlaying() then return end
     toast.fade:Stop()
     toast:SetAlpha(1)
-    if not toast:IsMouseOver() then toast.fade:Play() end
+    if not Hovered() then toast.fade:Play() end
 end
 
 -- An ability's tooltip: the spell's own.
@@ -398,15 +405,10 @@ EllesmereUI._LevelUpToast = {
     Get = Get,
     Cfg = F.Cfg,
     Apply = Apply,
-    -- A sample: the next level that brings something to learn (else the
-    -- next one), with typical gains and the time so far at the current one.
+    -- A sample: the last level, with what it teaches and typical gains.
     Preview = function()
-        local level = UnitLevel("player")
-        local shown = level + 1
-        for l = level + 1, GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or 60 do
-            if #LevelAbilities(l) > 0 then shown = l break end
-        end
-        Show(shown, level, LevelSeconds(level), 52, 38, 1, 1, 0, 2, 1)
+        local max = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or 60
+        Show(max, max - 1, 8040, 52, 38, 1, 1, 0, 2, 1)
     end,
 }
 

@@ -326,7 +326,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
               EllesmereUI:RefreshPage()  -- the sample button's disabled state
           end },
         { type = "labeledButton", text = "Preview", buttonText = "Show Sample",
-          tooltip = "Shows a sample toast for your next level.",
+          tooltip = "Shows a sample toast for the last level.",
           disabled = function() return not LU.Get("enabled") end, disabledTooltip = "Level Up Toast",
           onClick = function() LU.Preview() end }
     );  y = y - h
