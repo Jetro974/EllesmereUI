@@ -340,7 +340,9 @@ end
 --  Weapon skills: what each class can learn (SkillRaceClassInfo, same build)
 --  and the weapon masters who teach it. The masters' lists live on the
 --  server: these are the cities' weapon masters as the game has always had
---  them. map is the city's uiMapID (its name comes from the game).
+--  them, map (uiMapID) and x, y (0..100) where they stand. Their places
+--  and their French names come from WhatsTraining (MIT License, Copyright
+--  (c) 2019, https://github.com/fusionpit/WhatsTraining).
 -------------------------------------------------------------------------------
 local SWORDS, SWORDS2, AXES, AXES2, MACES, MACES2 = 201, 202, 196, 197, 198, 199
 local POLEARMS, STAVES, DAGGERS, FIST = 200, 227, 1180, 15590
@@ -360,21 +362,21 @@ local WEAPONS = {
 }
 
 local MASTERS = {
-    { name = "Woo Ping", map = 1453, faction = "Alliance",
+    { name = "Woo Ping", map = 1453, x = 57.1, y = 57.7, faction = "Alliance",
       teaches = { CROSSBOWS, DAGGERS, POLEARMS, STAVES, SWORDS, SWORDS2 } },
-    { name = "Bixi Wobblebonk", map = 1455, faction = "Alliance",
+    { name = "Bixi Wobblebonk", map = 1455, x = 62.2, y = 89.6, faction = "Alliance",
       teaches = { CROSSBOWS, DAGGERS, THROWN } },
-    { name = "Buliwyf Stonehand", map = 1455, faction = "Alliance",
+    { name = "Buliwyf Stonehand", map = 1455, x = 61.2, y = 89.5, faction = "Alliance",
       teaches = { AXES, AXES2, FIST, GUNS, MACES, MACES2 } },
-    { name = "Ilyenia Moonfire", map = 1457, faction = "Alliance",
+    { name = "Ilyenia Moonfire", map = 1457, x = 57.7, y = 46.0, faction = "Alliance",
       teaches = { BOWS, DAGGERS, FIST, STAVES, THROWN } },
-    { name = "Hanashi", map = 1454, faction = "Horde",
+    { name = "Hanashi", map = 1454, x = 81.5, y = 19.6, faction = "Horde",
       teaches = { AXES, AXES2, BOWS, STAVES, THROWN } },
-    { name = "Sayoc", map = 1454, faction = "Horde",
+    { name = "Sayoc", map = 1454, x = 81.7, y = 19.6, faction = "Horde",
       teaches = { AXES, AXES2, BOWS, DAGGERS, FIST, THROWN } },
-    { name = "Ansekhwa", map = 1456, faction = "Horde",
+    { name = "Ansekhwa", map = 1456, x = 40.0, y = 63.1, faction = "Horde",
       teaches = { GUNS, MACES, MACES2, STAVES } },
-    { name = "Archibald", map = 1458, faction = "Horde",
+    { name = "Archibald", map = 1458, x = 57.3, y = 32.8, faction = "Horde",
       teaches = { CROSSBOWS, DAGGERS, POLEARMS, SWORDS, SWORDS2 } },
 }
 

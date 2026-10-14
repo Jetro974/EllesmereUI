@@ -7,9 +7,11 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  (TrainerData.lua), with each ability's cost. The player's class shows
 --  what is trained (grey), what can be trained now (green) and what comes
 --  next; a class picker shows any other class. Weapon skills come first,
---  with the cities whose weapon master teaches them. Costs are not in the
---  client's data: each visit to a class trainer records them for the
---  account, under the visitor's class.
+--  with the cities whose weapon master teaches them; a click on one writes
+--  its weapon masters' map links to the chat. Costs are not in the client's
+--  data: each visit to a class trainer or weapon master records them for the
+--  account, under the visitor's class and by spell, along with whatever it
+--  teaches that the trainer data lacks.
 --
 --  The panel is a frame of our own anchored to the spellbook's side; the
 --  spellbook's OnShow/OnHide (HookScript) show and hide it. Nothing of
@@ -18,7 +20,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.trainingPlanner; unset keys read these.
--- costs: classFile = { "Name|Rank" = copper }
+-- prices: classFile = { [spellID] = copper }
+-- unlisted: classFile = { [spellID] = level }, taught but not in the data
 local F = module.Feature("trainingPlanner", { enabled = false })
 
 local PANEL_W = 290
@@ -36,10 +39,6 @@ local function PlayerClass()
     return class
 end
 
-local function Key(name, rank)
-    return rank and (name .. "|" .. rank) or name
-end
-
 local function Rank(spellID)
     local rank = C_Spell.GetSpellSubtext(spellID)
     if rank ~= "" then return rank end
@@ -52,26 +51,37 @@ end
 -- What class's trainer asks for spellID (the player's class by default);
 -- nil until a visit recorded it.
 local function Cost(spellID, class)
-    class = class or PlayerClass()
-    local all = F.Get("costs")
-    local costs = all and all[class]
-    local name = costs and C_Spell.GetSpellName(spellID)
-    if name then return costs[Key(name, Rank(spellID))] end
+    local all = F.Get("prices")
+    local prices = all and all[class or PlayerClass()]
+    return prices and prices[spellID]
 end
 
--- A class trainer's costs (professions and pet trainers left out).
+local function Sub(t, key)
+    t[key] = t[key] or {}
+    return t[key]
+end
+
+-- A class trainer's or weapon master's list (professions and pet trainers
+-- left out): each service's cost under its spell, read from the service's
+-- own tooltip data, and what the trainer data lacks.
 local function Capture()
     if IsTradeskillTrainer() or C_Trainer.GetTrainerType() ~= Enum.TrainerType.General then return end
+    local class = PlayerClass()
+    local listed = {}
+    for _, spells in pairs(module.TrainerSpells(class)) do
+        for i = 1, #spells do listed[spells[i]] = true end
+    end
+    for _, w in ipairs(module.WeaponSkills(class)) do listed[w.spellID] = true end
     local cfg = F.Cfg()
-    local _, class = UnitClass("player")
-    cfg.costs = cfg.costs or {}
-    local costs = cfg.costs[class] or {}
-    cfg.costs[class] = costs
+    local prices = Sub(Sub(cfg, "prices"), class)
+    local unlisted = Sub(Sub(cfg, "unlisted"), class)
     for i = 1, GetNumTrainerServices() do
-        local name, _, _, _, rank = GetTrainerServiceInfo(i)
-        if name and name ~= "" then
-            if rank == "" then rank = nil end
-            costs[Key(name, rank)] = GetTrainerServiceCost(i) or 0
+        local _, kind, _, level = GetTrainerServiceInfo(i)
+        local info = kind ~= "header" and C_TooltipInfo.GetTrainerService(i)
+        local id = info and info.id
+        if id then
+            prices[id] = GetTrainerServiceCost(i) or 0
+            if not listed[id] then unlisted[id] = level or 0 end
         end
     end
 end
@@ -122,6 +132,32 @@ local function CityName(map)
     return info and info.name or ""
 end
 
+-- A weapon skill's masters of the player's faction as map links in chat,
+-- the link /way prints (x, y travel as 0..10000). A line printed in combat
+-- taints chat history, so it waits for the end of combat.
+local function PrintMasters(masters)
+    local CC = EllesmereUI.COLOR_CODES
+    local faction = UnitFactionGroup("player")
+    for _, m in ipairs(masters) do
+        if m.faction == faction then
+            local link = ("|cffffff00|Hworldmap:%d:%d:%d|h[%s]|h|r"):format(m.map,
+                math.floor(m.x * 100 + 0.5), math.floor(m.y * 100 + 0.5), MAP_PIN_HYPERLINK)
+            EllesmereUI.Print(CC.BRAND .. "EllesmereUI:|r " .. link .. " " .. CC.WHITE .. EllesmereUI.L(m.name)
+                .. "|r " .. CC.DIM .. CityName(m.map) .. ("  %.1f, %.1f"):format(m.x, m.y) .. "|r")
+        end
+    end
+end
+
+local function RowClick(row, button)
+    if button ~= "LeftButton" or not row.masters then return end
+    local masters = row.masters
+    if InCombatLockdown() then
+        EllesmereUI.CombatQueue.Defer("TrainingPlannerLink", function() PrintMasters(masters) end)
+    else
+        PrintMasters(masters)
+    end
+end
+
 -- A row's tooltip: the spell's own, with its cost when recorded, or for a
 -- weapon skill the weapon masters of both factions.
 local function RowEnter(row)
@@ -137,11 +173,13 @@ local function RowEnter(row)
         for _, faction in ipairs({ "Alliance", "Horde" }) do
             for _, m in ipairs(row.masters) do
                 if m.faction == faction then
-                    GameTooltip:AddDoubleLine(m.name, CityName(m.map) .. " (" .. _G["FACTION_" .. faction:upper()] .. ")",
+                    GameTooltip:AddDoubleLine(EllesmereUI.L(m.name), CityName(m.map) .. " (" .. _G["FACTION_" .. faction:upper()] .. ")",
                         1, 1, 1, 0.7, 0.7, 0.7)
                 end
             end
         end
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(EllesmereUI.L("Click for your faction's weapon masters on the map."), 0.6, 0.6, 0.6)
     end
     GameTooltip:Show()
 end
@@ -158,6 +196,7 @@ local function Row(i)
     row:EnableMouseMotion(true)
     row:SetScript("OnEnter", RowEnter)
     row:SetScript("OnLeave", RowLeave)
+    row:SetScript("OnMouseUp", RowClick)
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetSize(ICON, ICON)
     row.icon:SetPoint("LEFT")
@@ -232,6 +271,7 @@ local function Refresh()
         row:SetPoint("TOPLEFT", 0, -y)
         row:SetPoint("RIGHT", panel.content, "RIGHT")
         row.spellID, row.cost, row.masters = e.spellID, not e.known and e.cost or nil, masters
+        row:SetMouseClickEnabled(masters ~= nil)
         row.icon:SetTexture(e.icon)
         row.icon:SetDesaturated(e.known or false)
         row.name:SetText(e.rank and (e.name .. " |cffaaaaaa(" .. e.rank .. ")|r") or e.name)
@@ -258,7 +298,8 @@ local function Refresh()
                     end
                 end
                 local known = own and IsPlayerSpell(w.spellID)
-                PlaceRow({ spellID = w.spellID, name = name, icon = C_Spell.GetSpellTexture(w.spellID), known = known },
+                PlaceRow({ spellID = w.spellID, name = name, icon = C_Spell.GetSpellTexture(w.spellID), known = known,
+                    cost = Cost(w.spellID, shownClass) },
                     known and GREY or WHITE, known and "" or "|cffaaaaaa" .. table.concat(cities, ", ") .. "|r", w.masters)
             else
                 C_Spell.RequestLoadSpellData(w.spellID)

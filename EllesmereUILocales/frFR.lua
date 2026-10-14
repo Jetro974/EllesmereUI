@@ -5830,3 +5830,8 @@ L["Trainable now: %d (%s)"] = "À apprendre maintenant : %d (%s)"
 L["Nothing to train at your level."] = "Rien à apprendre à votre niveau."
 L["Weapon Skills"] = "Compétences d'armes"
 L["Weapon Masters"] = "Maîtres d'armes"
+L["Click for your faction's weapon masters on the map."] = "Cliquez pour placer les maîtres d'armes de votre faction sur la carte."
+-- Weapon masters (TrainerData.lua)
+L["Buliwyf Stonehand"] = "Buliwyf Main-de-pierre"
+L["Bixi Wobblebonk"] = "Bixi Oscillognon"
+L["Ilyenia Moonfire"] = "Ilyenia Lunéclat"
