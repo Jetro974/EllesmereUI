@@ -5833,7 +5833,7 @@ L["While your line is in the water and the bobber is on screen, the Fishing Key 
 L["Bobber Indicator"] = "Indicateur du bouchon"
 L["While your line is in the water, an icon shows whether the bobber is targeted: green, the key reels in; red, keep the bobber on screen. Hover it for details; place it in Unlock Mode."] = "Tant que votre ligne est à l'eau, une icône indique si le bouchon est ciblé : en vert, la touche ferre ; en rouge, gardez le bouchon à l'écran. Survolez-la pour le détail ; placez-la en mode déverrouillage."
 L["Bobber found: %s reels in"] = "Bouchon repéré : %s pour ferrer"
-L["Bobber not found: keep it on screen"] = "Bouchon introuvable : gardez-le à l'écran"
+L["Bobber not found: keep it on screen, cast again, or right-click it to reel in."] = "Bouchon introuvable : gardez-le à l'écran, relancez, ou faites un clic droit dessus pour ferrer."
 L["Apply Lure"] = "Poser un appât"
 L["When your fishing pole has no lure, the Fishing Key first applies the best lure in your bags; the next press casts."] = "Quand votre canne n'a pas d'appât, la touche de pêche pose d'abord le meilleur appât de vos sacs ; l'appui suivant lance la ligne."
 L["Double-Click to Cast"] = "Double clic pour lancer"

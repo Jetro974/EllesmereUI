@@ -218,7 +218,7 @@ Blizzard damage meter is off
 Block
 BoE
 Bobber found: %s reels in
-Bobber not found: keep it on screen
+Bobber not found: keep it on screen, cast again, or right-click it to reel in.
 Bonus Roll Confirmation
 Bonus Roll Settings
 BonusRollConfirm is loaded and handles confirmation. Disable that addon and reload to use this feature.

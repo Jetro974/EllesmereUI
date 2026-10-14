@@ -168,7 +168,7 @@ local DEFAULT_INDICATOR_POS = { point = "CENTER", relPoint = "CENTER", x = 0, y 
 
 local function IndicatorTip()
     if reeling then return EllesmereUI.Lf("Bobber found: %s reels in", GetBindingText(FishCfg().key)) end
-    return EllesmereUI.L("Bobber not found: keep it on screen")
+    return EllesmereUI.L("Bobber not found: keep it on screen, cast again, or right-click it to reel in.")
 end
 
 local function PlaceIndicator()
