@@ -14,8 +14,10 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  its list. While it has none, the account's favorites are used.
 --
 --  Summoning is plain API, refused in combat only; it goes to the server, so
---  no Blizzard code runs inside our call. The player's own dismissals are
---  read from hooksecurefunc on the two dismiss calls. Events and hooks only
+--  no Blizzard code runs inside our call. A pet that goes away while no load,
+--  death, taxi, vehicle, mount or stealth explains it was put away by the
+--  player (action bar, menu or journal), as are the two dismiss calls read
+--  from hooksecurefunc. Events and hooks only
 --  exist once the feature has been on.
 -------------------------------------------------------------------------------
 local ns = select(2, ...)
@@ -78,6 +80,10 @@ local ev = CreateFrame("Frame")
 local timer
 local hooked = false
 local userDismissed = false  -- the player put the pet away themselves
+local current          -- the pet we last saw out (nil: none)
+local lastLoad = 0     -- GetTime() of the last loading screen
+local GONE_DELAY = 0.5 -- seconds before reading why the pet went away
+local LOAD_GRACE = 10  -- a pet gone this long after a load went with it
 
 local function CanSummonNow()
     if UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
@@ -118,32 +124,63 @@ Queue = function()
     timer = C_Timer.NewTimer(DELAY, Summon)
 end
 
--- After which a missing pet may come back.
+-- After which a missing pet may come back. The loads count from the moment
+-- the player leaves the world.
 local EVENTS = {
-    "COMPANION_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_ALIVE",
+    "COMPANION_UPDATE", "PLAYER_LEAVING_WORLD", "PLAYER_ENTERING_WORLD", "PLAYER_ALIVE",
     "PLAYER_UNGHOST", "PLAYER_CONTROL_GAINED", "UNIT_EXITED_VEHICLE",
     "UPDATE_STEALTH", "PLAYER_MOUNT_DISPLAY_CHANGED",
 }
 
+-- The game took the pet away (a load, death, taxi, vehicle, mount or
+-- stealth); anything else that put it away was the player.
+local function GameTookIt()
+    return GetTime() - lastLoad < LOAD_GRACE or UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
+        or UnitInVehicle("player") or IsMounted() or IsStealthed()
+end
+
+-- The pet just went away: once the cause has settled, either it comes back
+-- or the player's choice stands until they summon one again.
+local function OnPetGone()
+    if C_PetJournal.GetSummonedPetGUID() then return end
+    if GameTookIt() then
+        Queue()
+    else
+        userDismissed = true
+    end
+end
+
 ev:SetScript("OnEvent", function(_, event, arg1)
     if event == "COMPANION_UPDATE" then
         if arg1 == "MOUNT" then return end
-        if C_PetJournal.GetSummonedPetGUID() then
+        local guid = C_PetJournal.GetSummonedPetGUID()
+        if guid then
+            current = guid
             userDismissed = false
-            return
+        elseif current then
+            -- Also fires for other players' pets: only the loss of ours counts.
+            current = nil
+            C_Timer.After(GONE_DELAY, OnPetGone)
         end
+        return
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        lastLoad = GetTime()
+        return
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        lastLoad = GetTime()
     elseif event == "UNIT_EXITED_VEHICLE" and arg1 ~= "player" then
         return
     end
     if not userDismissed then Queue() end
 end)
 
--- The player's own dismissals: DismissSummonedPet, or SummonPetByGUID on the
--- pet already out (the journal's toggle). Post-hooks, so the pet still reads
--- as out here.
+-- The player's own dismissals through the API: DismissSummonedPet, or
+-- SummonPetByGUID on the pet out (the journal's toggle). The pet out is the
+-- one we last saw: the post-hook may run once it is gone. Action bars and
+-- menus that bypass both are caught by OnPetGone.
 local function OnDismiss() userDismissed = true end
 local function OnSummonByGUID(guid)
-    if guid and guid == C_PetJournal.GetSummonedPetGUID() then userDismissed = true end
+    if guid and guid == current then userDismissed = true end
 end
 
 -------------------------------------------------------------------------------
@@ -232,6 +269,7 @@ local function ApplyPetSummon()
         hooksecurefunc(C_PetJournal, "SummonPetByGUID", OnSummonByGUID)
         HookPetJournal()
     end
+    current = C_PetJournal.GetSummonedPetGUID()
     userDismissed = false
     Queue()
 end
