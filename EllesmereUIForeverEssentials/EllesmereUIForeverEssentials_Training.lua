@@ -163,9 +163,9 @@ end
 local function RowEnter(row)
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetSpellByID(row.spellID)
-    if row.cost and row.cost > 0 then
+    if row.copper and row.copper > 0 then
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(COSTS_LABEL .. " " .. Coins(row.cost), 1, 1, 1)
+        GameTooltip:AddLine(COSTS_LABEL .. " " .. Coins(row.copper), 1, 1, 1)
     end
     if row.masters then
         GameTooltip:AddLine(" ")
@@ -270,7 +270,7 @@ local function Refresh()
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", 0, -y)
         row:SetPoint("RIGHT", panel.content, "RIGHT")
-        row.spellID, row.cost, row.masters = e.spellID, not e.known and e.cost or nil, masters
+        row.spellID, row.copper, row.masters = e.spellID, not e.known and e.cost or nil, masters
         row:SetMouseClickEnabled(masters ~= nil)
         row.icon:SetTexture(e.icon)
         row.icon:SetDesaturated(e.known or false)
