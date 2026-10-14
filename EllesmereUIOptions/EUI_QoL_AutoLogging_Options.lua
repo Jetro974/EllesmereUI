@@ -252,28 +252,32 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
     _, h = W:Spacer(parent, y, 20); y = y - h
 
     ---------------------------------------------------------------------------
-    --  FISHING (One-Button Fishing, runtime in EllesmereUIQoL_Fishing.lua)
+    --  FISHING (runtime in EllesmereUIQoL_Fishing.lua)
     ---------------------------------------------------------------------------
     _, h = W:SectionHeader(parent, "FISHING", y); y = y - h
 
     local function ApplyFishing()
         if _G._EUI_ApplyFishing then _G._EUI_ApplyFishing() end
     end
-    local function NoFishKey() return FishCfg().key == nil end
+    local function FishToggle(text, tooltip, key)
+        return { type = "toggle", text = text, tooltip = tooltip,
+          -- Off by default.
+          getValue = function() return FishCfg()[key] == true end,
+          setValue = function(v) FishCfg()[key] = v; ApplyFishing() end }
+    end
+    local soundToggle = FishToggle("Fishing Sounds",
+        "While you fish, lowers music and ambience, raises sound effects so you hear the bobber splash, and keeps sound on when the game is in the background. Your sound settings come back when you move, enter combat or change zone.",
+        "sound")
 
-    -- Fishing Key (keybind) | Reel In With the Key
+    -- Fishing Key (keybind, its options in the cog) | Double-Click to Cast
+    -- (WoW Forever: a pole in the main hand) or Fishing Sounds
     local fishKeyRow
     fishKeyRow, h = W:DualRow(parent, y,
         { type="label", text="Fishing Key",
-          tooltip="One key for the whole loop: casts your line, then reels it in once the bobber bites. On WoW Forever, it first equips the best fishing pole in your bags if you hold none." },
-        { type    = "toggle",
-          text    = "Reel In With the Key",
-          tooltip = "While your line is in the water and the bobber is on screen, the Fishing Key reels it in; the line out, the key casts again. Turns on soft interact while you fish, and puts your settings back after.",
-          disabled = NoFishKey,
-          disabledTooltip = "Fishing Key",
-          -- On by default.
-          getValue = function() return FishCfg().reel ~= false end,
-          setValue = function(v) FishCfg().reel = v; ApplyFishing() end }
+          tooltip="One key for the whole loop: casts your line, then reels it in once the bobber bites. On WoW Forever, it first equips the best fishing pole in your bags if you hold none. Use the cog to reel in, show the bobber indicator and apply lures." },
+        EllesmereUI.IS_FOREVER and FishToggle("Double-Click to Cast",
+            "With a fishing pole in hand, a quick double right-click on the world casts your line (applying a lure first if the cog's option is on). Never on a character, in combat or while your line is in the water: right-click the bobber to reel in.",
+            "doubleClick") or soundToggle
     ); y = y - h
     if not EllesmereUI._prebuilding then
         local rgn = fishKeyRow._leftRegion
@@ -289,21 +293,37 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         })
         PP.Point(kbBtn, "RIGHT", rgn, "RIGHT", -20, 0)
         EllesmereUI.RegisterWidgetRefresh(refresh)
+
+        -- On by default, each of them.
+        local function CogToggle(label, tooltip, key)
+            return { type = "toggle", label = label, tooltip = tooltip,
+                get = function() return FishCfg()[key] ~= false end,
+                set = function(v) FishCfg()[key] = v; ApplyFishing() end }
+        end
+        local rows = {
+            CogToggle("Reel In With the Key",
+                "While your line is in the water and the bobber is on screen, the Fishing Key reels it in; the line out, the key casts again. Turns on soft interact while you fish, and puts your settings back after.",
+                "reel"),
+            CogToggle("Bobber Indicator",
+                "While your line is in the water, shows under your character whether the bobber is targeted: green, the key reels in; orange, keep the bobber on screen.",
+                "indicator"),
+        }
+        -- Lures are weapon enchants on the pole on WoW Forever only.
+        if EllesmereUI.IS_FOREVER then
+            rows[#rows + 1] = CogToggle("Apply Lure",
+                "When your fishing pole has no lure, the Fishing Key or a double-click first applies the best lure in your bags; the next one casts.",
+                "lure")
+        end
+        EllesmereUI.BuildInlineCog(rgn, {
+            title = "Fishing Key",
+            rows = rows,
+            disabled = function() return FishCfg().key == nil end,
+            disabledTooltip = "Fishing Key",
+        })
     end
 
-    -- Lures are weapon enchants on the pole on WoW Forever only.
     if EllesmereUI.IS_FOREVER then
-        _, h = W:DualRow(parent, y,
-            { type    = "toggle",
-              text    = "Apply Lure With the Key",
-              tooltip = "When your fishing pole has no lure, the Fishing Key first applies the best lure in your bags; the next press casts.",
-              disabled = NoFishKey,
-              disabledTooltip = "Fishing Key",
-              -- On by default.
-              getValue = function() return FishCfg().lure ~= false end,
-              setValue = function(v) FishCfg().lure = v; ApplyFishing() end },
-            EllesmereUI.BlankRowCfg()
-        ); y = y - h
+        _, h = W:DualRow(parent, y, soundToggle, EllesmereUI.BlankRowCfg()); y = y - h
     end
 
     _, h = W:Spacer(parent, y, 20); y = y - h

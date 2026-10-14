@@ -1,25 +1,38 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  EllesmereUIQoL_Fishing.lua
---  One-Button Fishing: one key of the player's choice does the whole loop.
---    - WoW Forever, no pole in the main hand: equips the best pole in the bags;
---    - WoW Forever, a pole with no lure (Apply Lure option): applies the best
---      lure in the bags;
---    - otherwise: casts Fishing;
---    - line in the water (Reel In option): once the game's soft interact
---      targets the bobber, the key interacts with it, which reels the line in.
---      The line out of the water, the key casts again.
+--  Fishing helpers, each its own setting (all off by default):
 --
---  Every action comes from a real key press: the key is an override binding
---  on a secure button, changed out of combat only. Reeling needs soft
---  interact on, so its CVars are held (EllesmereUI.HoldCVar) from the first
---  cast until the session ends (the player moves, enters combat or leaves the
---  world). The values from before are saved, so a reload mid-session puts
---  them back at the next login. The bobber must stay on screen: looking
---  away, soft interact targets something else and the key casts again.
---  Fishing is one spell by name on every client (ranks on WoW Forever), so
---  the channel is matched by name. Events, the button and the binding only
---  exist once a key has been set.
+--  Fishing Key      One key of the player's choice does the whole loop:
+--                     - WoW Forever, no pole in the main hand: equips the
+--                       best pole in the bags;
+--                     - WoW Forever, a pole with no lure (Apply Lure, cog):
+--                       applies the best lure in the bags;
+--                     - otherwise: casts Fishing;
+--                     - line in the water (Reel In, cog): once the game's
+--                       soft interact targets the bobber, the key interacts
+--                       with it, which reels the line in; the line out of
+--                       the water, the key casts again. The Bobber Indicator
+--                       (cog) shows on screen whether the bobber is targeted.
+--  Double-Click     WoW Forever, a pole in the main hand: a quick second
+--                   right-click on the world does what the key does (lure,
+--                   then cast), on its release. Never on a unit, in combat
+--                   or with the line in the water (a right-click on the
+--                   bobber stays the game's).
+--  Fishing Sounds   For the session, music and ambience go down, sound
+--                   effects up, and sound keeps playing in the background.
+--
+--  Every action comes from a real key press or click: the key and the
+--  double-click are override bindings on a secure button, changed out of
+--  combat only. A session starts with a cast and ends when the player
+--  moves, enters combat or leaves the world. CVars changed for it (soft
+--  interact for Reel In, the sounds) are held (EllesmereUI.HoldCVar) and the
+--  values from before saved, so a reload mid-session puts them back at the
+--  next login. The bobber must stay on screen: looking away, soft interact
+--  targets something else and the key casts again. Fishing is one spell by
+--  name on every client (ranks on WoW Forever), so the channel is matched by
+--  name. Events, frames, hooks and bindings only exist once a feature has
+--  been on.
 -------------------------------------------------------------------------------
 local ns = select(2, ...)
 local OWNER = "EllesmereUIQoL"
@@ -35,12 +48,23 @@ local LURES = { 6533, 6532, 7307, 6530, 6811, 6529 }
 -- The bobber (game object ID).
 local BOBBER = 35591
 
+local DOUBLE_CLICK_DELAY = 0.4  -- seconds at most between the two right-clicks
+local DISARM_DELAY = 1          -- no release by then: the right-click goes back to the game
+
+-- CVars held for the session: name = its value then, from the value before.
 -- Soft interact on, wide and far enough to target the bobber by itself.
 local REEL_CVARS = {
-    SoftTargetInteract = "3",
-    SoftTargetInteractRange = "30",
-    SoftTargetInteractArc = "2",
-    SoftTargetInteractRangeIsHard = "0",
+    SoftTargetInteract = function() return 3 end,
+    SoftTargetInteractRange = function() return 30 end,
+    SoftTargetInteractArc = function() return 2 end,
+    SoftTargetInteractRangeIsHard = function() return 0 end,
+}
+-- The splash of the bobber over the music.
+local SOUND_CVARS = {
+    Sound_MusicVolume = function(before) return before * 0.3 end,
+    Sound_AmbienceVolume = function(before) return before * 0.3 end,
+    Sound_SFXVolume = function(before) return math.max(before, 0.8) end,
+    Sound_EnableSoundWhenGameIsInBG = function() return 1 end,
 }
 
 -- Settings live on the shared EllesmereUIDB (lazy-init, never re-init at scope).
@@ -50,16 +74,25 @@ local function FishCfg()
     return EllesmereUIDB.fishing
 end
 
-local function ReelOn() return FishCfg().reel ~= false end  -- default ON
-local function LureOn()                                      -- default ON, WoW Forever only
-    return EllesmereUI.IS_FOREVER and FishCfg().lure ~= false
-end
+local function KeyOn() return FishCfg().key ~= nil end
+local function ReelOn() return KeyOn() and FishCfg().reel ~= false end            -- default ON
+local function IndicatorOn() return ReelOn() and FishCfg().indicator ~= false end -- default ON
+local function SoundOn() return FishCfg().sound == true end                        -- default OFF
+-- WoW Forever only: lures on the pole and the pole in the main hand.
+local function LureOn() return EllesmereUI.IS_FOREVER and FishCfg().lure ~= false end
+local function DoubleClickOn() return EllesmereUI.IS_FOREVER and FishCfg().doubleClick == true end
+local function AnyOn() return KeyOn() or DoubleClickOn() or SoundOn() end
 
 local ev = CreateFrame("Frame")
-local castButton
+local clickOwner = CreateFrame("Frame")  -- holds the double-click's binding
+local castButton, indicator
 local fishingID, fishingName  -- the Fishing spell known (nil: none)
 local inSession = false
+local lineOut = false         -- the Fishing channel runs
 local reeling = false         -- the key is bound to Interact With Target
+local clickArmed = false      -- the right-click is bound to the button
+local lastRightClick = 0
+local worldHooked = false
 
 -------------------------------------------------------------------------------
 --  Helpers
@@ -114,7 +147,70 @@ local function ObjectID(guid)
 end
 
 -------------------------------------------------------------------------------
---  The key
+--  Held CVars: FishCfg().held[set] = { [cvar] = the value before }
+-------------------------------------------------------------------------------
+local function CVarText(v) return v % 1 == 0 and tostring(v) or ("%.2f"):format(v) end
+
+local function Hold(set, cvars)
+    local cfg = FishCfg()
+    cfg.held = cfg.held or {}
+    if cfg.held[set] then return end
+    local was = {}
+    for name, value in pairs(cvars) do
+        local cur = C_CVar.GetCVar(name)
+        local want = cur and CVarText(value(tonumber(cur) or 0))
+        if cur ~= nil and cur ~= want and EllesmereUI.HoldCVar(name, want, OWNER) then
+            was[name] = cur
+        end
+    end
+    cfg.held[set] = was
+end
+
+local function Release(set)
+    local held = FishCfg().held
+    local was = held and held[set]
+    if not was then return end
+    for name, value in pairs(was) do
+        EllesmereUI.ReleaseCVar(name, value, OWNER)
+    end
+    held[set] = nil
+end
+
+-------------------------------------------------------------------------------
+--  Bobber Indicator: while the line is in the water, whether the key reels in
+-------------------------------------------------------------------------------
+local function UpdateIndicator()
+    if not (lineOut and IndicatorOn()) then
+        if indicator then indicator:Hide() end
+        return
+    end
+    if not indicator then
+        indicator = CreateFrame("Frame", nil, UIParent)
+        indicator:SetSize(300, 24)
+        indicator:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
+        indicator:SetFrameStrata("HIGH")
+        indicator.icon = indicator:CreateTexture(nil, "ARTWORK")
+        indicator.icon:SetSize(20, 20)
+        indicator.icon:SetTexture("Interface\\Icons\\Trade_Fishing")
+        indicator.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        indicator.text = indicator:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        indicator.text:SetPoint("CENTER", 12, 0)
+        indicator.icon:SetPoint("RIGHT", indicator.text, "LEFT", -6, 0)
+    end
+    if reeling then
+        indicator.text:SetText(EllesmereUI.Lf("Bobber found: %s reels in", GetBindingText(FishCfg().key)))
+        indicator.text:SetTextColor(0.3, 1, 0.4)
+        indicator.icon:SetDesaturated(false)
+    else
+        indicator.text:SetText(EllesmereUI.L("Bobber not found: keep it on screen"))
+        indicator.text:SetTextColor(1, 0.6, 0.2)
+        indicator.icon:SetDesaturated(true)
+    end
+    indicator:Show()
+end
+
+-------------------------------------------------------------------------------
+--  The key and the double-click
 -------------------------------------------------------------------------------
 -- What the next press does. Out of combat only.
 local function UpdateCastButton()
@@ -160,36 +256,23 @@ local function StopReel()
     if not reeling then return end
     reeling = false
     BindCast()
+    UpdateIndicator()
+end
+
+-- The right-click back to the game. Out of combat only.
+local function Disarm()
+    if clickArmed and not InCombatLockdown() then
+        ClearOverrideBindings(clickOwner)
+        clickArmed = false
+    end
 end
 
 -------------------------------------------------------------------------------
---  Session: soft interact held while fishing
+--  Session
 -------------------------------------------------------------------------------
-local function HoldReel()
-    local cfg = FishCfg()
-    if cfg.reelWas then return end
-    local was = {}
-    for name, value in pairs(REEL_CVARS) do
-        local cur = C_CVar.GetCVar(name)
-        if cur ~= nil and cur ~= value and EllesmereUI.HoldCVar(name, value, OWNER) then
-            was[name] = cur
-        end
-    end
-    cfg.reelWas = was
-end
-
-local function ReleaseReel()
-    local cfg = FishCfg()
-    local was = cfg.reelWas
-    if not was then return end
-    for name, value in pairs(was) do
-        EllesmereUI.ReleaseCVar(name, value, OWNER)
-    end
-    cfg.reelWas = nil
-end
-
 local function StartSession()
-    if ReelOn() then HoldReel() end
+    if ReelOn() then Hold("reel", REEL_CVARS) end
+    if SoundOn() then Hold("sound", SOUND_CVARS) end
     if inSession then return end
     inSession = true
     ev:RegisterEvent("PLAYER_STARTED_MOVING")
@@ -198,7 +281,8 @@ end
 
 local function EndSession()
     StopReel()
-    ReleaseReel()
+    Release("reel")
+    Release("sound")
     if not inSession then return end
     inSession = false
     ev:UnregisterEvent("PLAYER_STARTED_MOVING")
@@ -209,7 +293,8 @@ end
 local function BuildButton()
     if castButton then return end
     castButton = CreateFrame("Button", BUTTON_NAME, UIParent, "SecureActionButtonTemplate")
-    -- Acts on the key's release: the session starts just before a cast.
+    -- Acts on the release: the session starts just before a cast, and the
+    -- double-click's second right-click casts as it comes up.
     castButton:RegisterForClicks("AnyUp", "AnyDown")
     castButton:SetAttribute("useOnKeyDown", false)
     castButton:Hide()
@@ -218,6 +303,26 @@ local function BuildButton()
             StartSession()
         end
     end)
+    castButton:SetScript("PostClick", function(_, _, down)
+        if not down then Disarm() end
+    end)
+end
+
+-- A second right-click on the world soon after the first: bound to the
+-- button just for this click.
+local function OnWorldMouseDown(_, button)
+    if button ~= "RightButton" or not DoubleClickOn() then return end
+    local now = GetTime()
+    local double = now - lastRightClick < DOUBLE_CLICK_DELAY
+    lastRightClick = double and 0 or now
+    if not double or not castButton or InCombatLockdown() or UnitChannelInfo("player")
+       or UnitExists("mouseover") or not PoleInMainHand() then
+        return
+    end
+    UpdateCastButton()
+    SetOverrideBindingClick(clickOwner, true, "BUTTON2", BUTTON_NAME)
+    clickArmed = true
+    C_Timer.After(DISARM_DELAY, Disarm)
 end
 
 -------------------------------------------------------------------------------
@@ -229,11 +334,12 @@ ev:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         -- water: the key reels in. Anything else: it casts again.
         if InCombatLockdown() then return end
         local key = FishCfg().key
-        if key and ReelOn() and ObjectID(arg2) == BOBBER and UnitChannelInfo("player") then
+        if ReelOn() and lineOut and ObjectID(arg2) == BOBBER then
             if not reeling then
                 reeling = true
                 ClearOverrideBindings(castButton)
                 SetOverrideBinding(castButton, true, key, "INTERACTTARGET")
+                UpdateIndicator()
             end
         else
             StopReel()
@@ -241,9 +347,15 @@ ev:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
         -- arg3: the spell ID
         if not (fishingName and arg3) or (issecretvalue and issecretvalue(arg3)) then return end
-        if C_Spell.GetSpellName(arg3) == fishingName then StartSession() end
+        if C_Spell.GetSpellName(arg3) == fishingName then
+            lineOut = true
+            StartSession()
+            UpdateIndicator()
+        end
     elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
+        lineOut = false
         StopReel()
+        UpdateIndicator()
     elseif event == "SPELLS_CHANGED" then
         ResolveFishing()
         UpdateCastButton()
@@ -252,14 +364,20 @@ ev:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     else
         -- PLAYER_STARTED_MOVING, PLAYER_REGEN_DISABLED (bindings can still
         -- change), PLAYER_LEAVING_WORLD
+        if event == "PLAYER_REGEN_DISABLED" then
+            ClearOverrideBindings(clickOwner)
+            clickArmed = false
+        end
+        lineOut = false
         EndSession()
+        UpdateIndicator()
     end
 end)
 
 local FEATURE_EVENTS = { "SPELLS_CHANGED", "BAG_UPDATE_DELAYED", "PLAYER_REGEN_DISABLED", "PLAYER_LEAVING_WORLD" }
 
 -- Login and the options; takes effect immediately in both directions. The
--- button and the binding only change out of combat: in combat the apply
+-- button and the bindings only change out of combat: in combat the apply
 -- waits for its end.
 local function ApplyFishing()
     if InCombatLockdown() then
@@ -267,8 +385,10 @@ local function ApplyFishing()
         return
     end
     EndSession()
+    Disarm()
     if castButton then ClearOverrideBindings(castButton) end
-    if not FishCfg().key then
+    UpdateIndicator()
+    if not AnyOn() then
         ev:UnregisterAllEvents()
         return
     end
@@ -278,6 +398,10 @@ local function ApplyFishing()
     ev:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
     ev:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")
     ev:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
+    if DoubleClickOn() and not worldHooked then
+        worldHooked = true
+        WorldFrame:HookScript("OnMouseDown", OnWorldMouseDown)
+    end
     UpdateCastButton()
     BindCast()
 end
@@ -287,7 +411,17 @@ local boot = CreateFrame("Frame")
 boot:RegisterEvent("PLAYER_LOGIN")
 boot:SetScript("OnEvent", function(self)
     self:UnregisterAllEvents()
-    -- What a reload or a disconnect mid-session left held goes back.
-    ReleaseReel()
-    if FishCfg().key then ApplyFishing() end
+    -- What a reload or a disconnect mid-session left held goes back (reelWas:
+    -- the first test build's soft interact values).
+    local cfg = FishCfg()
+    if cfg.reelWas then
+        cfg.held = cfg.held or {}
+        cfg.held.reel = cfg.held.reel or cfg.reelWas
+        cfg.reelWas = nil
+    end
+    local held = cfg.held
+    if held then
+        for set in pairs(held) do Release(set) end
+    end
+    if AnyOn() then ApplyFishing() end
 end)

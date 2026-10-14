@@ -5824,11 +5824,19 @@ L["Shows the parts of the world map you have not explored yet. Use the cog to pi
 L["Unexplored Color"] = "Couleur des zones inexplorées"
 L["Tints the areas you have not explored yet. White shows them as they are."] = "Teinte les zones que vous n'avez pas encore explorées. Le blanc les affiche telles quelles."
 
--- One-Button Fishing (EllesmereUIQoL_Fishing.lua)
+-- Fishing (EllesmereUIQoL_Fishing.lua)
 L["FISHING"] = "PÊCHE"
 L["Fishing Key"] = "Touche de pêche"
-L["One key for the whole loop: casts your line, then reels it in once the bobber bites. On WoW Forever, it first equips the best fishing pole in your bags if you hold none."] = "Une seule touche pour tout : elle lance votre ligne, puis la ramène quand ça mord. Sur WoW Forever, elle équipe d'abord la meilleure canne à pêche de vos sacs si vous n'en tenez pas."
+L["One key for the whole loop: casts your line, then reels it in once the bobber bites. On WoW Forever, it first equips the best fishing pole in your bags if you hold none. Use the cog to reel in, show the bobber indicator and apply lures."] = "Une seule touche pour tout : elle lance votre ligne, puis la ramène quand ça mord. Sur WoW Forever, elle équipe d'abord la meilleure canne à pêche de vos sacs si vous n'en tenez pas. Le rouage permet de ferrer, d'afficher l'indicateur du bouchon et de poser des appâts."
 L["Reel In With the Key"] = "Ferrer avec la touche"
 L["While your line is in the water and the bobber is on screen, the Fishing Key reels it in; the line out, the key casts again. Turns on soft interact while you fish, and puts your settings back after."] = "Tant que votre ligne est à l'eau et que le bouchon est à l'écran, la touche de pêche la ramène ; la ligne sortie, la touche relance. Active l'interaction douce pendant que vous pêchez, puis remet vos réglages."
-L["Apply Lure With the Key"] = "Poser un appât avec la touche"
-L["When your fishing pole has no lure, the Fishing Key first applies the best lure in your bags; the next press casts."] = "Quand votre canne n'a pas d'appât, la touche de pêche pose d'abord le meilleur appât de vos sacs ; l'appui suivant lance la ligne."
+L["Bobber Indicator"] = "Indicateur du bouchon"
+L["While your line is in the water, shows under your character whether the bobber is targeted: green, the key reels in; orange, keep the bobber on screen."] = "Tant que votre ligne est à l'eau, indique sous votre personnage si le bouchon est ciblé : en vert, la touche ferre ; en orange, gardez le bouchon à l'écran."
+L["Bobber found: %s reels in"] = "Bouchon repéré : %s pour ferrer"
+L["Bobber not found: keep it on screen"] = "Bouchon introuvable : gardez-le à l'écran"
+L["Apply Lure"] = "Poser un appât"
+L["When your fishing pole has no lure, the Fishing Key or a double-click first applies the best lure in your bags; the next one casts."] = "Quand votre canne n'a pas d'appât, la touche de pêche ou un double clic pose d'abord le meilleur appât de vos sacs ; le suivant lance la ligne."
+L["Double-Click to Cast"] = "Double clic pour lancer"
+L["With a fishing pole in hand, a quick double right-click on the world casts your line (applying a lure first if the cog's option is on). Never on a character, in combat or while your line is in the water: right-click the bobber to reel in."] = "Canne en main, un double clic droit rapide sur le monde lance votre ligne (en posant d'abord un appât si l'option du rouage est active). Jamais sur un personnage, en combat ni quand votre ligne est à l'eau : clic droit sur le bouchon pour ferrer."
+L["Fishing Sounds"] = "Sons de pêche"
+L["While you fish, lowers music and ambience, raises sound effects so you hear the bobber splash, and keeps sound on when the game is in the background. Your sound settings come back when you move, enter combat or change zone."] = "Pendant que vous pêchez, baisse la musique et l'ambiance, monte les effets sonores pour entendre le bouchon plonger, et garde le son quand le jeu est en arrière-plan. Vos réglages de son reviennent quand vous bougez, entrez en combat ou changez de zone."
