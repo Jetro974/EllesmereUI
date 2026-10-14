@@ -400,7 +400,7 @@ end
 -- A level up waits for the game's level-up toast.
 local pending, hooked
 local FALLBACK = 8      -- seconds before it shows on its own
-local AFTER_GAME = 0.15  -- seconds after the game's toast starts fading in
+local AFTER_GAME = 0.2   -- seconds after the game's toast starts fading in
 
 local function ShowPending()
     local p = pending
