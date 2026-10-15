@@ -23,6 +23,8 @@ local _, module = ...
 -- Settings live in EllesmereUIDB.trainingPlanner; unset keys read these.
 -- prices: classFile = { [spellID] = copper }
 -- unlisted: classFile = { [spellID] = level }, taught but not in the data
+-- absent: classFile = { [spellID] = level }, in the data but neither shown by
+--   the trainer nor known by the visitor: not taught there
 -- collapsed: section key = true/false; unset, Already Trained is folded
 local F = module.Feature("trainingPlanner", { enabled = false })
 
@@ -70,24 +72,46 @@ end
 -- A class trainer's or weapon master's list (professions and pet trainers
 -- left out): each service's cost under its spell, read from the service's
 -- own tooltip data, and what the trainer data lacks.
+-- Riding is taught by the riding trainers, never by the class trainer.
+local OTHER_TRAINER = { [33388] = true, [33391] = true }
+
 local function Capture()
     if IsTradeskillTrainer() or C_Trainer.GetTrainerType() ~= Enum.TrainerType.General then return end
     local class = PlayerClass()
+    local data = module.TrainerSpells(class)
     local listed = {}
-    for _, spells in pairs(module.TrainerSpells(class)) do
+    for _, spells in pairs(data) do
         for i = 1, #spells do listed[spells[i]] = true end
     end
     for _, w in ipairs(module.WeaponSkills(class)) do listed[w.spellID] = true end
     local cfg = F.Cfg()
     local prices = Sub(Sub(cfg, "prices"), class)
     local unlisted = Sub(Sub(cfg, "unlisted"), class)
+    local shown, any = {}, false
     for i = 1, GetNumTrainerServices() do
         local _, kind, _, level = GetTrainerServiceInfo(i)
         local info = kind ~= "header" and C_TooltipInfo.GetTrainerService(i)
         local id = info and info.id
         if id then
+            any = true
+            shown[id] = true
             prices[id] = GetTrainerServiceCost(i) or 0
             if not listed[id] then unlisted[id] = level or 0 end
+        end
+    end
+    -- A class trainer showing what can and cannot be trained yet lists all it
+    -- teaches: a spell of the data it leaves out, unknown to the visitor, is
+    -- not taught there.
+    if not (any and GetTrainerServiceTypeFilter("available") and GetTrainerServiceTypeFilter("unavailable")) then return end
+    local absent = Sub(Sub(cfg, "absent"), class)
+    for level, spells in pairs(data) do
+        for i = 1, #spells do
+            local id = spells[i]
+            if shown[id] or IsPlayerSpell(id) or OTHER_TRAINER[id] then
+                absent[id] = nil
+            else
+                absent[id] = level
+            end
         end
     end
 end
