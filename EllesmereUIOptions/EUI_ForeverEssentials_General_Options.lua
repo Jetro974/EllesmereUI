@@ -619,6 +619,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
             disabledTooltip = "Gathering Skill in Tooltips",
         })
     end
+    ---------------------------------------------------------------------------
     --  CLASS ROADMAP (EllesmereUIForeverEssentials_Training.lua)
     ---------------------------------------------------------------------------
     local TP = EllesmereUI._TrainingPlanner
