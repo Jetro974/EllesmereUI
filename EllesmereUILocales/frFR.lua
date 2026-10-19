@@ -5826,7 +5826,6 @@ L["Tints the areas you have not explored yet. White shows them as they are."] = 
 L["CLASS ROADMAP"] = "FEUILLE DE ROUTE"
 L["Class Roadmap"] = "Feuille de route"
 L["Opens a panel beside the spellbook with what each class trainer teaches, from level 1 to the last: what you have trained, what you can train now and what comes next. Visits to your trainer add the costs."] = "Ouvre un panneau à côté du grimoire avec ce qu'enseigne chaque maître de classe, du niveau 1 au dernier : ce que vous avez appris, ce que vous pouvez apprendre maintenant et ce qui vient ensuite. Vos visites à votre maître ajoutent les coûts."
-L["Trainable now: %d (%s)"] = "À apprendre maintenant : %d (%s)"
 L["Trainable now: %d"] = "À apprendre maintenant : %d"
 L["Nothing to train at your level."] = "Rien à apprendre à votre niveau."
 L["Weapon Skills"] = "Compétences d'armes"

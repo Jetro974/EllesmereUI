@@ -4,15 +4,15 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  EllesmereUIForeverEssentials_Training.lua  (WoW Forever only)
 --  Class Roadmap: a panel beside the spellbook listing what a class
 --  trainer teaches from level 1 to the last, from the trainer data
---  (TrainerData.lua), with each ability's cost. The player's class shows
+--  (TrainerData.lua). The player's class shows
 --  what is trained (grey), what can be trained now (green) and what comes
 --  next, each group a section that folds (its state kept), the levels kept
 --  inside; a class picker shows any other class. Weapon skills come first,
---  with the cities whose weapon master teaches them; a click on one writes
---  its weapon masters' map links to the chat. Costs are not in the client's
---  data: each visit to a class trainer or weapon master records them for the
---  account, under the visitor's class and by spell, along with whatever it
---  teaches that the trainer data lacks.
+--  with the cities of the player's faction whose weapon master teaches them;
+--  a click on one writes its weapon masters' map links to the chat. Each
+--  visit to a class trainer or weapon master records for the account, under
+--  the visitor's class and by spell, its costs (not shown here) along with
+--  whatever it teaches that the trainer data lacks.
 --
 --  The panel is a frame of our own anchored to the spellbook's side; the
 --  spellbook's OnShow/OnHide (HookScript) show and hide it. Nothing of
@@ -38,8 +38,6 @@ local SECTION_H = 28
 local PLUS = "Interface\\Buttons\\UI-PlusButton-Up"
 local MINUS = "Interface\\Buttons\\UI-MinusButton-Up"
 local TOP = 62         -- the title and summary above the list
-local RIGHT_MAX = 110  -- the right column (cost, cities) at its widest
-local WEAPON_COST = 1000 -- copper: every weapon master asks 10 silver, a visit not needed
 
 local events, waiter, hooked, panel, shownClass, reloading
 local rows, headers, sections = {}, {}, {}
@@ -52,10 +50,6 @@ end
 local function Rank(spellID)
     local rank = C_Spell.GetSpellSubtext(spellID)
     if rank ~= "" then return rank end
-end
-
-local function Coins(copper)
-    return copper and copper > 0 and C_CurrencyInfo.GetCoinTextureString(copper) or ""
 end
 
 -- What class's trainer asks for spellID (the player's class by default);
@@ -130,12 +124,25 @@ local function List(class)
             local name = C_Spell.GetSpellName(id)
             if name then
                 out[#out + 1] = { spellID = id, name = name, rank = Rank(id), level = level,
-                    icon = C_Spell.GetSpellTexture(id), cost = Cost(id, class),
+                    icon = C_Spell.GetSpellTexture(id),
                     known = own and IsPlayerSpell(id) or nil }
             else
                 C_Spell.RequestLoadSpellData(id)
                 missing = true
             end
+        end
+    end
+    if own then
+        -- The book may not keep a lower rank once a higher one is learned: a
+        -- rank at or under a learned rank of the same spell counts as learned.
+        local top = {}
+        for _, e in ipairs(out) do
+            local n = e.known and e.rank and tonumber(e.rank:match("%d+"))
+            if n and n > (top[e.name] or 0) then top[e.name] = n end
+        end
+        for _, e in ipairs(out) do
+            local n = not e.known and e.rank and tonumber(e.rank:match("%d+"))
+            if n and n <= (top[e.name] or 0) then e.known = true end
         end
     end
     table.sort(out, function(a, b)
@@ -190,15 +197,11 @@ local function RowClick(row, button)
     end
 end
 
--- A row's tooltip: the spell's own, with its cost when recorded, or for a
--- weapon skill the weapon masters of the player's faction.
+-- A row's tooltip: the spell's own, or for a weapon skill the weapon masters
+-- of the player's faction.
 local function RowEnter(row)
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetSpellByID(row.spellID)
-    if row.copper and row.copper > 0 then
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(COSTS_LABEL .. " " .. Coins(row.copper), 1, 1, 1)
-    end
     if row.masters then
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(EllesmereUI.L("Weapon Masters"), 1, 0.82, 0)
@@ -231,15 +234,10 @@ local function Row(i)
     row.icon:SetSize(ICON, ICON)
     row.icon:SetPoint("LEFT")
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    row.cost = row:CreateFontString(nil, "OVERLAY")
-    Font(row.cost, 11)
-    row.cost:SetPoint("RIGHT")
-    row.cost:SetJustifyH("RIGHT")
-    row.cost:SetWordWrap(false)
     row.name = row:CreateFontString(nil, "OVERLAY")
     Font(row.name, 12)
     row.name:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
-    row.name:SetPoint("RIGHT", row.cost, "LEFT", -6, 0)
+    row.name:SetPoint("RIGHT")
     row.name:SetJustifyH("LEFT")
     row.name:SetWordWrap(false)
     row.sub = row:CreateFontString(nil, "OVERLAY")
@@ -317,18 +315,14 @@ function Refresh()
     panel.missing = missing
     local playerLevel = UnitLevel("player")
     local own = shownClass == PlayerClass()
-    local count, total = 0, 0
+    local count = 0
     for _, e in ipairs(list) do
-        if own and not e.known and e.level <= playerLevel then
-            count = count + 1
-            total = total + (e.cost or 0)
-        end
+        if own and not e.known and e.level <= playerLevel then count = count + 1 end
     end
     if not own then
         panel.summary:SetText("")
     elseif count > 0 then
-        panel.summary:SetText(total > 0 and EllesmereUI.Lf("Trainable now: %d (%s)", count, Coins(total))
-            or EllesmereUI.Lf("Trainable now: %d", count))
+        panel.summary:SetText(EllesmereUI.Lf("Trainable now: %d", count))
     else
         panel.summary:SetText(EllesmereUI.L("Nothing to train at your level."))
     end
@@ -336,7 +330,7 @@ function Refresh()
     local y, nRows, nHeaders, nSections = 0, 0, 0, 0
     local r, g, b = Accent()
     -- A section's header; true when it is open.
-    local function PlaceSection(key, title, count, extra)
+    local function PlaceSection(key, title, count)
         nSections = nSections + 1
         local sec = Section(nSections)
         sec.key = key
@@ -346,7 +340,7 @@ function Refresh()
         local open = not Collapsed(key)
         sec.icon:SetTexture(open and MINUS or PLUS)
         sec.text:SetTextColor(r, g, b)
-        sec.text:SetText(title .. " |cffaaaaaa(" .. count .. ")|r" .. (extra or ""))
+        sec.text:SetText(title .. " |cffaaaaaa(" .. count .. ")|r")
         sec:Show()
         y = y + SECTION_H
         return open
@@ -360,8 +354,8 @@ function Refresh()
         h:Show()
         y = y + HEADER_H
     end
-    -- right: the cost column; sub: a second line under the name, which makes the row taller.
-    local function PlaceRow(e, color, right, masters, sub)
+    -- sub: a second line under the name, which makes the row taller.
+    local function PlaceRow(e, color, masters, sub)
         nRows = nRows + 1
         local row = Row(nRows)
         local h = sub and ROW_H2 or ROW_H
@@ -375,19 +369,15 @@ function Refresh()
             row.name:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, -3)
         else
             row.name:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
-            row.name:SetPoint("RIGHT", row.cost, "LEFT", -6, 0)
+            row.name:SetPoint("RIGHT")
         end
         row.sub:SetText(sub or "")
-        row.spellID, row.copper, row.masters = e.spellID, not e.known and e.cost or nil, masters
+        row.spellID, row.masters = e.spellID, masters
         row:SetMouseClickEnabled(masters ~= nil)
         row.icon:SetTexture(e.icon)
         row.icon:SetDesaturated(e.known or false)
         row.name:SetText(e.rank and (e.name .. " |cffaaaaaa(" .. e.rank .. ")|r") or e.name)
         row.name:SetTextColor(color[1], color[2], color[3])
-        -- The right column keeps the name readable: past RIGHT_MAX it is cut.
-        row.cost:SetWidth(0)
-        row.cost:SetText(right)
-        if row.cost:GetStringWidth() > RIGHT_MAX then row.cost:SetWidth(RIGHT_MAX) end
         row:Show()
         y = y + h
     end
@@ -408,10 +398,8 @@ function Refresh()
                     end
                 end
                 local known = own and IsPlayerSpell(w.spellID)
-                local cost = Cost(w.spellID, shownClass)
-                PlaceRow({ spellID = w.spellID, name = name, icon = C_Spell.GetSpellTexture(w.spellID), known = known,
-                    cost = cost and cost > 0 and cost or WEAPON_COST },
-                    known and GREY or WHITE, "", w.masters, not known and "|cffaaaaaa" .. table.concat(cities, ", ") .. "|r" or nil)
+                PlaceRow({ spellID = w.spellID, name = name, icon = C_Spell.GetSpellTexture(w.spellID), known = known },
+                    known and GREY or WHITE, w.masters, not known and "|cffaaaaaa" .. table.concat(cities, ", ") .. "|r" or nil)
             else
                 C_Spell.RequestLoadSpellData(w.spellID)
                 panel.missing = true
@@ -419,21 +407,14 @@ function Refresh()
         end
     end
 
-    -- entries (by level) under their level's line, in color; trained ones
-    -- without their cost.
+    -- entries (by level) under their level's line, in color.
     local function PlaceLevels(entries, color)
         local i = 1
         while entries[i] do
-            local level, sum, j = entries[i].level, 0, i
-            while entries[j] and entries[j].level == level do
-                if not entries[j].known then sum = sum + (entries[j].cost or 0) end
-                j = j + 1
-            end
-            PlaceHeader(EllesmereUI.Lf("Level %d", level) .. (sum > 0 and ("   |cffffffff" .. Coins(sum) .. "|r") or ""))
-            for k = i, j - 1 do
-                local e = entries[k]
-                PlaceRow(e, color, e.known and "" or Coins(e.cost))
-            end
+            local level, j = entries[i].level, i
+            while entries[j] and entries[j].level == level do j = j + 1 end
+            PlaceHeader(EllesmereUI.Lf("Level %d", level))
+            for k = i, j - 1 do PlaceRow(entries[k], color) end
             i = j
         end
     end
@@ -447,8 +428,7 @@ function Refresh()
         if #trained > 0 and PlaceSection("trained", EllesmereUI.L("Already Trained"), #trained) then
             PlaceLevels(trained, GREY)
         end
-        if #available > 0 and PlaceSection("available", EllesmereUI.L("Available Now"), #available,
-            total > 0 and ("   |cffffffff" .. Coins(total) .. "|r") or nil) then
+        if #available > 0 and PlaceSection("available", EllesmereUI.L("Available Now"), #available) then
             PlaceLevels(available, GREEN)
         end
         if #upcoming > 0 and PlaceSection("upcoming", EllesmereUI.L("Upcoming Levels"), #upcoming) then

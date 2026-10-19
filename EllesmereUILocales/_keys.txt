@@ -1152,7 +1152,6 @@ Tracking Bars
 Tracking Bars: %1$s
 Tracking it also makes the fill show Ignore Pain alone; without it the fill shows your total absorb, so other shields can add to it.
 Trainable now: %d
-Trainable now: %d (%s)
 Training Dummy
 Trinket 1
 Trinket 2
