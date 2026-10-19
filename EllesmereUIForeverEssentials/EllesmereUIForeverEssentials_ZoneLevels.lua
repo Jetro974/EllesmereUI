@@ -10,7 +10,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --
 --  The map's area label writes the hovered zone's name into its Name text,
 --  only when it changes; a hooksecurefunc on that SetText reads it, and the
---  lines go in a text of our own under the label. Nothing of Blizzard's is
+--  lines go in texts of our own under the label, the fishing skill in a
+--  much smaller one. Nothing of Blizzard's is
 --  written; no cursor reading, no OnUpdate.
 --  Fishing skills: the original game's zone values, fish no longer getting
 --  away 95 points above them. The zones WoW Forever added are left out until
@@ -98,7 +99,7 @@ local NO_GETAWAY = 95
 local FISHING_SPELL = 7620
 
 local byName      -- zone name (as the map writes it) = its uiMapID; built on first use
-local text, waiter
+local text, fishText, areaName, waiter
 local hooked = false
 
 -- The map's own format: the range colored like a quest of the nearest level.
@@ -156,15 +157,23 @@ local function OnLabelName(_, name)
     end
     local lv = levels and onContinent and zone and LEVELS[zone]
     local base = fishing and zone and FISHING[zone]
-    if lv and base then
-        text:SetText(LevelsText(lv) .. "\n" .. FishingText(base))
-    elseif lv or base then
-        text:SetText(lv and LevelsText(lv) or FishingText(base))
-    else
+    if not (lv or base) then
         text:Hide()
+        fishText:Hide()
         return
     end
-    text:Show()
+    text:SetShown(lv and true or false)
+    if lv then text:SetText(LevelsText(lv)) end
+    fishText:SetShown(base and true or false)
+    if base then
+        fishText:SetText(FishingText(base))
+        fishText:ClearAllPoints()
+        if lv then
+            fishText:SetPoint("TOP", text, "BOTTOM", 0, -2)
+        else
+            fishText:SetPoint("TOP", areaName, "BOTTOM", 0, -6)
+        end
+    end
 end
 
 -- The map's area label, read from its data providers.
@@ -189,12 +198,18 @@ local function Build()
     local holder = CreateFrame("Frame", nil, WorldMapFrame.ScrollContainer)
     holder:SetAllPoints()
     holder:SetFrameStrata("HIGH")
+    areaName = label.Name
     text = holder:CreateFontString(nil, "OVERLAY", "SubZoneTextFont")
-    -- Smaller than the zone name it sits under.
-    local font, size, flags = label.Name:GetFont()
-    if font and size then text:SetFont(font, math.floor(size * 0.7 + 0.5), flags) end
-    text:SetPoint("TOP", label.Name, "BOTTOM", 0, -6)
+    fishText = holder:CreateFontString(nil, "OVERLAY", "SubZoneTextFont")
+    -- Smaller than the zone name they sit under, the fishing skill much smaller.
+    local font, size, flags = areaName:GetFont()
+    if font and size then
+        text:SetFont(font, math.floor(size * 0.7 + 0.5), flags)
+        fishText:SetFont(font, math.max(9, math.floor(size * 0.4 + 0.5)), flags)
+    end
+    text:SetPoint("TOP", areaName, "BOTTOM", 0, -6)
     text:Hide()
+    fishText:Hide()
     hooksecurefunc(label.Name, "SetText", OnLabelName)
 end
 
@@ -203,7 +218,10 @@ end
 local function Apply()
     local any = F.Enabled() or F.Get("fishing")
     if hooked then
-        if not any then text:Hide() end
+        if not any then
+            text:Hide()
+            fishText:Hide()
+        end
         return
     end
     if not any then
