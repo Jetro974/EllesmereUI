@@ -38,6 +38,12 @@ local SECTION_H = 28
 local PLUS = "Interface\\Buttons\\UI-PlusButton-Up"
 local MINUS = "Interface\\Buttons\\UI-MinusButton-Up"
 local TOP = 62         -- the title and summary above the list
+local RACIAL = { 0.4, 0.75, 1 }  -- a racial ability's tint, half mixed into its row's color
+
+-- A row's color tinted for a racial ability.
+local function Tint(c)
+    return { (c[1] + RACIAL[1]) / 2, (c[2] + RACIAL[2]) / 2, (c[3] + RACIAL[3]) / 2 }
+end
 
 local events, waiter, hooked, panel, shownClass, reloading
 local rows, headers, sections = {}, {}, {}
@@ -218,7 +224,7 @@ local function RowEnter(row)
     GameTooltip:SetSpellByID(row.spellID)
     if row.races then
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(EllesmereUI.Lf("Race: %s", RaceNames(row.races)), 1, 0.82, 0)
+        GameTooltip:AddLine(EllesmereUI.Lf("Race: %s", RaceNames(row.races)), RACIAL[1], RACIAL[2], RACIAL[3])
     end
     if row.masters then
         GameTooltip:AddLine(" ")
@@ -395,6 +401,7 @@ function Refresh()
         row.icon:SetTexture(e.icon)
         row.icon:SetDesaturated(e.known or false)
         row.name:SetText(e.rank and (e.name .. " |cffaaaaaa(" .. e.rank .. ")|r") or e.name)
+        if e.races then color = Tint(color) end
         row.name:SetTextColor(color[1], color[2], color[3])
         row:Show()
         y = y + h
