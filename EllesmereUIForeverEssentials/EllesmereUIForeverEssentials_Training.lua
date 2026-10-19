@@ -113,18 +113,20 @@ local function Capture()
 end
 
 -- class's abilities by level then name; known is set for the player's own
--- class. A spell whose data the client has not loaded yet is asked for and
--- left out; missing tells the caller to look again once it comes.
+-- class, which lists the player's race's racial abilities, any other class
+-- every race's (races = the mask of a racial ability). A spell whose data the
+-- client has not loaded yet is asked for and left out; missing tells the
+-- caller to look again once it comes.
 local function List(class)
     local out, missing = {}, false
     local own = class == PlayerClass()
-    for level, spells in pairs(module.TrainerSpells(class)) do
+    for level, spells in pairs(module.TrainerSpells(class, not own)) do
         for i = 1, #spells do
             local id = spells[i]
             local name = C_Spell.GetSpellName(id)
             if name then
                 out[#out + 1] = { spellID = id, name = name, rank = Rank(id), level = level,
-                    icon = C_Spell.GetSpellTexture(id),
+                    icon = C_Spell.GetSpellTexture(id), races = module.SpellRaces(class, id),
                     known = own and IsPlayerSpell(id) or nil }
             else
                 C_Spell.RequestLoadSpellData(id)
@@ -197,11 +199,27 @@ local function RowClick(row, button)
     end
 end
 
--- A row's tooltip: the spell's own, or for a weapon skill the weapon masters
--- of the player's faction.
+-- The names of the races a racial ability's mask holds (bit n = race id n + 1).
+local function RaceNames(mask)
+    local names = {}
+    for id = 1, 12 do
+        if bit.band(mask, bit.lshift(1, id - 1)) ~= 0 then
+            local info = C_CreatureInfo.GetRaceInfo(id)
+            if info then names[#names + 1] = info.raceName end
+        end
+    end
+    return table.concat(names, ", ")
+end
+
+-- A row's tooltip: the spell's own, with the races that learn it when it is
+-- racial, or for a weapon skill the weapon masters of the player's faction.
 local function RowEnter(row)
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetSpellByID(row.spellID)
+    if row.races then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(EllesmereUI.Lf("Race: %s", RaceNames(row.races)), 1, 0.82, 0)
+    end
     if row.masters then
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(EllesmereUI.L("Weapon Masters"), 1, 0.82, 0)
@@ -372,7 +390,7 @@ function Refresh()
             row.name:SetPoint("RIGHT")
         end
         row.sub:SetText(sub or "")
-        row.spellID, row.masters = e.spellID, masters
+        row.spellID, row.masters, row.races = e.spellID, masters, e.races
         row:SetMouseClickEnabled(masters ~= nil)
         row.icon:SetTexture(e.icon)
         row.icon:SetDesaturated(e.known or false)
