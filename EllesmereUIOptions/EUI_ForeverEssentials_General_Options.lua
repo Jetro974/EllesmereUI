@@ -318,7 +318,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
 
     _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Class Roadmap",
-          tooltip = "Opens a panel beside the spellbook with what each class trainer teaches, from level 1 to the last: what you have trained, what you can train now and what comes next. Visits to your trainer add the costs.",
+          tooltip = "Opens a panel beside the spellbook with what each class trainer teaches, from level 1 to the last: what you have trained, what you can train now and what comes next.",
           getValue = function() return TP.Get("enabled") end,
           setValue = function(v)
               TP.Cfg().enabled = v

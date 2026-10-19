@@ -11,8 +11,10 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  effects, runes and books out, what the trainer teaches in.
 --  { spellID, raceMask } for an ability only some races learn.
 --
---  module.TrainerSpells(class) = { [level] = { spellID, ... } } for the
---  player's race; the table is built on first use only.
+--  module.TrainerSpells(class, allRaces) = { [level] = { spellID, ... } } for
+--  the player's race, or every race's with allRaces; each table is built on
+--  first use only. module.SpellRaces(class, spellID) = the race mask of a
+--  racial ability listed so far, nil for the others.
 -------------------------------------------------------------------------------
 local _, module = ...
 
@@ -314,13 +316,16 @@ local function Data()
     }
 end
 
-local data, byClass = nil, {}
+local data, byClass, byClassAll, racial = nil, {}, {}, {}
 
-function module.TrainerSpells(class)
-    local out = byClass[class]
+function module.TrainerSpells(class, allRaces)
+    local cache = allRaces and byClassAll or byClass
+    local out = cache[class]
     if out then return out end
     data = data or Data()
     out = {}
+    local masks = racial[class] or {}
+    racial[class] = masks
     local race = bit.lshift(1, select(3, UnitRace("player")) - 1)
     for level, list in pairs(data[class] or {}) do
         local spells = {}
@@ -328,14 +333,21 @@ function module.TrainerSpells(class)
             local e = list[i]
             if type(e) == "number" then
                 spells[#spells + 1] = e
-            elseif bit.band(e[2], race) ~= 0 then
-                spells[#spells + 1] = e[1]
+            else
+                masks[e[1]] = e[2]
+                if allRaces or bit.band(e[2], race) ~= 0 then
+                    spells[#spells + 1] = e[1]
+                end
             end
         end
         out[level] = spells
     end
-    byClass[class] = out
+    cache[class] = out
     return out
+end
+
+function module.SpellRaces(class, spellID)
+    return racial[class] and racial[class][spellID]
 end
 
 -------------------------------------------------------------------------------
