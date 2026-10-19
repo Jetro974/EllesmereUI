@@ -32,12 +32,14 @@ local PANEL_W = 290
 local PAD = 12
 local ICON = 20
 local ROW_H = 24
+local ROW_H2 = 34       -- a weapon skill to learn: its name, the cities under it
 local HEADER_H = 26
 local SECTION_H = 28
 local PLUS = "Interface\\Buttons\\UI-PlusButton-Up"
 local MINUS = "Interface\\Buttons\\UI-MinusButton-Up"
 local TOP = 62         -- the title and summary above the list
 local RIGHT_MAX = 110  -- the right column (cost, cities) at its widest
+local WEAPON_COST = 1000 -- copper: every weapon master asks 10 silver, a visit not needed
 
 local events, waiter, hooked, panel, shownClass, reloading
 local rows, headers, sections = {}, {}, {}
@@ -189,7 +191,7 @@ local function RowClick(row, button)
 end
 
 -- A row's tooltip: the spell's own, with its cost when recorded, or for a
--- weapon skill the weapon masters of both factions.
+-- weapon skill the weapon masters of the player's faction.
 local function RowEnter(row)
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetSpellByID(row.spellID)
@@ -200,12 +202,10 @@ local function RowEnter(row)
     if row.masters then
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(EllesmereUI.L("Weapon Masters"), 1, 0.82, 0)
-        for _, faction in ipairs({ "Alliance", "Horde" }) do
-            for _, m in ipairs(row.masters) do
-                if m.faction == faction then
-                    GameTooltip:AddDoubleLine(EllesmereUI.L(m.name), CityName(m.map) .. " (" .. _G["FACTION_" .. faction:upper()] .. ")",
-                        1, 1, 1, 0.7, 0.7, 0.7)
-                end
+        local faction = UnitFactionGroup("player")
+        for _, m in ipairs(row.masters) do
+            if m.faction == faction then
+                GameTooltip:AddDoubleLine(EllesmereUI.L(m.name), CityName(m.map), 1, 1, 1, 0.7, 0.7, 0.7)
             end
         end
         GameTooltip:AddLine(" ")
@@ -242,6 +242,12 @@ local function Row(i)
     row.name:SetPoint("RIGHT", row.cost, "LEFT", -6, 0)
     row.name:SetJustifyH("LEFT")
     row.name:SetWordWrap(false)
+    row.sub = row:CreateFontString(nil, "OVERLAY")
+    Font(row.sub, 10)
+    row.sub:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -2)
+    row.sub:SetPoint("RIGHT", row, "RIGHT")
+    row.sub:SetJustifyH("LEFT")
+    row.sub:SetWordWrap(false)
     rows[i] = row
     return row
 end
@@ -354,12 +360,24 @@ function Refresh()
         h:Show()
         y = y + HEADER_H
     end
-    local function PlaceRow(e, color, right, masters)
+    -- right: the cost column; sub: a second line under the name, which makes the row taller.
+    local function PlaceRow(e, color, right, masters, sub)
         nRows = nRows + 1
         local row = Row(nRows)
+        local h = sub and ROW_H2 or ROW_H
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", 0, -y)
         row:SetPoint("RIGHT", panel.content, "RIGHT")
+        row:SetHeight(h)
+        row.name:ClearAllPoints()
+        if sub then
+            row.name:SetPoint("TOPLEFT", row, "TOPLEFT", ICON + 8, -3)
+            row.name:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, -3)
+        else
+            row.name:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
+            row.name:SetPoint("RIGHT", row.cost, "LEFT", -6, 0)
+        end
+        row.sub:SetText(sub or "")
         row.spellID, row.copper, row.masters = e.spellID, not e.known and e.cost or nil, masters
         row:SetMouseClickEnabled(masters ~= nil)
         row.icon:SetTexture(e.icon)
@@ -371,7 +389,7 @@ function Refresh()
         row.cost:SetText(right)
         if row.cost:GetStringWidth() > RIGHT_MAX then row.cost:SetWidth(RIGHT_MAX) end
         row:Show()
-        y = y + ROW_H
+        y = y + h
     end
     local GREY, GREEN, WHITE = { 0.5, 0.5, 0.5 }, { 0.25, 1, 0.25 }, { 1, 1, 1 }
 
@@ -390,9 +408,10 @@ function Refresh()
                     end
                 end
                 local known = own and IsPlayerSpell(w.spellID)
+                local cost = Cost(w.spellID, shownClass)
                 PlaceRow({ spellID = w.spellID, name = name, icon = C_Spell.GetSpellTexture(w.spellID), known = known,
-                    cost = Cost(w.spellID, shownClass) },
-                    known and GREY or WHITE, known and "" or "|cffaaaaaa" .. table.concat(cities, ", ") .. "|r", w.masters)
+                    cost = cost and cost > 0 and cost or WEAPON_COST },
+                    known and GREY or WHITE, "", w.masters, not known and "|cffaaaaaa" .. table.concat(cities, ", ") .. "|r" or nil)
             else
                 C_Spell.RequestLoadSpellData(w.spellID)
                 panel.missing = true
