@@ -85,6 +85,7 @@ local function MakeGhostSet(opts)
         -- gesture parity). Every refresh path funnels here, so the ghost stays
         -- hidden until the next unlock entry clears the flag.
         if g._tempHidden then g:Hide(); return end
+        if UM.FilterHides and UM.FilterHides(g._childKey) then HideGhost(g); return end  -- element filter
         if g._dragging then return end
         local childKey = g._childKey
         local link = getLink(g)

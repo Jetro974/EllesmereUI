@@ -8313,3 +8313,12 @@ L["A movable icon shows Blizzard's recommended next ability with its keybind and
 L["bags inventory items slots reagent categories columns sidebar"] = "Taschen Inventar Gegenstände Plätze Reagenzien Kategorien Spalten Seitenleiste gegenstaende plaetze"
 L["blizzard skin character sheet tooltip menu popup dragon riding skyriding window skins lfg group finder premade queue pause game menu great vault inspect collections mounts pets toys spellbook talents adventure guide encounter journal professions guild communities calendar achievements mail catalyst gem socket item upgrade upgrades crest loot window loot toast you received popup micro menu modern delves companion brann loot roll need greed pass disenchant loot rolls pending rolls group invite invited to a group role"] = "Blizzard Skin Charakterfenster Tooltip Menü Popup Drachenreiten Himmelsreiten Fensterskins Dungeonsuche Gruppenfinder Dungeons & Schlachtzüge Warteschlange Pause Spielmenü Große Schatzkammer Betrachten Sammlungen Reittiere Haustiere Spielzeuge Zauberbuch Talente Abenteuerführer Dungeontagebuch Berufe Gilde Communitys Kalender Erfolge Post Katalysator Edelstein Sockel Gegenstandsaufwertung Aufwertungen Wappen Beutefenster Beutebenachrichtigung Du hast erhalten Mikromenü Modern Tiefen Begleiter Brann Würfeln Bedarf Gier Passen Entzaubern Würfelverlauf Ausstehende Würfe Gruppeneinladung In eine Gruppe eingeladen Rolle charakter uebersicht menue skyriding fenster skins lfg gruppensuche premade spielmenue abenteuerfuehrer gilden gegenstand aufwertung beute benachrichtigung mikromenue wuerfeln beutewuerfe wuerfe"
 L["damage meters dps hps healing interrupts dispels spell history"] = "Schadensmeter DPS HPS Heilung Unterbrechungen Banneffekte Zauberverlauf Schadensmesser heilungen bannungen zauberhistorie"
+
+L["Wowhead Link"] = "Wowhead-Link"
+L["Wowhead Quest Links"] = "Wowhead-Questlinks"
+L["Adds a copyable Wowhead link to quest log right-click menus."] = "Ergänzt das Rechtsklick-Menü von Quests im Questlog um einen kopierbaren Wowhead-Link."
+L["Press Ctrl+C to copy, then paste the link into your browser."] = "Mit Strg+C kopieren und anschließend im Browser einfügen."
+
+L["Wowhead Link Settings"] = "Wowhead-Link-Einstellungen"
+L["Jump to Comments"] = "Direkt zu Kommentaren"
+L["Use Client Language"] = "Client-Sprache verwenden"

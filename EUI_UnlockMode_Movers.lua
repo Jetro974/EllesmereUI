@@ -4290,6 +4290,8 @@ local function CreateMover(barKey)
     mover:HookScript("OnDragStart", function()
         EllesmereUI.HideWidgetTooltip()
     end)
+    -- Element filter (EUI_UnlockMode_Filter.lua): a new or re-shown mover stays hidden while filtered.
+    if UM.FilterOnShow then mover:HookScript("OnShow", UM.FilterOnShow); UM.FilterOnShow(mover) end
 
     movers[barKey] = mover
     return mover

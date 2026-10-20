@@ -477,10 +477,11 @@ local function CreateHUD(parent)
             end
         end
 
-        local function ApplyBannerScale(newScale)
+        -- noSave: the filter's screen fit (EUI_UnlockMode_Filter.lua) keeps the saved choice.
+        local function ApplyBannerScale(newScale, noSave)
             newScale = max(SCALE_MIN, min(SCALE_MAX, newScale))
             bannerUserScale = newScale
-            if EllesmereUIDB then EllesmereUIDB.unlockBannerScale = newScale end
+            if EllesmereUIDB and not noSave then EllesmereUIDB.unlockBannerScale = newScale end
             UM.hudFrame:SetScale(uiScale * newScale)
             -- Keep flush with top of screen
             UM.hudFrame:ClearAllPoints()
@@ -552,6 +553,9 @@ local function CreateHUD(parent)
         RefreshScaleBtns()
     end
 
+    -- Element filter right of the logo, the banner widened for it (EUI_UnlockMode_Filter.lua)
+    if UM.BuildFilter then UM.BuildFilter(UM.hudFrame, iconCenterY) end
+
     ---------------------------------------------------------------
     --  Hover-bar logic: when hoverBarEnabled, the banner + all children fade out
     --  unless the cursor is in a 1144x60 zone at the top of the screen. Fade = 0.5s.
@@ -581,12 +585,14 @@ local function CreateHUD(parent)
         UM.hudFrame._gridBtn, UM.hudFrame._darkOverlayBtn, UM.hudFrame._flashBtn,
         UM.hudFrame._magnetBtn, UM.hudFrame._coordBtn, UM.hudFrame._hoverBtn,
         UM.hudFrame._exitBtn, UM.hudFrame._saveBtn, UM.hudFrame._minusBtn, UM.hudFrame._plusBtn,
+        UM.hudFrame._filterBox, UM.hudFrame._filterIcon, UM.hudFrame._filterClear,
     }
     local shiftMouseCut = false
 
     UM.hudFrame:SetScript("OnUpdate", function(self, dt)
         -- Hold Shift: temporarily hide the top bar (works in both modes)
         local shiftHeld = IsShiftKeyDown()
+            and not (self._filterBox and self._filterBox:HasFocus())  -- typing capitals in the filter
         if shiftHeld ~= shiftMouseCut then
             shiftMouseCut = shiftHeld
             for i = 1, #hudMouseKids do
@@ -631,6 +637,7 @@ local function CreateHUD(parent)
         local screenH = UIParent:GetHeight()
         local zoneBot = screenH - (HOVER_ZONE_H * (UM.hudFrame:GetScale() or uiScale))
         local inZone = (cy >= zoneBot)
+        if self._filterBox and self._filterBox:HasFocus() then inZone = true end  -- typing in the filter
 
         if inZone then
             hoverAlpha = min(1, hoverAlpha + dt / HOVER_FADE)

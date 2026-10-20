@@ -117,9 +117,9 @@ local function LevelsText(lv)
     return EllesmereUI.HexColor(c.r, c.g, c.b) .. ("(%d-%d)|r"):format(lo, hi)
 end
 
--- "Fishing 1-25", colored by the player's skill (lures and gear included):
--- red below the base, yellow while fish still get away, green once none do;
--- white without Fishing.
+-- "Fishing 330": the skill the zone needs, colored by the player's skill
+-- (lures and gear included): red below it, yellow while fish still get away,
+-- green once none do; white without Fishing.
 local function FishingText(base)
     local low, high = math.max(base, 1), base + NO_GETAWAY
     local r, g, b = 1, 1, 1
@@ -136,7 +136,7 @@ local function FishingText(base)
         end
     end
     return EllesmereUI.HexColor(r, g, b)
-        .. ("%s %d-%d|r"):format(C_Spell.GetSpellName(FISHING_SPELL) or "", low, high)
+        .. ("%s %d|r"):format(C_Spell.GetSpellName(FISHING_SPELL) or "", low)
 end
 
 -- The area label's Name changed. On a continent, when it names one of its
