@@ -1,13 +1,14 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
---  EllesmereUIQoL_WorldMarker.lua
---  Replaces Blizzard's in-game navigation marker (SuperTrackedFrame) with an
---  EllesmereUI pin: tinted per tracking type, distance and time to arrival
---  under it, and an arrow on an ellipse around the screen centre while the
---  destination is off screen. Arrival plays a short pulse instead of the pin
---  just vanishing.
+--  EllesmereUIQoL_WorldMarker.lua  (WoW Forever only)
+--  Replaces Blizzard's in-game navigation marker (SuperTrackedFrame) with our
+--  own copy: Blizzard's icons (the corpse gets retail's tombstone, Forever's
+--  own is drawn from its retail sheet through StockAtlas), distance and time
+--  to arrival in the EllesmereUI font under it, an arrow on an ellipse around
+--  the screen centre while the destination is off screen, and a short pulse
+--  on arrival instead of the icon just vanishing.
 --
---  The pin follows the engine's navigation frame (C_Navigation.GetFrame),
+--  The icon follows the engine's navigation frame (C_Navigation.GetFrame),
 --  which only exists while In-Game Navigation (showInGameNavigation) is on:
 --  enabling the option holds that CVar on, disabling hands it back.
 --
@@ -17,18 +18,22 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  Off by default; while off nothing below is built or registered.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
+if not EUI.IS_FOREVER then return end
 
 local CVAR  = "showInGameNavigation"
 local OWNER = "EllesmereUIQoL"
 
-local PIN_SIZE    = 30
-local ARROW_SIZE  = 22
 local FONT_SIZE   = 13
 local ETA_SIZE    = 11
-local ICON_PATH   = "Interface\\AddOns\\EllesmereUI\\media\\icons\\"
 local ARRIVE_YARDS  = 40   -- a frame lost closer than this is an arrival
 local TEXT_INTERVAL = 0.1
 local ETA_INTERVAL  = 0.25
+
+-- Blizzard's own icon per tracking type (SuperTrackedFrame's iconLookup).
+local ICON_DEFAULT = "Navigation-Tracked-Icon"
+local ICON_PIN     = "Waypoint-MapPin-Tracked"
+local ICON_CORPSE  = "Navigation-Tombstone-Icon"
+local ICON_ARROW   = "Navigation-Tracked-Arrow"
 
 -- Created in the main chunk so their handlers bill to this addon.
 local ev  = CreateFrame("Frame")
@@ -44,41 +49,46 @@ local function IsEnabled() return Cfg().worldMarker == true end
 -------------------------------------------------------------------------------
 --  Marker frame (built on first enable)
 -------------------------------------------------------------------------------
-local marker, body, back, pin, arrow, distText, etaText, pulse
+local marker, body, pin, arrow, distText, etaText, pulse
 local navFrame
 local isClamped, lastDist, alpha = nil, nil, 0
 local textAcc, etaAcc, etaDist, speed = 0, 0, nil, 0
 
-local function TypeColor()
+local function IconFor()
     local st = Enum.SuperTrackingType
-    local t = st and C_SuperTrack.GetHighestPrioritySuperTrackingType and C_SuperTrack.GetHighestPrioritySuperTrackingType()
-    if st and t == st.Quest then return 1, 0.82, 0 end
-    if st and t == st.Corpse then return 0.72, 0.82, 1 end
-    local ac = EUI.ELLESMERE_GREEN
-    return ac.r, ac.g, ac.b
+    local t = st and C_SuperTrack.GetHighestPrioritySuperTrackingType()
+    if not t then return ICON_DEFAULT end
+    if t == st.Corpse then return ICON_CORPSE end
+    if t == st.UserWaypoint or t == st.Content then return ICON_PIN end
+    return ICON_DEFAULT
 end
 
-local function UpdateTint()
+-- An atlas at its own size times the pin size setting.
+local function PaintAtlas(tex, name, s)
+    EUI.StockAtlas(tex, name)
+    local info = EUI.StockAtlasInfo(name)
+    if info then tex:SetSize(info.width * s, info.height * s) end
+end
+
+local function Scale() return (Cfg().markerScale or 100) / 100 end
+
+local function UpdateIcon()
     if not marker then return end
-    local r, g, b = TypeColor()
-    pin:SetVertexColor(r, g, b)
-    arrow:SetVertexColor(r, g, b)
+    PaintAtlas(pin, IconFor(), Scale())
 end
 
 local function ApplyLayout()
     if not marker then return end
     local c = Cfg()
-    local s = (c.markerScale or 100) / 100
-    pin:SetSize(PIN_SIZE * s, PIN_SIZE * s)
-    back:SetSize((PIN_SIZE + 5) * s, (PIN_SIZE + 5) * s)
-    arrow:SetSize(ARROW_SIZE * s, ARROW_SIZE * s)
+    local s = Scale()
+    PaintAtlas(pin, IconFor(), s)
+    PaintAtlas(arrow, ICON_ARROW, s)
     local font = (EUI.GetFontPath("extras")) or STANDARD_TEXT_FONT
     local flag = (EUI.GetFontOutlineFlag and EUI.GetFontOutlineFlag("qol")) or "OUTLINE"
     distText:SetFont(font, math.floor(FONT_SIZE * s + 0.5), flag)
     etaText:SetFont(font, math.floor(ETA_SIZE * s + 0.5), flag)
     distText:SetShown(c.markerDistance ~= false)
     etaText:SetShown(not isClamped and c.markerETA ~= false)
-    UpdateTint()
 end
 
 local function BuildMarker()
@@ -92,24 +102,19 @@ local function BuildMarker()
     body = CreateFrame("Frame", nil, marker)
     body:SetAllPoints()
 
-    back = body:CreateTexture(nil, "BACKGROUND")
-    back:SetTexture(ICON_PATH .. "eui-waypoint-pin-back.png")
-    back:SetVertexColor(0, 0, 0, 0.6)
-
+    -- Centred on the navigation frame, as Blizzard draws it.
     pin = body:CreateTexture(nil, "ARTWORK")
-    pin:SetTexture(ICON_PATH .. "eui-waypoint-pin.png")
-    back:SetPoint("CENTER", pin, "CENTER", 0, -1)
+    pin:SetPoint("CENTER", marker, "CENTER")
 
     arrow = body:CreateTexture(nil, "ARTWORK")
-    arrow:SetTexture(ICON_PATH .. "eui-waypoint-arrow.png")
     arrow:Hide()
 
     distText = body:CreateFontString(nil, "OVERLAY")
-    distText:SetPoint("TOP", pin, "BOTTOM", 0, -3)
-    distText:SetTextColor(1, 1, 1)
+    distText:SetPoint("TOP", pin, "BOTTOM", 0, -4)
+    distText:SetTextColor(1, 0.82, 0)
     etaText = body:CreateFontString(nil, "OVERLAY")
     etaText:SetPoint("TOP", distText, "BOTTOM", 0, -1)
-    etaText:SetTextColor(0.75, 0.75, 0.75)
+    etaText:SetTextColor(0.8, 0.8, 0.8)
 
     pulse = body:CreateAnimationGroup()
     local grow = pulse:CreateAnimation("Scale")
@@ -132,15 +137,11 @@ end
 -------------------------------------------------------------------------------
 --  Placement
 -------------------------------------------------------------------------------
--- On screen: the pin's tip on the destination. Clamped: the pin on an ellipse
--- around the screen centre, the arrow outside it pointing at the destination.
+-- On screen: on the navigation frame. Clamped: on an ellipse around the
+-- screen centre, the arrow outside it pointing at the destination.
 local function SetClamped(clamped)
     isClamped = clamped
-    pin:ClearAllPoints()
-    if clamped then
-        pin:SetPoint("CENTER", marker, "CENTER")
-    else
-        pin:SetPoint("BOTTOM", marker, "CENTER")
+    if not clamped then
         marker:ClearAllPoints()
         marker:SetPoint("CENTER", navFrame, "CENTER")
     end
@@ -165,7 +166,7 @@ local function PlaceClamped()
 
     local len = math.sqrt(dx * dx + dy * dy)
     local ux, uy = dx / len, dy / len
-    local off = pin:GetWidth() * 0.95
+    local off = math.max(pin:GetSize())
     arrow:ClearAllPoints()
     arrow:SetPoint("CENTER", marker, "CENTER", ux * off, uy * off)
     arrow:SetRotation(math.atan2(dy, dx) - math.pi / 2)
@@ -245,7 +246,7 @@ local function Attach()
     textAcc, etaAcc, alpha = TEXT_INTERVAL, 0, 0
     marker:SetAlpha(0)
     etaText:SetText("")
-    UpdateTint()
+    UpdateIcon()
     SetClamped(false)
     marker:Show()
     Drv.Add("worldMarker", OnTick)
@@ -337,7 +338,7 @@ ev:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "NAVIGATION_FRAME_DESTROYED" then
         Detach()
     elseif event == "SUPER_TRACKING_CHANGED" then
-        UpdateTint()
+        UpdateIcon()
     elseif event == "ADDON_LOADED" then
         if SuperTrackedFrame then
             self:UnregisterEvent("ADDON_LOADED")

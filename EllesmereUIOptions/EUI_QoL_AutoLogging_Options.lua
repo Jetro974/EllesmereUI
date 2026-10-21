@@ -221,9 +221,11 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
                   reload    = true,
               })
           end },
+        -- WoW Forever only (EllesmereUIQoL_WorldMarker.lua).
+        not EllesmereUI.IS_FOREVER and EllesmereUI.BlankRowCfg() or
         { type    = "toggle",
           text    = "EllesmereUI Pin in the World",
-          tooltip = "Replaces Blizzard's in-game navigation marker with an EllesmereUI pin showing the distance and time to arrival, pointing from the screen edge while the destination is off screen. Turns on Blizzard's In-Game Navigation setting while enabled.",
+          tooltip = "Replaces Blizzard's in-game navigation marker with an EllesmereUI copy: Blizzard's icons, the distance and time to arrival, and an arrow from the screen edge while the destination is off screen. Turns on Blizzard's In-Game Navigation setting while enabled.",
           -- Off by default; applies live (EllesmereUIQoL_WorldMarker.lua).
           getValue = function() return WayCfg().worldMarker == true end,
           setValue = function(v)
@@ -261,27 +263,30 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
               end },
         },
     })
-    local function ApplyPin()
-        if _G._EUI_ApplyWorldMarker then _G._EUI_ApplyWorldMarker(false) end
+    -- WoW Forever only (EllesmereUIQoL_WorldMarker.lua).
+    if EllesmereUI.IS_FOREVER then
+        local function ApplyPin()
+            if _G._EUI_ApplyWorldMarker then _G._EUI_ApplyWorldMarker(false) end
+        end
+        EllesmereUI.BuildInlineCog(wayRow._rightRegion, {
+            title = "EllesmereUI Pin in the World",
+            disabled = function() return WayCfg().worldMarker ~= true end,
+            disabledTooltip = "EllesmereUI Pin in the World",
+            rows = {
+                { type="slider", label="Pin Size", min=50, max=200, step=5,
+                  get=function() return WayCfg().markerScale or 100 end,
+                  set=function(v) SetWay("markerScale", v) ApplyPin() end },
+                { type="toggle", label="Show Distance",
+                  tooltip="Shows the distance to the destination under the pin.",
+                  get=function() return WayCfg().markerDistance ~= false end,
+                  set=function(v) SetWay("markerDistance", v) ApplyPin() end },
+                { type="toggle", label="Show Time to Arrival",
+                  tooltip="Shows the time left at your current pace toward the destination.",
+                  get=function() return WayCfg().markerETA ~= false end,
+                  set=function(v) SetWay("markerETA", v) ApplyPin() end },
+            },
+        })
     end
-    EllesmereUI.BuildInlineCog(wayRow._rightRegion, {
-        title = "EllesmereUI Pin in the World",
-        disabled = function() return WayCfg().worldMarker ~= true end,
-        disabledTooltip = "EllesmereUI Pin in the World",
-        rows = {
-            { type="slider", label="Pin Size", min=50, max=200, step=5,
-              get=function() return WayCfg().markerScale or 100 end,
-              set=function(v) SetWay("markerScale", v) ApplyPin() end },
-            { type="toggle", label="Show Distance",
-              tooltip="Shows the distance to the destination under the pin.",
-              get=function() return WayCfg().markerDistance ~= false end,
-              set=function(v) SetWay("markerDistance", v) ApplyPin() end },
-            { type="toggle", label="Show Time to Arrival",
-              tooltip="Shows the time left at your current pace toward the destination.",
-              get=function() return WayCfg().markerETA ~= false end,
-              set=function(v) SetWay("markerETA", v) ApplyPin() end },
-        },
-    })
 
     _, h = W:Spacer(parent, y, 20); y = y - h
 

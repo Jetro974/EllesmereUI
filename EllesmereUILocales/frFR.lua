@@ -5939,7 +5939,7 @@ L["Ooze Covered Rich Thorium Vein"] = "Riche filon de thorium couvert de limon"
 L["Hakkari Thorium Vein"] = "Filon de thorium Hakkari"
 -- In-world pin (EllesmereUIQoL_WorldMarker.lua)
 L["EllesmereUI Pin in the World"] = "Repère EllesmereUI dans le monde"
-L["Replaces Blizzard's in-game navigation marker with an EllesmereUI pin showing the distance and time to arrival, pointing from the screen edge while the destination is off screen. Turns on Blizzard's In-Game Navigation setting while enabled."] = "Remplace le marqueur de navigation en jeu de Blizzard par un repère EllesmereUI qui affiche la distance et le temps d'arrivée, et indique la direction depuis le bord de l'écran quand la destination est hors champ. Active le réglage Navigation en jeu de Blizzard tant que l'option est activée."
+L["Replaces Blizzard's in-game navigation marker with an EllesmereUI copy: Blizzard's icons, the distance and time to arrival, and an arrow from the screen edge while the destination is off screen. Turns on Blizzard's In-Game Navigation setting while enabled."] = "Remplace le marqueur de navigation en jeu de Blizzard par une copie EllesmereUI : les icônes de Blizzard, la distance et le temps d'arrivée, et une flèche depuis le bord de l'écran quand la destination est hors champ. Active le réglage Navigation en jeu de Blizzard tant que l'option est activée."
 L["Close the world map first."] = "Fermez d'abord la carte du monde."
 L["Pin Size"] = "Taille du repère"
 L["Show Distance"] = "Afficher la distance"
