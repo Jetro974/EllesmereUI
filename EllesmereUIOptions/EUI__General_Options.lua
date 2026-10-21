@@ -2698,6 +2698,20 @@ initFrame:SetScript("OnEvent", function(self)
             })
         end
 
+        -- Row 4: Login Tips (EllesmereUI_LoginTips.lua) | blank
+        _, h = W:DualRow(parent, y,
+            { type="toggle", text="Login Tips",
+              tooltip="At login, prints one short chat tip about an EllesmereUI feature you have not used yet. Type /euitips to see one now.",
+              getValue=function()
+                  return not (EllesmereUIDB and EllesmereUIDB.loginTips == false)
+              end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.loginTips = v
+              end },
+            { type="label", text="" }
+        );  y = y - h
+
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
         _, h = W:SectionHeader(parent, "UNLOCK MODE", y);  y = y - h
