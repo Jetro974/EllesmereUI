@@ -323,6 +323,16 @@ local TRIGGERS = {
     { "autoShotPvP",         false, { "PVP_MATCH_COMPLETE" }, true },
     { "autoShotRaidEntry",   true,  { "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA" } },
     { "autoShotZone",        false, { "MAP_EXPLORATION_UPDATED" } },
+    { "autoShotRep",         false, { "FACTION_STANDING_CHANGED", "MAJOR_FACTION_RENOWN_LEVEL_CHANGED" } },
+    { "autoShotWorldBoss",   false, { "BOSS_KILL" }, true },
+    { "autoShotTravel",      false, { "PERKS_ACTIVITY_COMPLETED" }, true },
+    { "autoShotDuel",        false, { "DUEL_FINISHED" } },
+    { "autoShotMount",       false, { "NEW_MOUNT_ADDED" } },
+    { "autoShotPet",         false, { "NEW_PET_ADDED" } },
+    { "autoShotToy",         false, { "NEW_TOY_ADDED" } },
+    { "autoShotRecipe",      false, { "NEW_RECIPE_LEARNED" } },
+    { "autoShotDecor",       false, { "NEW_HOUSING_ITEM_ACQUIRED" } },
+    { "autoShotLoot",        false, { IS_FOREVER and "CHAT_MSG_LOOT" or "SHOW_LOOT_TOAST" } },
 }
 
 local BYKEY = {}
@@ -370,6 +380,97 @@ end
 local function Span(sec)
     if SecondsToTime then return SecondsToTime(sec, true) end
     return Clock(sec)
+end
+
+-------------------------------------------------------------------------------
+--  Reputation, collections and loot
+-------------------------------------------------------------------------------
+-- Per-character table under EllesmereUIDB[store].
+local function CharTable(store)
+    local db = EllesmereUIDB
+    if not db then return nil end
+    if type(db[store]) ~= "table" then db[store] = {} end
+    local charKey = CharKey()
+    if not db[store][charKey] then db[store][charKey] = {} end
+    return db[store][charKey]
+end
+
+-- A faction's rank as one number (friendships 100 + level), its standing
+-- text, whether it is the top rank, and its name. Renown factions have their
+-- own event.
+local function RankOf(factionID)
+    local data = C_Reputation and C_Reputation.GetFactionDataByID and C_Reputation.GetFactionDataByID(factionID)
+    if type(data) ~= "table" or issecretvalue(data) then return end
+    if C_Reputation.IsMajorFaction and C_Reputation.IsMajorFaction(factionID) then return end
+    local name = Str(data.name)
+    local fr = C_GossipInfo and C_GossipInfo.GetFriendshipReputation and C_GossipInfo.GetFriendshipReputation(factionID)
+    if type(fr) == "table" and Known(fr.friendshipFactionID, "number") and fr.friendshipFactionID > 0 then
+        local ranks = C_GossipInfo.GetFriendshipReputationRanks(factionID)
+        local cur, max = ranks and ranks.currentLevel, ranks and ranks.maxLevel
+        if not Known(cur, "number") then return end
+        return 100 + cur, Str(fr.reaction), Known(max, "number") and cur >= max, name
+    end
+    local r = data.reaction
+    if not Known(r, "number") then return end
+    return r, _G["FACTION_STANDING_LABEL" .. r], r >= 8, name
+end
+
+local function ReputationShot(name, standing, isMax)
+    if Opt("autoShotRepMaxOnly") and not isMax then return end
+    Request({ label = name or EllesmereUI.L("Reputation"),
+              card = { title = EllesmereUI.L("Reputation"), lines = { Big(name), Colored(standing, 0.3, 1, 0.3) } } })
+end
+
+local function Collected(title, name, icon)
+    name = Str(name)
+    Request({ label = name or title,
+              card = { title = title, icon = not issecretvalue(icon) and icon or nil, lines = { Big(name) } } })
+end
+
+-- Loot at or above the picked quality (default Epic), once its data is in.
+local function LootShot(link, quantity)
+    if not (C_Item and C_Item.GetItemInfo) then return end
+    local function go()
+        local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(link)
+        local min = tonumber(EllesmereUIDB and EllesmereUIDB.autoShotLootQuality) or 4
+        if not Known(quality, "number") or quality < min then return end
+        name = Str(name)
+        if not name then return end
+        local r, g, b = C_Item.GetItemQualityColor(quality)
+        local text = name
+        if Known(quantity, "number") and quantity > 1 then text = text .. " x" .. quantity end
+        Request({ label = name, card = { title = EllesmereUI.L("Special Loot"), icon = icon,
+                                         lines = { { text, r or 1, g or 1, b or 1, true } } } })
+    end
+    if C_Item.GetItemInfo(link) then
+        go()
+    elseif Item and Item.CreateFromItemLink then
+        Item:CreateFromItemLink(link):ContinueOnItemLoad(go)
+    end
+end
+
+-- Forever: the player's own loot lines, matched against the client's
+-- localized formats (the multiple-item one first: the single one matches
+-- its lines too). Built on first use.
+local lootPatterns
+local function OwnLootLink(text)
+    if not lootPatterns then
+        lootPatterns = {}
+        for _, key in ipairs({ "LOOT_ITEM_SELF_MULTIPLE", "LOOT_ITEM_SELF",
+                               "LOOT_ITEM_BONUS_ROLL_SELF_MULTIPLE", "LOOT_ITEM_BONUS_ROLL_SELF" }) do
+            local fmt = _G[key]
+            if type(fmt) == "string" and fmt ~= "" then
+                local pat = fmt:gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0")
+                pat = pat:gsub("%%%d%$s", "(.+)"):gsub("%%s", "(.+)")
+                pat = pat:gsub("%%%d%$d", "(%%d+)"):gsub("%%d", "(%%d+)")
+                lootPatterns[#lootPatterns + 1] = "^" .. pat .. "$"
+            end
+        end
+    end
+    for _, pat in ipairs(lootPatterns) do
+        local link, count = text:match(pat)
+        if link then return link, tonumber(count) or 1 end
+    end
 end
 
 local encounterStart = {}
@@ -536,6 +637,110 @@ local HANDLERS = {
         end
         Request({ label = EllesmereUI.L("PvP Victory"),
                   card = { title = EllesmereUI.L("PvP Victory"), lines = lines } })
+    end,
+
+    FACTION_STANDING_CHANGED = function(factionID)
+        if not Known(factionID, "number") then return end
+        local rank, standing, isMax, name = RankOf(factionID)
+        local ranks = rank and CharTable("autoShotRanks")
+        if not ranks then return end
+        -- The first change of a faction only records its rank.
+        local prev = ranks[factionID]
+        ranks[factionID] = rank
+        if type(prev) ~= "number" or rank <= prev or math.floor(rank / 100) ~= math.floor(prev / 100) then return end
+        ReputationShot(name, standing, isMax)
+    end,
+
+    MAJOR_FACTION_RENOWN_LEVEL_CHANGED = function(factionID, newLevel, oldLevel)
+        if not (Known(factionID, "number") and Known(newLevel, "number")) then return end
+        if Known(oldLevel, "number") and newLevel <= oldLevel then return end
+        local data = C_MajorFactions.GetMajorFactionData(factionID)
+        local isMax = C_MajorFactions.HasMaximumRenown and C_MajorFactions.HasMaximumRenown(factionID)
+        ReputationShot(type(data) == "table" and Str(data.name) or nil,
+            EllesmereUI.Lf("Renown %1$d", newLevel), not issecretvalue(isMax) and isMax == true)
+    end,
+
+    -- Retail: a boss killed outside an instance.
+    BOSS_KILL = function(_, encounterName)
+        if IsInInstance() then return end
+        local boss = Str(encounterName)
+        Request({ label = boss or EllesmereUI.L("World Boss Kill"), waitCombat = true, roster = true,
+                  card = { title = EllesmereUI.L("World Boss Kill"), lines = { Big(boss) } } })
+    end,
+
+    PERKS_ACTIVITY_COMPLETED = function(activityID)
+        if not Known(activityID, "number") then return end
+        local info = C_PerksActivities.GetPerksActivityInfo(activityID)
+        if type(info) ~= "table" then return end
+        local name = Str(info.activityName)
+        Request({ label = name or EllesmereUI.L("Traveler's Log"),
+                  card = { title = EllesmereUI.L("Traveler's Log"), lines = { Big(name), Dim(Str(info.description)) } } })
+    end,
+
+    -- No API names the winner, and a declined request ends with the same
+    -- event: only a duel that left the player in combat counts.
+    DUEL_FINISHED = function()
+        if not UnitAffectingCombat("player") then return end
+        Request({ label = EllesmereUI.L("Duel"), waitCombat = true,
+                  card = { title = EllesmereUI.L("Duel"), lines = {} } })
+    end,
+
+    NEW_MOUNT_ADDED = function(mountID)
+        if not Known(mountID, "number") then return end
+        local name, _, icon = C_MountJournal.GetMountInfoByID(mountID)
+        Collected(EllesmereUI.L("New Mount"), name, icon)
+    end,
+
+    NEW_PET_ADDED = function(petGUID)
+        if not Known(petGUID, "string") then return end
+        local _, customName, _, _, _, _, _, name, icon = C_PetJournal.GetPetInfoByPetID(petGUID)
+        Collected(EllesmereUI.L("New Battle Pet"), Str(customName) or name, icon)
+    end,
+
+    NEW_TOY_ADDED = function(itemID)
+        if not Known(itemID, "number") then return end
+        local _, name, icon = C_ToyBox.GetToyInfo(itemID)
+        Collected(EllesmereUI.L("New Toy"), name, icon)
+    end,
+
+    NEW_RECIPE_LEARNED = function(recipeID)
+        if not Known(recipeID, "number") then return end
+        Collected(EllesmereUI.L("New Recipe"), C_Spell.GetSpellName(recipeID), C_Spell.GetSpellTexture(recipeID))
+    end,
+
+    NEW_HOUSING_ITEM_ACQUIRED = function(itemType, itemName, icon)
+        local decor = Enum.HousingItemToastType and Enum.HousingItemToastType.Decor
+        if decor and (not Known(itemType, "number") or itemType ~= decor) then return end
+        Collected(EllesmereUI.L("New Housing Decor"), itemName, icon)
+    end,
+
+    -- Retail loot toasts; money and currency only with their option.
+    SHOW_LOOT_TOAST = function(typeIdentifier, link, quantity, _, _, isPersonal)
+        if not Known(typeIdentifier, "string") then return end
+        if typeIdentifier == "item" then
+            if Known(link, "string") then LootShot(link, quantity) end
+            return
+        end
+        if not Opt("autoShotLootMoney") then return end
+        if typeIdentifier == "money" and Known(quantity, "number") and GetMoneyString then
+            Request({ label = EllesmereUI.L("Special Loot"),
+                      card = { title = EllesmereUI.L("Special Loot"), lines = { Big(GetMoneyString(quantity)) } } })
+        elseif typeIdentifier == "currency" and isPersonal and Known(link, "string") then
+            local info = C_CurrencyInfo.GetCurrencyInfoFromLink(link)
+            local name = type(info) == "table" and Str(info.name)
+            if not name then return end
+            local text = name
+            if Known(quantity, "number") and quantity > 1 then text = text .. " x" .. quantity end
+            Request({ label = name, card = { title = EllesmereUI.L("Special Loot"), icon = info.iconFileID,
+                                             lines = { Big(text) } } })
+        end
+    end,
+
+    -- Forever: the player's own loot lines.
+    CHAT_MSG_LOOT = function(text)
+        if not Known(text, "string") then return end
+        local link, count = OwnLootLink(text)
+        if link and link:find("|Hitem:", 1, true) then LootShot(link, count) end
     end,
 }
 
