@@ -119,7 +119,7 @@ _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
     ); y = y - h
     Cog(row._leftRegion, "Hide Interface", "autoShotHideUI", true, {
         { type="toggle", label="Caption",
-          tooltip="Adds the event, character and date to the screenshot.",
+          tooltip="Adds a card to the screenshot: the event, your character, the date and zone, and the details of that event.",
           get=function() return Get("autoShotCaption", true) == true end,
           set=function(v) Set("autoShotCaption", v) end },
     })

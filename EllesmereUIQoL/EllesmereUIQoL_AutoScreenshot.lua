@@ -3,13 +3,12 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  EllesmereUIQoL_AutoScreenshot.lua
 --  Auto Screenshots: a screenshot on level up, achievements, boss kills,
 --  deaths, Mythic+ completions and PvP wins, optionally with the interface
---  hidden and a caption. /euishot takes one clean screenshot now.
+--  hidden and a card of the event (EllesmereUIQoL_AutoScreenshotCard.lua).
+--  /euishot takes one clean screenshot now.
 --
 --  Taint: the interface is hidden with UIParent:SetAlpha(0), never Hide() or
 --  SetUIVisibility(), so no Blizzard OnHide/OnShow code (CloseAllWindows, the
---  managed frame layout) runs inside this addon's call. The caption is an
---  addon frame on WorldFrame, which stays drawn while UIParent is invisible
---  (Blizzard's ActionStatus falls back to the same parent).
+--  managed frame layout) runs inside this addon's call.
 -------------------------------------------------------------------------------
 local ns  = select(2, ...)
 local EUI = EllesmereUI
@@ -34,43 +33,6 @@ local PREFIX = CC.BRAND .. "EllesmereUI:|r "
 local function Say(msg) EUI.Print(PREFIX .. msg) end
 
 -------------------------------------------------------------------------------
---  Caption (built on the first shot that shows it)
--------------------------------------------------------------------------------
-local caption
-
-local function ShowCaption(label)
-    if not caption then
-        caption = CreateFrame("Frame", nil, WorldFrame)
-        caption:SetFrameStrata("TOOLTIP")
-        caption:EnableMouse(false)
-        local bg = caption:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetColorTexture(0.05, 0.05, 0.05, 0.6)
-        caption.bar = caption:CreateTexture(nil, "ARTWORK")
-        caption.bar:SetPoint("TOPLEFT")
-        caption.bar:SetPoint("BOTTOMLEFT")
-        caption.bar:SetWidth(3)
-        caption.title = caption:CreateFontString(nil, "OVERLAY")
-        caption.title:SetPoint("TOPLEFT", 14, -9)
-        caption.sub = caption:CreateFontString(nil, "OVERLAY")
-        caption.sub:SetPoint("TOPLEFT", caption.title, "BOTTOMLEFT", 0, -4)
-    end
-    -- UIParent's scale on a WorldFrame child, like ActionStatus.
-    caption:SetScale(UIParent:GetEffectiveScale() / WorldFrame:GetEffectiveScale())
-    EUI.ApplyModuleFont(caption.title, nil, 16, "extras")
-    EUI.ApplyModuleFont(caption.sub, nil, 12, "extras")
-    caption.bar:SetColorTexture(EUI.GetAccentColor())
-    caption.title:SetText(label)
-    caption.sub:SetText(UnitName("player") .. " - " .. GetRealmName() .. "   " .. date("%Y-%m-%d %H:%M"))
-    caption.sub:SetTextColor(0.8, 0.8, 0.8)
-    local w = math.max(caption.title:GetStringWidth(), caption.sub:GetStringWidth())
-    caption:SetSize(w + 28, caption.title:GetStringHeight() + caption.sub:GetStringHeight() + 22)
-    caption:ClearAllPoints()
-    caption:SetPoint("BOTTOMRIGHT", WorldFrame, "BOTTOMRIGHT", -30, 30)
-    caption:Show()
-end
-
--------------------------------------------------------------------------------
 --  Capture queue: one shot at a time, so hide/restore never overlap.
 -------------------------------------------------------------------------------
 local queue, busy = {}, false
@@ -92,7 +54,7 @@ local function Finish(id, ok)
         if UIParent:GetAlpha() == 0 then UIParent:SetAlpha(savedAlpha) end
         savedAlpha = nil
     end
-    if caption then caption:Hide() end
+    ns.AutoShotCard.Hide()
     if ok and On("autoShotChat") then
         Say(EllesmereUI.Lf("Screenshot taken: %1$s", job.label or "/euishot"))
     end
@@ -113,9 +75,9 @@ local function Shoot(job)
     if not combat and (job.clean or On("autoShotHideUI")) then
         savedAlpha = UIParent:GetAlpha()
         UIParent:SetAlpha(0)
-        if job.label and On("autoShotCaption") then ShowCaption(job.label) end
+        if job.card and On("autoShotCaption") then ns.AutoShotCard.Show(job) end
     end
-    -- One short wait so the hidden UI and the caption are drawn first. The
+    -- One short wait so the hidden UI and the card are drawn first. The
     -- Hide Screenshot Status listener (EllesmereUIQoL.lua) hands the
     -- SCREENSHOT_SUCCEEDED / _FAILED result to _autoShotResult.
     C_Timer.After(savedAlpha and 0.1 or 0, function()
@@ -176,12 +138,29 @@ local function MaxLevel()
     if GetMaxPlayerLevel then return GetMaxPlayerLevel() end
 end
 
+local function Str(v) return Known(v, "string") and v ~= "" and v or nil end
+
+-- Card lines: { text, r, g, b, big }
+local function Big(text) return { text, 1, 1, 1, true } end
+local function Dim(text) return { text, 0.75, 0.75, 0.75 } end
+local function Colored(text, r, g, b) return { text, r, g, b } end
+
+local function Clock(sec)
+    sec = math.floor(sec + 0.5)
+    if sec >= 3600 then
+        return ("%d:%02d:%02d"):format(math.floor(sec / 3600), math.floor(sec / 60) % 60, sec % 60)
+    end
+    return ("%d:%02d"):format(math.floor(sec / 60), sec % 60)
+end
+
+local function CharKey() return UnitName("player") .. " - " .. GetRealmName() end
+
 -- First kills per character: EllesmereUIDB.autoShotKills["Name - Realm"][difficultyID][encounterID].
 local function SeenKill(difficultyID, encounterID)
     local db = EllesmereUIDB
     if not db then return false end
     if type(db.autoShotKills) ~= "table" then db.autoShotKills = {} end
-    local charKey = UnitName("player") .. " - " .. GetRealmName()
+    local charKey = CharKey()
     local mine = db.autoShotKills[charKey]
     if not mine then mine = {}; db.autoShotKills[charKey] = mine end
     local diff = mine[difficultyID]
@@ -191,6 +170,62 @@ local function SeenKill(difficultyID, encounterID)
     return seen
 end
 
+-- WoW Forever: achievements are Legacy challenges (Blizzard_LegacySystem).
+local LEGACY = IS_FOREVER and Constants and Constants.LegacyConsts
+
+-- "3/5" for a tracked challenge, as the objective tracker counts it.
+local function Progress(id)
+    local n = GetAchievementNumCriteria(id)
+    if not Known(n, "number") or n == 0 then return nil end
+    if n == 1 then
+        local _, _, done, qty, total = GetAchievementCriteriaInfo(id, 1)
+        if Known(qty, "number") and Known(total, "number") and total > 1 then
+            return qty .. "/" .. total
+        end
+        return (not issecretvalue(done) and done) and "1/1" or "0/1"
+    end
+    local count = 0
+    for i = 1, n do
+        local _, _, done = GetAchievementCriteriaInfo(id, i)
+        if not issecretvalue(done) and done then count = count + 1 end
+    end
+    return count .. "/" .. n
+end
+
+local function LegacyLines(lines, achievementID)
+    if not LEGACY then return end
+    local pts = C_Traits and C_Traits.GetTraitCurrencyForAchievement
+        and C_Traits.GetTraitCurrencyForAchievement(LEGACY.LEGACY_POINTS_TRAIT_CURRENCY_ID, achievementID)
+    if Known(pts, "number") and pts > 0 then
+        lines[#lines + 1] = Colored(EllesmereUI.Lf("%1$d Legacy points", pts), 1, 0.82, 0)
+    end
+    -- The total Blizzard's Legacy window shows: the reward track's renown.
+    local total = C_MajorFactions and C_MajorFactions.GetCurrentRenownLevel
+        and C_MajorFactions.GetCurrentRenownLevel(LEGACY.LEGACY_REWARD_TRACK_FACTION_ID)
+    if Known(total, "number") then
+        lines[#lines + 1] = Dim(EllesmereUI.Lf("Total Legacy points: %1$d", total))
+    end
+    local tracked = C_ContentTracking and C_ContentTracking.GetTrackedIDs and Enum.ContentTrackingType
+        and C_ContentTracking.GetTrackedIDs(Enum.ContentTrackingType.Achievement)
+    if type(tracked) ~= "table" then return end
+    local shown = 0
+    for _, id in ipairs(tracked) do
+        if shown == 3 then break end
+        if Known(id, "number") and id ~= achievementID then
+            local _, name, _, _, _, _, _, _, _, _, _, _, mine = GetAchievementInfo(id)
+            name = Str(name)
+            if name and not (not issecretvalue(mine) and mine) then
+                if shown == 0 then lines[#lines + 1] = Dim(EllesmereUI.L("In progress:")) end
+                local p = Progress(id)
+                lines[#lines + 1] = { "  " .. name .. (p and ("  " .. p) or ""), 1, 1, 1 }
+                shown = shown + 1
+            end
+        end
+    end
+end
+
+local encounterStart = {}
+
 local HANDLERS = {
     PLAYER_LEVEL_UP = function(level)
         if not Known(level, "number") then level = nil end
@@ -198,36 +233,76 @@ local HANDLERS = {
             local max = MaxLevel()
             if not (level and max and level >= max) then return end
         end
+        local lines = {}
+        if level then lines[1] = Big(EllesmereUI.Lf("Level %1$d", level)) end
+        local className, class = UnitClass("player")
+        local c = EUI.GetClassColor(class)
+        lines[#lines + 1] = Colored((UnitRace("player") or "") .. " " .. (className or ""), c.r, c.g, c.b)
         -- Forever: leave the level-up toast time to show.
         Request({ label = level and EllesmereUI.Lf("Level %1$d", level) or EllesmereUI.L("Level Up"),
-                  minDelay = IS_FOREVER and 1 or nil })
+                  minDelay = IS_FOREVER and 1 or nil,
+                  card = { title = EllesmereUI.L("Level Up"), lines = lines } })
     end,
 
     ACHIEVEMENT_EARNED = function(achievementID, alreadyEarned)
         if not Known(achievementID, "number") or issecretvalue(alreadyEarned)
            or alreadyEarned or not GetAchievementInfo then return end
-        local _, name, _, _, _, _, _, _, _, _, _, isGuild = GetAchievementInfo(achievementID)
+        local _, name, points, _, _, _, _, description, _, icon, _, isGuild = GetAchievementInfo(achievementID)
         if isGuild then return end
-        Request({ label = Known(name, "string") and name or EllesmereUI.L("Achievement Earned") })
+        name = Str(name)
+        local lines = { Big(name) }
+        lines[#lines + 1] = Dim(Str(description))
+        if LEGACY then
+            LegacyLines(lines, achievementID)
+        elseif Known(points, "number") and points > 0 then
+            lines[#lines + 1] = Colored(EllesmereUI.Lf("%1$d points", points), 1, 0.82, 0)
+        end
+        Request({ label = name or EllesmereUI.L("Achievement Earned"),
+                  card = { title = LEGACY and EllesmereUI.L("Legacy Challenge") or EllesmereUI.L("Achievement Earned"),
+                           icon = not issecretvalue(icon) and icon or nil, lines = lines } })
+    end,
+
+    ENCOUNTER_START = function(encounterID)
+        if Known(encounterID, "number") then encounterStart[encounterID] = GetTime() end
     end,
 
     ENCOUNTER_END = function(encounterID, encounterName, difficultyID, _, success)
+        local started
+        if Known(encounterID, "number") then
+            started = encounterStart[encounterID]
+            encounterStart[encounterID] = nil
+        end
         if issecretvalue(success) or success ~= 1 then return end
         local firstOnly = On("autoShotBossFirstOnly")
-        if Known(encounterID, "number") and Known(difficultyID, "number") then
+        local known = Known(encounterID, "number") and Known(difficultyID, "number")
+        if known then
             if SeenKill(difficultyID, encounterID) and firstOnly then return end
         elseif firstOnly then
             return
         end
-        Request({ label = Known(encounterName, "string") and encounterName or EllesmereUI.L("Boss Kill"),
-                  waitCombat = true })
+        local boss = Str(encounterName)
+        local instance = Str((GetInstanceInfo()))
+        local lines = { Big(boss), instance and { instance, 1, 1, 1 } or nil }
+        local diffName = known and GetDifficultyInfo and Str((GetDifficultyInfo(difficultyID)))
+        if diffName then lines[#lines + 1] = Dim(diffName) end
+        if started then
+            lines[#lines + 1] = Dim(EllesmereUI.Lf("Duration: %1$s", Clock(GetTime() - started)))
+        end
+        Request({ label = boss or EllesmereUI.L("Boss Kill"), waitCombat = true,
+                  card = { title = EllesmereUI.L("Boss Kill"), lines = lines } })
     end,
 
     PLAYER_DEAD = function()
         local where = EllesmereUIDB and EllesmereUIDB.autoShotDeathWhere or "all"
         local inInstance = IsInInstance()
         if (where == "instance" and not inInstance) or (where == "world" and inInstance) then return end
-        Request({ label = EllesmereUI.L("Death") })
+        local lines = { Big(EllesmereUI.Lf("Level %1$d", UnitLevel("player"))) }
+        -- Forever: Blizzard_HardcoreUI reads the ruleset from C_GameRules.
+        if IS_FOREVER and C_GameRules and C_GameRules.IsHardcoreActive and C_GameRules.IsHardcoreActive() then
+            lines[2] = Colored(EllesmereUI.L("Hardcore"), 1, 0.3, 0.3)
+        end
+        Request({ label = EllesmereUI.L("Death"),
+                  card = { title = EllesmereUI.L("Death"), lines = lines } })
     end,
 
     CHALLENGE_MODE_COMPLETED = function()
@@ -238,13 +313,32 @@ local HANDLERS = {
         if issecretvalue(onTime) then onTime = nil end
         if On("autoShotMythicPlusTimed") and onTime ~= true then return end
         local label = EllesmereUI.L("Mythic+ Completed")
+        local lines = {}
         local level = info and info.level
-        if Known(level, "number") and level > 0 then label = label .. " +" .. level end
-        Request({ label = label })
+        local mapID, ms = info and info.mapChallengeModeID, info and info.time
+        local name, _, limit
+        if Known(mapID, "number") and C_ChallengeMode.GetMapUIInfo then
+            name, _, limit = C_ChallengeMode.GetMapUIInfo(mapID)
+        end
+        name = Str(name)
+        lines[1] = Big(name)
+        if Known(level, "number") and level > 0 then
+            label = label .. " +" .. level
+            lines[#lines + 1] = { EllesmereUI.Lf("Keystone Level %1$d", level), 1, 1, 1 }
+        end
+        if Known(ms, "number") and Known(limit, "number") then
+            lines[#lines + 1] = Dim(EllesmereUI.Lf("Time: %1$s / %2$s", Clock(ms / 1000), Clock(limit)))
+        end
+        if onTime == true then
+            lines[#lines + 1] = Colored(EllesmereUI.L("On time"), 0.3, 1, 0.3)
+        elseif onTime == false then
+            lines[#lines + 1] = Colored(EllesmereUI.L("Over time"), 1, 0.3, 0.3)
+        end
+        Request({ label = label, card = { title = EllesmereUI.L("Mythic+ Completed"), lines = lines } })
     end,
 
     -- Win test as PVPMatchResults.lua: the winner index against the player's team.
-    PVP_MATCH_COMPLETE = function(winner)
+    PVP_MATCH_COMPLETE = function(winner, duration)
         if not Known(winner, "number") or not GetBattlefieldArenaFaction then return end
         local team = GetBattlefieldArenaFaction()
         if not Known(team, "number") or winner ~= team then return end
@@ -252,18 +346,23 @@ local HANDLERS = {
         local statID = C_PvP and C_PvP.GetCustomVictoryStatID and C_PvP.GetCustomVictoryStatID()
         if Known(statID, "number") and statID > 0
            and not (C_PvP.IsRatedSoloShuffle and C_PvP.IsRatedSoloShuffle()) then return end
-        Request({ label = EllesmereUI.L("PvP Victory") })
+        local lines = { Big(Str((GetInstanceInfo()))) }
+        if Known(duration, "number") and duration > 0 then
+            lines[#lines + 1] = Dim(EllesmereUI.Lf("Duration: %1$s", Clock(duration)))
+        end
+        Request({ label = EllesmereUI.L("PvP Victory"),
+                  card = { title = EllesmereUI.L("PvP Victory"), lines = lines } })
     end,
 }
 
--- key, default once the master is on, event, retail only
+-- key, default once the master is on, events, retail only
 local TRIGGERS = {
-    { "autoShotLevelUp",     true,  "PLAYER_LEVEL_UP" },
-    { "autoShotAchievement", true,  "ACHIEVEMENT_EARNED" },
-    { "autoShotBoss",        true,  "ENCOUNTER_END" },
-    { "autoShotDeath",       false, "PLAYER_DEAD" },
-    { "autoShotMythicPlus",  false, "CHALLENGE_MODE_COMPLETED", true },
-    { "autoShotPvP",         false, "PVP_MATCH_COMPLETE", true },
+    { "autoShotLevelUp",     true,  { "PLAYER_LEVEL_UP" } },
+    { "autoShotAchievement", true,  { "ACHIEVEMENT_EARNED" } },
+    { "autoShotBoss",        true,  { "ENCOUNTER_START", "ENCOUNTER_END" } },
+    { "autoShotDeath",       false, { "PLAYER_DEAD" } },
+    { "autoShotMythicPlus",  false, { "CHALLENGE_MODE_COMPLETED" }, true },
+    { "autoShotPvP",         false, { "PVP_MATCH_COMPLETE" }, true },
 }
 
 local function TriggerOn(t)
@@ -288,16 +387,26 @@ end)
 local registered = {}
 local slashDone = false
 
+local wanted = {}
+
 local function Sync()
     local master = Enabled()
+    wipe(wanted)
     for _, t in ipairs(TRIGGERS) do
-        local ev = t[3]
-        local want = master and TriggerOn(t) and ValidEvent(ev) or false
-        if want ~= (registered[ev] == true) then
-            registered[ev] = want
-            if want then evFrame:RegisterEvent(ev) else evFrame:UnregisterEvent(ev) end
+        if master and TriggerOn(t) then
+            for _, ev in ipairs(t[3]) do wanted[ev] = ValidEvent(ev) or nil end
         end
     end
+    for _, t in ipairs(TRIGGERS) do
+        for _, ev in ipairs(t[3]) do
+            local want = wanted[ev] == true
+            if want ~= (registered[ev] == true) then
+                registered[ev] = want
+                if want then evFrame:RegisterEvent(ev) else evFrame:UnregisterEvent(ev) end
+            end
+        end
+    end
+    if not registered.ENCOUNTER_END then wipe(encounterStart) end
     if master and not slashDone then
         slashDone = true
         SLASH_EUISHOT1 = "/euishot"
