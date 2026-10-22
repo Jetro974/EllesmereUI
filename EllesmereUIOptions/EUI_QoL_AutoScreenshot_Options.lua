@@ -40,6 +40,11 @@ local ZONE_MODES = { capitals = "Capitals Only", zones = "Zones", all = "Every D
 local ZONE_ORDER = { "capitals", "zones", "all" }
 local QUALITIES = { ["2"] = "Uncommon", ["3"] = "Rare", ["4"] = "Epic", ["5"] = "Legendary" }
 local QUALITY_ORDER = { "2", "3", "4", "5" }
+local FORMATS = { game = "Game Setting", jpeg = "JPEG", png = "PNG", tga = "TGA" }
+local FORMAT_ORDER = { "game", "jpeg", "png", "tga" }
+local SOUNDS = { none = "Off", camera = "Camera Shutter", ready = "Ready Check", quest = "Quest Complete",
+                 ping = "Map Ping", epic = "Epic Loot" }
+local SOUND_ORDER = { "none", "camera", "ready", "quest", "ping", "epic" }
 
 -- Collection triggers, each its own key, offered where the client has the event.
 local COLLECTIONS = {
@@ -188,6 +193,27 @@ local function Slots()
               set=function(v) Set("autoShotRoster", v) end },
         }))
     add(Toggle("Chat Message", "autoShotChat", true, "Prints a line in chat for each screenshot taken."))
+    add({ type="dropdown", text="Sound", values=SOUNDS, order=SOUND_ORDER,
+          tooltip="A sound once a screenshot is saved.",
+          getValue=function() return Get("autoShotSound", "none") end,
+          setValue=function(v) Set("autoShotSound", v ~= "none" and v or nil) end })
+    add({ type="dropdown", text="Image Format", values=FORMATS, order=FORMAT_ORDER,
+          tooltip="The file format of these screenshots (and /euishot). The game setting is switched only for the shot, out of combat, and put back right after.",
+          getValue=function() return Get("autoShotFormat", "game") end,
+          setValue=function(v) Set("autoShotFormat", v ~= "game" and v or nil) end },
+        function(rgn)
+            if EllesmereUI._prebuilding then return end
+            EllesmereUI.BuildInlineCog(rgn, {
+                title = "Image Format", gap = 9,
+                rows = {
+                    { type="slider", label="JPEG Quality", min=1, max=10, step=1,
+                      get=function() return Get("autoShotQuality", 9) end,
+                      set=function(v) Set("autoShotQuality", v) end },
+                },
+                disabled = function() return Get("autoShotFormat", "game") ~= "jpeg" end,
+                disabledTooltip = "This option requires Image Format to be set to JPEG",
+            })
+        end)
     return list
 end
 

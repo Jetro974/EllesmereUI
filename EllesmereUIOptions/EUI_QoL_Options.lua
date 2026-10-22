@@ -2652,7 +2652,9 @@ initFrame:SetScript("OnEvent", function(self)
                     "autoShotPvP", "autoShotWorldBoss", "autoShotTravel", "autoShotRep", "autoShotRepMaxOnly",
                     "autoShotDuel", "autoShotMount", "autoShotPet", "autoShotToy", "autoShotRecipe", "autoShotDecor",
                     "autoShotLoot", "autoShotLootQuality", "autoShotLootMoney", "autoShotLogin",
-                    "autoShotInterval", "autoShotIntervalMin", "autoShotRaidEntry", "autoShotZone", "autoShotZoneMode", "autoShotHideUI", "autoShotCaption", "autoShotRoster", "autoShotChat" }) do
+                    "autoShotInterval", "autoShotIntervalMin", "autoShotRaidEntry", "autoShotZone",
+                    "autoShotZoneMode", "autoShotHideUI", "autoShotCaption", "autoShotRoster", "autoShotChat",
+                    "autoShotSound", "autoShotFormat", "autoShotQuality" }) do
                     EllesmereUIDB[k] = nil
                 end
             end

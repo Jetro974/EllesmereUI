@@ -46,6 +46,43 @@ local function Done()
     if #queue > 0 then C_Timer.After(GAP, Process) end
 end
 
+-- Image format: the screenshot CVars are held only around our own shot,
+-- out of combat, through EUI's CVar record, and put back right after.
+local OWNER = "EllesmereUIQoL"
+local heldFormat, heldQuality
+
+local function HoldFormat()
+    local fmt = EllesmereUIDB and EllesmereUIDB.autoShotFormat
+    if type(fmt) ~= "string" or fmt == "game" or InCombatLockdown() then return end
+    local cur = C_CVar.GetCVar("screenshotFormat")
+    if cur ~= nil and cur ~= fmt and EUI.HoldCVar("screenshotFormat", fmt, OWNER) then heldFormat = cur end
+    if fmt ~= "jpeg" then return end
+    local q, curQ = tostring(Num("autoShotQuality", 9)), C_CVar.GetCVar("screenshotQuality")
+    if curQ ~= nil and curQ ~= q and EUI.HoldCVar("screenshotQuality", q, OWNER) then heldQuality = curQ end
+end
+
+local function ReleaseFormat()
+    if not (heldFormat or heldQuality) then return end
+    if InCombatLockdown() then
+        ns.CombatQueue.Defer("AutoScreenshotFormat", ReleaseFormat)
+        return
+    end
+    if heldFormat then EUI.ReleaseCVar("screenshotFormat", heldFormat, OWNER); heldFormat = nil end
+    if heldQuality then EUI.ReleaseCVar("screenshotQuality", heldQuality, OWNER); heldQuality = nil end
+end
+
+-- Stock game sounds by SOUNDKIT name (present on both clients).
+local SOUNDS = {
+    camera = "REPORT_SCREENSHOT_CAMERA", ready = "READY_CHECK", quest = "IG_QUEST_LIST_COMPLETE",
+    ping = "MAP_PING", epic = "UI_EPICLOOT_TOAST",
+}
+
+local function PlayShotSound()
+    local name = SOUNDS[EllesmereUIDB and EllesmereUIDB.autoShotSound or ""]
+    local kit = name and SOUNDKIT and SOUNDKIT[name]
+    if type(kit) == "number" then PlaySound(kit) end
+end
+
 local function Finish(id, ok)
     if id ~= shotID or not inFlight then return end
     local job = inFlight
@@ -56,6 +93,8 @@ local function Finish(id, ok)
         savedAlpha = nil
     end
     ns.AutoShotCard.Hide()
+    ReleaseFormat()
+    if ok then PlayShotSound() end
     if ok and On("autoShotChat") then
         Say(EllesmereUI.Lf("Screenshot taken: %1$s", job.label or "/euishot"))
     end
@@ -96,6 +135,7 @@ local function Shoot(job)
     C_Timer.After(savedAlpha and 0.1 or 0, function()
         if id ~= shotID or not inFlight then return end
         EUI._autoShotResult = function(event) Finish(id, event == "SCREENSHOT_SUCCEEDED") end
+        HoldFormat()
         Screenshot()
     end)
 end
