@@ -520,7 +520,8 @@ do
                and cmd:sub(1, 1) == "/" and not byToken[token] then
                 local name = cmd:sub(2)
                 -- Capitalised for display only. A first letter outside ASCII
-                -- ("/éternuer") is left as typed: upper() would not touch it.
+                -- (a French emote with an accented first letter) is left as typed:
+                -- upper() would not touch it.
                 name = name:sub(1, 1):upper() .. name:sub(2)
                 local rec = { token = token, command = cmd, name = name }
                 byToken[token] = rec
