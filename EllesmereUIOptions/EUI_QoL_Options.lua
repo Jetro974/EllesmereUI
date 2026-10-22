@@ -22,6 +22,7 @@ local PAGE_UPGCALC  = "Upgrader"
 local PAGE_SHIFTER  = "Shifter"
 local PAGE_MOVEMENT = "MoveAlert"
 local PAGE_RAIDTOOLS = "Raid Tools"
+local PAGE_AFK       = "AFK"
 
 -------------------------------------------------------------------------------
 --  Hide Item Transforms picker popup
@@ -2488,7 +2489,8 @@ initFrame:SetScript("OnEvent", function(self)
     -- No item upgrade system on WoW Forever: the Upgrader tab is not offered there
     -- (its resident file returns at load, so the page builder never exists either).
     if not EllesmereUI.IS_FOREVER then pages[#pages + 1] = PAGE_UPGCALC end
-    local searchTerms = { "brez", "bres", "battle res", "combat res", "cursor", "macro", "fps", "logging", "combat log", "warcraft logs", "upgrade", "ilvl", "item level", "crest", "upgrade calculator", "shifter", "move", "drag", "position", "demodal", "drift", "combat alert", "enter combat", "leave combat", "in combat", "combat text", "combat notification", "transform", "transforms", "costume", "disguise", "chef's hat", "noggenfogger", "target distance", "distance to target", "range text", "yard", "yards", "movement", "mobility", "gap closer", "blink", "gateway", "warlock gateway", "control shard", "time spiral", "free movement", "raid tools", "raid", "pull timer", "pull", "ready check", "role check", "raid marker", "target marker", "world marker", "flare", "disband", "convert to raid", "countdown" }
+    pages[#pages + 1] = PAGE_AFK
+    local searchTerms = { "brez", "bres", "battle res", "combat res", "cursor", "macro", "fps", "logging", "combat log", "warcraft logs", "upgrade", "ilvl", "item level", "crest", "upgrade calculator", "shifter", "move", "drag", "position", "demodal", "drift", "combat alert", "enter combat", "leave combat", "in combat", "combat text", "combat notification", "transform", "transforms", "costume", "disguise", "chef's hat", "noggenfogger", "target distance", "distance to target", "range text", "yard", "yards", "movement", "mobility", "gap closer", "blink", "gateway", "warlock gateway", "control shard", "time spiral", "free movement", "raid tools", "raid", "pull timer", "pull", "ready check", "role check", "raid marker", "target marker", "world marker", "flare", "disband", "convert to raid", "countdown", "afk", "away", "afk screen", "idle", "screensaver" }
     -- Terms for features WoW Forever does not have (the Battle Res indicator,
     -- the Macro Factory) are dropped there, so a sidebar search for them does
     -- not list this module; retail keeps the full list.
@@ -2530,6 +2532,9 @@ initFrame:SetScript("OnEvent", function(self)
             end
             if pageName == PAGE_RAIDTOOLS and _G._EUI_BuildRaidToolsPage then
                 return _G._EUI_BuildRaidToolsPage(pageName, parent, yOffset)
+            end
+            if pageName == PAGE_AFK and _G._EUI_BuildAFKPage then
+                return _G._EUI_BuildAFKPage(pageName, parent, yOffset)
             end
         end,
         -- Cached pages are restored WITHOUT a rebuild, so buildPage never runs
@@ -2637,6 +2642,8 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.waypointCmd = nil
             end
             EllesmereUIDB.autoLogging = nil
+            EllesmereUIDB.afkScreen = nil
+            if _G._EUI_ApplyAFKScreen then _G._EUI_ApplyAFKScreen() end
             if _G._EUI_ResetUpgradeCalc then _G._EUI_ResetUpgradeCalc() end
             if _G._EBS_ResetCursor then _G._EBS_ResetCursor() end
             -- Battle Res and Bloodlust do not exist on WoW Forever.
