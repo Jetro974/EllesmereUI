@@ -72,18 +72,26 @@ _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
     row, h = W:DualRow(parent, y,
         Toggle("Level Up", "autoShotLevelUp", true),
         Toggle("Achievement Earned", "autoShotAchievement", true,
-            "Your own achievements only: guild achievements and those already earned on your account are skipped.")
+            "Achievements you earn. Use the cog to also include guild achievements and those already earned on another character.")
     ); y = y - h
     Cog(row._leftRegion, "Level Up", "autoShotLevelUp", true, {
         { type="toggle", label="Max Level Only",
           get=function() return Get("autoShotLevelMaxOnly", false) == true end,
           set=function(v) Set("autoShotLevelMaxOnly", v or nil) end },
     })
+    Cog(row._rightRegion, "Achievement Earned", "autoShotAchievement", true, {
+        { type="toggle", label="Guild Achievements",
+          get=function() return Get("autoShotAchGuild", false) == true end,
+          set=function(v) Set("autoShotAchGuild", v or nil) end },
+        { type="toggle", label="Already Earned on Another Character",
+          get=function() return Get("autoShotAchAccount", false) == true end,
+          set=function(v) Set("autoShotAchAccount", v or nil) end },
+    })
 
     row, h = W:DualRow(parent, y,
         Toggle("Boss Kill", "autoShotBoss", true,
             "Dungeon, raid and other encounter bosses defeated."),
-        Toggle("Death", "autoShotDeath", false)
+        Toggle("Boss Wipe", "autoShotWipe", false, "An encounter that ends without the kill.")
     ); y = y - h
     Cog(row._leftRegion, "Boss Kill", "autoShotBoss", true, {
         { type="toggle", label="First Kill Only (per difficulty)",
@@ -95,7 +103,18 @@ _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
           get=function() return Get("autoShotBossWait", 3) end,
           set=function(v) Set("autoShotBossWait", v) end },
     })
-    Cog(row._rightRegion, "Death", "autoShotDeath", false, {
+    Cog(row._rightRegion, "Boss Wipe", "autoShotWipe", false, {
+        { type="toggle", label="Raids Only",
+          get=function() return Get("autoShotWipeRaidsOnly", true) == true end,
+          set=function(v) Set("autoShotWipeRaidsOnly", v) end },
+    })
+
+    row, h = W:DualRow(parent, y,
+        Toggle("Death", "autoShotDeath", false),
+        Toggle("First Raid Entry", "autoShotRaidEntry", true,
+            "The first time this character enters each raid. Raids visited before you turn this on are not known, so the first visit after you turn this on also counts.")
+    ); y = y - h
+    Cog(row._leftRegion, "Death", "autoShotDeath", false, {
         { type="dropdown", label="Where", values=DEATH_WHERE, order=DEATH_ORDER,
           get=function() return Get("autoShotDeathWhere", "all") end,
           set=function(v) Set("autoShotDeathWhere", v) end },
@@ -115,12 +134,11 @@ _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
     end
 
     row, h = W:DualRow(parent, y,
-        Toggle("First Raid Entry", "autoShotRaidEntry", true,
-            "The first time this character enters each raid. Raids visited before you turn this on are not known, so the first visit after you turn this on also counts."),
         Toggle("Zone Discovery", "autoShotZone", false,
-            "When you discover a new area. Use the cog to pick capitals only, each zone once, or every discovery. Each place counts once per character.")
+            "When you discover a new area. Use the cog to pick capitals only, each zone once, or every discovery. Each place counts once per character."),
+        Toggle("Chat Message", "autoShotChat", true, "Prints a line in chat for each screenshot taken.")
     ); y = y - h
-    Cog(row._rightRegion, "Zone Discovery", "autoShotZone", false, {
+    Cog(row._leftRegion, "Zone Discovery", "autoShotZone", false, {
         { type="dropdown", label="Discoveries", values=ZONE_MODES, order=ZONE_ORDER,
           get=function() return Get("autoShotZoneMode", "capitals") end,
           set=function(v) Set("autoShotZoneMode", v) end },
@@ -129,7 +147,7 @@ _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
     row, h = W:DualRow(parent, y,
         Toggle("Hide Interface", "autoShotHideUI", true,
             "Hides the interface for the screenshot and shows it again right after. In combat the screenshot keeps the interface."),
-        Toggle("Chat Message", "autoShotChat", true, "Prints a line in chat for each screenshot taken.")
+        EllesmereUI.BlankRowCfg()
     ); y = y - h
     Cog(row._leftRegion, "Hide Interface", "autoShotHideUI", true, {
         { type="toggle", label="Caption",

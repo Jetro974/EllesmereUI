@@ -312,6 +312,66 @@ local function LegacyLines(lines, achievementID)
     end
 end
 
+-- key, default once the master is on, events, retail only
+local TRIGGERS = {
+    { "autoShotLevelUp",     true,  { "PLAYER_LEVEL_UP", "TIME_PLAYED_MSG", "PLAYER_LOGOUT" } },
+    { "autoShotAchievement", true,  { "ACHIEVEMENT_EARNED" } },
+    { "autoShotBoss",        true,  { "ENCOUNTER_START", "ENCOUNTER_END" } },
+    { "autoShotWipe",        false, { "ENCOUNTER_START", "ENCOUNTER_END" } },
+    { "autoShotDeath",       false, { "PLAYER_DEAD" } },
+    { "autoShotMythicPlus",  false, { "CHALLENGE_MODE_COMPLETED" }, true },
+    { "autoShotPvP",         false, { "PVP_MATCH_COMPLETE" }, true },
+    { "autoShotRaidEntry",   true,  { "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA" } },
+    { "autoShotZone",        false, { "MAP_EXPLORATION_UPDATED" } },
+}
+
+local BYKEY = {}
+for _, t in ipairs(TRIGGERS) do BYKEY[t[1]] = t end
+
+local function TriggerOn(t)
+    if t[4] and IS_FOREVER then return false end
+    local v = EllesmereUIDB and EllesmereUIDB[t[1]]
+    if v == nil then return t[2] end
+    return v == true
+end
+
+local function ValidEvent(ev)
+    return C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid(ev) or false
+end
+
+-- For events several triggers share: is this one on?
+local function IsOn(key) return Enabled() and TriggerOn(BYKEY[key]) end
+
+-- Time played. Blizzard's chat frame prints every TIME_PLAYED_MSG itself
+-- (ChatFrameMixin:SystemEventHandler, which returns before the message
+-- filters run), so asking for it would always add a chat line. Nothing here
+-- asks: the last report from any /played is kept per character and carried
+-- forward with GetTime() while logged in, the only time played time grows.
+local sessionStart = GetTime()
+local played    -- { t = total, l = at this level, lvl = that level, at = GetTime() }
+
+local function PlayedStore()
+    local db = EllesmereUIDB
+    if not db then return nil end
+    if type(db.autoShotPlayed) ~= "table" then db.autoShotPlayed = {} end
+    return db.autoShotPlayed
+end
+
+local function Played()
+    if played then return played end
+    local store = PlayedStore()
+    local saved = store and store[CharKey()]
+    if type(saved) == "table" and type(saved.t) == "number" then
+        played = { t = saved.t, l = saved.l, lvl = saved.lvl, at = sessionStart }
+    end
+    return played
+end
+
+local function Span(sec)
+    if SecondsToTime then return SecondsToTime(sec, true) end
+    return Clock(sec)
+end
+
 local encounterStart = {}
 
 local HANDLERS = {
@@ -321,26 +381,48 @@ local HANDLERS = {
 
     PLAYER_LEVEL_UP = function(level)
         if not Known(level, "number") then level = nil end
-        if Opt("autoShotLevelMaxOnly") then
-            local max = MaxLevel()
-            if not (level and max and level >= max) then return end
-        end
         local lines = {}
         if level then lines[1] = Big(EllesmereUI.Lf("Level %1$d", level)) end
         local className, class = UnitClass("player")
         local c = EUI.GetClassColor(class)
         lines[#lines + 1] = Colored((UnitRace("player") or "") .. " " .. (className or ""), c.r, c.g, c.b)
+        local p = Played()
+        if p then
+            local now = GetTime()
+            local total = p.t + (now - p.at)
+            if level and p.l and p.lvl == level - 1 then
+                lines[#lines + 1] = Dim(EllesmereUI.Lf("Time at level %1$d: %2$s", level - 1, Span(p.l + now - p.at)))
+            end
+            lines[#lines + 1] = Dim(EllesmereUI.Lf("Total time played: %1$s", Span(total)))
+            played = { t = total, l = 0, lvl = level or UnitLevel("player"), at = now }
+        end
+        if Opt("autoShotLevelMaxOnly") then
+            local max = MaxLevel()
+            if not (level and max and level >= max) then return end
+        end
         -- Forever: leave the level-up toast time to show.
         Request({ label = level and EllesmereUI.Lf("Level %1$d", level) or EllesmereUI.L("Level Up"),
                   minDelay = IS_FOREVER and 1 or nil,
                   card = { title = EllesmereUI.L("Level Up"), lines = lines } })
     end,
 
+    TIME_PLAYED_MSG = function(total, thisLevel)
+        if not Known(total, "number") or not Known(thisLevel, "number") then return end
+        played = { t = total, l = thisLevel, lvl = UnitLevel("player"), at = GetTime() }
+    end,
+
+    PLAYER_LOGOUT = function()
+        local p, store = Played(), PlayedStore()
+        if not (p and store) then return end
+        local since = GetTime() - p.at
+        store[CharKey()] = { t = p.t + since, l = p.l and (p.l + since), lvl = p.lvl }
+    end,
+
     ACHIEVEMENT_EARNED = function(achievementID, alreadyEarned)
-        if not Known(achievementID, "number") or issecretvalue(alreadyEarned)
-           or alreadyEarned or not GetAchievementInfo then return end
+        if not Known(achievementID, "number") or issecretvalue(alreadyEarned) or not GetAchievementInfo then return end
+        if alreadyEarned and not Opt("autoShotAchAccount") then return end
         local _, name, points, _, _, _, _, description, _, icon, _, isGuild = GetAchievementInfo(achievementID)
-        if isGuild then return end
+        if isGuild and not Opt("autoShotAchGuild") then return end
         name = Str(name)
         local lines = { Big(name) }
         lines[#lines + 1] = Dim(Str(description))
@@ -364,13 +446,21 @@ local HANDLERS = {
             started = encounterStart[encounterID]
             encounterStart[encounterID] = nil
         end
-        if issecretvalue(success) or success ~= 1 then return end
-        local firstOnly = On("autoShotBossFirstOnly")
+        if issecretvalue(success) then return end
+        local kill = success == 1
         local known = Known(encounterID, "number") and Known(difficultyID, "number")
-        if known then
-            if SeenKill(difficultyID, encounterID) and firstOnly then return end
-        elseif firstOnly then
-            return
+        if kill then
+            if not IsOn("autoShotBoss") then return end
+            local firstOnly = On("autoShotBossFirstOnly")
+            if known then
+                if SeenKill(difficultyID, encounterID) and firstOnly then return end
+            elseif firstOnly then
+                return
+            end
+        else
+            if not IsOn("autoShotWipe") then return end
+            local _, instanceType = IsInInstance()
+            if On("autoShotWipeRaidsOnly") and instanceType ~= "raid" then return end
         end
         local boss = Str(encounterName)
         local instance = Str((GetInstanceInfo()))
@@ -380,8 +470,9 @@ local HANDLERS = {
         if started then
             lines[#lines + 1] = Dim(EllesmereUI.Lf("Duration: %1$s", Clock(GetTime() - started)))
         end
-        Request({ label = boss or EllesmereUI.L("Boss Kill"), waitCombat = true, roster = true,
-                  card = { title = EllesmereUI.L("Boss Kill"), lines = lines } })
+        local title = kill and EllesmereUI.L("Boss Kill") or EllesmereUI.L("Boss Wipe")
+        Request({ label = boss or title, waitCombat = true, roster = true,
+                  card = { title = title, lines = lines } })
     end,
 
     PLAYER_DEAD = function()
@@ -447,29 +538,6 @@ local HANDLERS = {
                   card = { title = EllesmereUI.L("PvP Victory"), lines = lines } })
     end,
 }
-
--- key, default once the master is on, events, retail only
-local TRIGGERS = {
-    { "autoShotLevelUp",     true,  { "PLAYER_LEVEL_UP" } },
-    { "autoShotAchievement", true,  { "ACHIEVEMENT_EARNED" } },
-    { "autoShotBoss",        true,  { "ENCOUNTER_START", "ENCOUNTER_END" } },
-    { "autoShotDeath",       false, { "PLAYER_DEAD" } },
-    { "autoShotMythicPlus",  false, { "CHALLENGE_MODE_COMPLETED" }, true },
-    { "autoShotPvP",         false, { "PVP_MATCH_COMPLETE" }, true },
-    { "autoShotRaidEntry",   true,  { "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA" } },
-    { "autoShotZone",        false, { "MAP_EXPLORATION_UPDATED" } },
-}
-
-local function TriggerOn(t)
-    if t[4] and IS_FOREVER then return false end
-    local v = EllesmereUIDB and EllesmereUIDB[t[1]]
-    if v == nil then return t[2] end
-    return v == true
-end
-
-local function ValidEvent(ev)
-    return C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid(ev) or false
-end
 
 -------------------------------------------------------------------------------
 --  Enable / disable: events only while the master and that trigger are on.
