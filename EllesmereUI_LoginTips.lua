@@ -3,10 +3,9 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  EllesmereUI_LoginTips.lua
 --
 --  EUI Tips: one short chat line at login pointing at a feature the user has
---  never used, with a [Show Me] link that opens it. Never a popup: the login
---  popups (first install, style picker, announcements, conflict check) keep
---  the screen to themselves, and a tip only prints on a login none of them
---  claimed.
+--  never used, with a [Show Me] link that opens it. Never a popup: a chat
+--  line cannot collide with the login popups, so only the install sessions
+--  (module picker, then style picker) stay tip-free.
 --
 --  API (EllesmereUI.LoginTips):
 --    Register(id, def) -- def = {
@@ -16,8 +15,11 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --        unused  = function() return true end          (true = still worth telling),
 --        show    = function() ... end                  (the [Show Me] action),
 --      }
---    MarkUsed(key)     -- feature used; tips that check UsedKey(key) stand down
 --    ShowNext(force)   -- print the next eligible tip (force skips login gates)
+--
+--  "Unused" is read from saved settings only (a feature that is still off);
+--  nothing is tracked or hooked. A tip with no setting to read (a slash
+--  command) simply shows once.
 --
 --  MODES: WoW Forever (EllesmereUI.IS_FOREVER) and retail are told apart for
 --  every tip, never mixed: Forever runs a different module set (no Mythic+
@@ -26,16 +28,13 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --
 --  When a tip prints (all must hold):
 --    * a real login (isInitialLogin), never a /reload;
---    * at least MIN_LOGINS logins counted, so a new user's first sessions
---      stay quiet (the counter starts at this build, so upgrades wait too);
---    * no login popup pending (the _*Pending flags the conflict check reads);
+--    * not an install session (first-install or style picker pending);
 --    * out of combat and outside instances;
 --    * the user has not turned tips off (EllesmereUIDB.loginTips ~= false).
 --  One tip per login at most. A printed tip is stamped seen and never repeats;
 --  /euitips reset clears that.
 --
---  State (per account): EllesmereUIDB.loginTipsState = {
---    logins = n, seen = { [id] = true }, used = { [key] = true } }
+--  State (per account): EllesmereUIDB.loginTipsState = { seen = { [id] = true } }
 -------------------------------------------------------------------------------
 
 local EllesmereUI = _G.EllesmereUI
@@ -46,8 +45,7 @@ local EUI_HOST_ADDON = ...
 local IS_STANDALONE = type(EUI_HOST_ADDON) == "string" and EUI_HOST_ADDON:find("Standalone") ~= nil
 if IS_STANDALONE then return end
 
-local MIN_LOGINS = 3
-local PRINT_DELAY = 8       -- seconds after login: lets the login popups claim the screen first
+local PRINT_DELAY = 8       -- seconds after login: lets the login burst of chat lines settle
 local LINK_PREFIX = "addon:EllesmereUI:tip:"
 
 local tips, order = {}, {}
@@ -60,8 +58,6 @@ local function State()
         EllesmereUIDB.loginTipsState = s
     end
     s.seen = s.seen or {}
-    s.used = s.used or {}
-    s.logins = s.logins or 0
     return s
 end
 
@@ -77,14 +73,10 @@ local function AddonLoaded(folder)
     return C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded(folder) and true or false
 end
 
-local function UsedKey(key)
-    local s = State()
-    return s and s.used[key] == true or false
-end
-
-local function MarkUsed(key)
-    local s = State()
-    if s then s.used[key] = true end
+-- A module's live profile table (defaults merged at load), or {} when absent.
+local function ModuleProfile(folder)
+    local prof = EllesmereUI.GetActiveProfileData()
+    return prof and type(prof.addons) == "table" and prof.addons[folder] or {}
 end
 
 -- A tip is eligible when it belongs to the current mode, its module is
@@ -107,12 +99,10 @@ local function NextTip()
     return nil
 end
 
-local function LoginPopupPending()
+-- The two install sessions: the module picker, then the style picker on the
+-- next login. A brand-new user meets the suite there, not in tips.
+local function InstallSession()
     return EllesmereUI._firstInstallPending or EllesmereUI._styleChoicePending
-        or EllesmereUI._raidFramesIntroPending or EllesmereUI._patchNotesIntroPending
-        or EllesmereUI._windowSkinsIntroPending or EllesmereUI._specOvIntroPending
-        or EllesmereUI._ptrManagersIntroPending or EllesmereUI._launchVideoIntroPending
-        or EllesmereUI._styleLaunchIntroPending
         or (EllesmereUIDB and EllesmereUIDB.styleChoicePending)
 end
 
@@ -166,37 +156,14 @@ end)
 -------------------------------------------------------------------------------
 --  Login driver
 -------------------------------------------------------------------------------
--- Slash commands whose first use means the matching feature is known.
--- Hooked at PLAYER_ENTERING_WORLD: child modules register some of these
--- from their own login handlers.
-local USAGE_SLASH = {
-    EABQUICKKEYBIND = "kb",
-    EUIUNLOCK       = "unlock",
-    EUIMPLUS        = "runSummary",
-}
-
-local function HookUsage()
-    for cmd, key in pairs(USAGE_SLASH) do
-        if SlashCmdList[cmd] then
-            hooksecurefunc(SlashCmdList, cmd, function() MarkUsed(key) end)
-        end
-    end
-end
-
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("PLAYER_ENTERING_WORLD")
 loader:SetScript("OnEvent", function(self, _, isInitialLogin, isReloadingUi)
     self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-    HookUsage()
     if not isInitialLogin or isReloadingUi then return end
-    local s = State()
-    if not s then return end
-    s.logins = s.logins + 1
-    if s.logins <= MIN_LOGINS or not Enabled() then return end
-    -- A login that opened with a popup pending belongs to that popup.
-    if LoginPopupPending() then return end
+    if not Enabled() or InstallSession() then return end
     C_Timer.After(PRINT_DELAY, function()
-        if LoginPopupPending() or InCombatLockdown() or IsInInstance() then return end
+        if InCombatLockdown() or IsInInstance() then return end
         ShowNext(false)
     end)
 end)
@@ -211,7 +178,7 @@ SlashCmdList.EUITIPS = function(msg)
     local cmd = (msg or ""):lower():match("^%s*(.-)%s*$")
     C_Timer.After(0, function()
         local BRAND = EllesmereUI.COLOR_CODES.BRAND .. "EllesmereUI:|r "
-            if cmd == "on" or cmd == "off" then
+        if cmd == "on" or cmd == "off" then
             if EllesmereUIDB then EllesmereUIDB.loginTips = (cmd == "on") end
             EllesmereUI.Print(BRAND .. (cmd == "on" and EllesmereUI.L("Login tips turned on.")
                 or EllesmereUI.L("Login tips turned off. Type /euitips on to turn them back on.")))
@@ -230,7 +197,6 @@ EllesmereUI.LoginTips = {
         if not tips[id] then order[#order + 1] = id end
         tips[id] = def
     end,
-    MarkUsed = MarkUsed,
     ShowNext = ShowNext,
 }
 
@@ -259,10 +225,10 @@ Register("unlock_mode", {
         return EllesmereUI.L("Type /unlock to drag, anchor and size-match any EllesmereUI element.")
     end,
     unused = function()
-        return not (EllesmereUIDB and EllesmereUIDB.unlockTipSeen) and not UsedKey("unlock")
+        -- Stamped by Unlock Mode's own how-to tip on its first open.
+        return not (EllesmereUIDB and EllesmereUIDB.unlockTipSeen)
     end,
     show = function()
-        MarkUsed("unlock")
         SlashCmdList.EUIUNLOCK()
     end,
 })
@@ -272,9 +238,8 @@ Register("quick_keybind", {
     text = function()
         return EllesmereUI.L("Type /kb to bind keys by hovering an action button and pressing a key.")
     end,
-    unused = function() return not UsedKey("kb") end,
+    unused = function() return true end,   -- nothing to read: shows once
     show = function()
-        MarkUsed("kb")
         SlashCmdList.EABQUICKKEYBIND()
     end,
 })
@@ -309,15 +274,16 @@ Register("run_summary", {
     modes = RETAIL,
     addon = "EllesmereUIMythicTimer",
     text = function()
-        return EllesmereUI.L("After a Mythic+ key, /ov opens a full run summary of your group.")
+        return EllesmereUI.L("Turn on Run Summary for a full recap of your group after each Mythic+ key (/ov).")
     end,
     unused = function()
         local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion()
         if maxLevel and UnitLevel("player") < maxLevel then return false end
-        return not UsedKey("runSummary")
+        -- Off by default; /ov only answers once it is on.
+        local rs = ModuleProfile("EllesmereUIMythicTimer").runSummary
+        return not (rs and rs.enabled == true)
     end,
     show = function()
-        MarkUsed("runSummary")
         EllesmereUI:NavigateToElementSettings("EllesmereUIMythicTimer", "Run Summary")
     end,
 })
