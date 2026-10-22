@@ -333,6 +333,8 @@ local TRIGGERS = {
     { "autoShotRecipe",      false, { "NEW_RECIPE_LEARNED" } },
     { "autoShotDecor",       false, { "NEW_HOUSING_ITEM_ACQUIRED" } },
     { "autoShotLoot",        false, { IS_FOREVER and "CHAT_MSG_LOOT" or "SHOW_LOOT_TOAST" } },
+    { "autoShotLogin",       false, { "PLAYER_ENTERING_WORLD" } },
+    { "autoShotInterval",    false, {} },
 }
 
 local BYKEY = {}
@@ -476,8 +478,17 @@ end
 local encounterStart = {}
 
 local HANDLERS = {
-    PLAYER_ENTERING_WORLD   = RaidEntry,
     ZONE_CHANGED_NEW_AREA   = RaidEntry,
+
+    -- Shared by First Raid Entry and Login (the session's first load only).
+    PLAYER_ENTERING_WORLD = function(isInitialLogin)
+        if IsOn("autoShotRaidEntry") then RaidEntry() end
+        if isInitialLogin == true and IsOn("autoShotLogin") then
+            Request({ label = EllesmereUI.L("Login"), minDelay = 5,
+                      card = { title = EllesmereUI.L("Login"),
+                               lines = { Dim(EllesmereUI.Lf("Level %1$d", UnitLevel("player"))) } } })
+        end
+    end,
     MAP_EXPLORATION_UPDATED = Discovery,
 
     PLAYER_LEVEL_UP = function(level)
@@ -755,6 +766,26 @@ end)
 local registered = {}
 local slashDone = false
 
+-- Interval screenshots: a ticker only while that trigger is on. A tick is
+-- skipped in combat, while dead, AFK or in a cinematic, or behind a capture.
+local ticker, tickerMins
+local function IntervalTick()
+    if busy or #queue > 0 or InCombatLockdown() or UnitIsDeadOrGhost("player") or UnitIsAFK("player") then return end
+    if (InCinematic and InCinematic()) or (IsInCinematicScene and IsInCinematicScene())
+       or (MovieFrame and MovieFrame:IsShown()) then return end
+    Request({ label = EllesmereUI.L("Interval Screenshot"),
+              card = { title = EllesmereUI.L("Interval Screenshot"), lines = {} } })
+end
+
+local function SyncInterval(want)
+    local mins = Num("autoShotIntervalMin", 30)
+    if want and ticker and tickerMins == mins then return end
+    if ticker then ticker:Cancel(); ticker = nil end
+    if want then
+        ticker, tickerMins = C_Timer.NewTicker(mins * 60, IntervalTick), mins
+    end
+end
+
 local wanted = {}
 
 local function Sync()
@@ -775,6 +806,7 @@ local function Sync()
         end
     end
     if not registered.ENCOUNTER_END then wipe(encounterStart) end
+    SyncInterval(master and TriggerOn(BYKEY.autoShotInterval))
     if master and not slashDone then
         slashDone = true
         SLASH_EUISHOT1 = "/euishot"

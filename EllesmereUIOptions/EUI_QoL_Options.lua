@@ -2651,7 +2651,8 @@ initFrame:SetScript("OnEvent", function(self)
                     "autoShotDeathWhere", "autoShotMythicPlus", "autoShotMythicPlusTimed",
                     "autoShotPvP", "autoShotWorldBoss", "autoShotTravel", "autoShotRep", "autoShotRepMaxOnly",
                     "autoShotDuel", "autoShotMount", "autoShotPet", "autoShotToy", "autoShotRecipe", "autoShotDecor",
-                    "autoShotLoot", "autoShotLootQuality", "autoShotLootMoney", "autoShotRaidEntry", "autoShotZone", "autoShotZoneMode", "autoShotHideUI", "autoShotCaption", "autoShotRoster", "autoShotChat" }) do
+                    "autoShotLoot", "autoShotLootQuality", "autoShotLootMoney", "autoShotLogin",
+                    "autoShotInterval", "autoShotIntervalMin", "autoShotRaidEntry", "autoShotZone", "autoShotZoneMode", "autoShotHideUI", "autoShotCaption", "autoShotRoster", "autoShotChat" }) do
                     EllesmereUIDB[k] = nil
                 end
             end

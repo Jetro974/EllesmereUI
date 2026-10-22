@@ -167,6 +167,14 @@ local function Slots()
     end
     add(Toggle("Duel", "autoShotDuel", false,
             "A duel you fought. No API tells the winner, so every duel counts; a declined request does not."))
+    add(Toggle("Login", "autoShotLogin", false, "Once per session, after the first loading screen."))
+    add(Toggle("Interval Screenshots", "autoShotInterval", false,
+            "Every few minutes, out of combat only. Skipped while dead, AFK or in a cinematic."),
+        CogRow("Interval Screenshots", "autoShotInterval", false, {
+            { type="slider", label="Every (min)", min=5, max=120, step=5,
+              get=function() return Get("autoShotIntervalMin", 30) end,
+              set=function(v) Set("autoShotIntervalMin", v) end },
+        }))
     add(Toggle("Hide Interface", "autoShotHideUI", true,
             "Hides the interface for the screenshot and shows it again right after. In combat the screenshot keeps the interface."),
         CogRow("Hide Interface", "autoShotHideUI", true, {
