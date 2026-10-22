@@ -255,6 +255,13 @@ local function FishSlots()
         }))
     add(Placeholder("Professions", "Which professions count for Profession Milestones."),
         CheckboxDropdown(PROF_KINDS, true, "autoShotProf"))
+    add(Toggle("First Gather", "autoShotGather", false,
+            "The first time this character loots each kind of herb, ore or stone, or leather."),
+        CogRow("First Gather", "autoShotGather", false, {
+            { type="toggle", label="Rare and Better Only",
+              get=function() return Get("autoShotGatherRare", false) == true end,
+              set=function(v) Set("autoShotGatherRare", v or nil) end },
+        }))
     return list
 end
 

@@ -375,6 +375,7 @@ local TRIGGERS = {
     { "autoShotLoot",        false, { IS_FOREVER and "CHAT_MSG_LOOT" or "SHOW_LOOT_TOAST" } },
     { "autoShotLogin",       false, { "PLAYER_ENTERING_WORLD" } },
     { "autoShotProf",        false, { "SKILL_LINES_CHANGED" } },
+    { "autoShotGather",      false, { "CHAT_MSG_LOOT" } },
     { "autoShotInterval",    false, {} },
 }
 
@@ -470,20 +471,15 @@ local function Collected(title, name, icon)
               card = { title = title, icon = not issecretvalue(icon) and icon or nil, lines = { Big(name) } } })
 end
 
--- Loot at or above the picked quality (default Epic), once its data is in.
-local function LootShot(link, quantity)
+-- fn(name, quality, icon, r, g, b) once the item's data is in.
+local function WithItem(link, fn)
     if not (C_Item and C_Item.GetItemInfo) then return end
     local function go()
         local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(link)
-        local min = tonumber(EllesmereUIDB and EllesmereUIDB.autoShotLootQuality) or 4
-        if not Known(quality, "number") or quality < min then return end
         name = Str(name)
-        if not name then return end
+        if not (name and Known(quality, "number")) then return end
         local r, g, b = C_Item.GetItemQualityColor(quality)
-        local text = name
-        if Known(quantity, "number") and quantity > 1 then text = text .. " x" .. quantity end
-        Request({ label = name, card = { title = EllesmereUI.L("Special Loot"), icon = icon,
-                                         lines = { { text, r or 1, g or 1, b or 1, true } } } })
+        fn(name, quality, icon, r or 1, g or 1, b or 1)
     end
     if C_Item.GetItemInfo(link) then
         go()
@@ -492,7 +488,49 @@ local function LootShot(link, quantity)
     end
 end
 
--- Forever: the player's own loot lines, matched against the client's
+-- Loot at or above the picked quality (default Epic).
+local function LootShot(link, quantity)
+    WithItem(link, function(name, quality, icon, r, g, b)
+        local min = tonumber(EllesmereUIDB and EllesmereUIDB.autoShotLootQuality) or 4
+        if quality < min then return end
+        local text = name
+        if Known(quantity, "number") and quantity > 1 then text = text .. " x" .. quantity end
+        Request({ label = name, card = { title = EllesmereUI.L("Special Loot"), icon = icon,
+                                         lines = { { text, r, g, b, true } } } })
+    end)
+end
+
+-- First Gather: a herb, ore or stone, or leather (Trade Goods subclasses 9, 7
+-- and 6, wago.tools ItemSubClass) this character never looted before. What
+-- one loot brings in is gathered for a second into one shot.
+local GATHER_SUBCLASS = { [6] = true, [7] = true, [9] = true }
+local gatherPending
+
+local function FlushGather()
+    local list = gatherPending
+    gatherPending = nil
+    if not list or #list == 0 then return end
+    Request({ label = list[1][1], card = { title = EllesmereUI.L("First Gather"), icon = list[1].icon, lines = list } })
+end
+
+local function GatherCheck(link)
+    if not (C_Item and C_Item.GetItemInfoInstant) then return end
+    local itemID, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(link)
+    if not Known(itemID, "number") or classID ~= 7 or not GATHER_SUBCLASS[subclassID] then return end
+    local seen = CharTable("autoShotGathered")
+    if not seen or seen[itemID] then return end
+    seen[itemID] = true
+    WithItem(link, function(name, quality, icon, r, g, b)
+        if Opt("autoShotGatherRare") and quality < 3 then return end
+        if not gatherPending then
+            gatherPending = {}
+            C_Timer.After(1, FlushGather)
+        end
+        gatherPending[#gatherPending + 1] = { name, r, g, b, true, icon = icon }
+    end)
+end
+
+-- The player's own loot lines, matched against the client's
 -- localized formats (the multiple-item one first: the single one matches
 -- its lines too). Built on first use.
 local lootPatterns
@@ -849,11 +887,13 @@ local HANDLERS = {
 
     SKILL_LINES_CHANGED = ScanProfessions,
 
-    -- Forever: the player's own loot lines.
+    -- The player's own loot lines: Special Loot on Forever, First Gather.
     CHAT_MSG_LOOT = function(text)
         if not Known(text, "string") then return end
         local link, count = OwnLootLink(text)
-        if link and link:find("|Hitem:", 1, true) then LootShot(link, count) end
+        if not (link and link:find("|Hitem:", 1, true)) then return end
+        if IS_FOREVER and IsOn("autoShotLoot") then LootShot(link, count) end
+        if IsOn("autoShotGather") then GatherCheck(link) end
     end,
 }
 
