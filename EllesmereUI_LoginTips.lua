@@ -30,7 +30,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --    * a real login (isInitialLogin), never a /reload;
 --    * not an install session (first-install or style picker pending);
 --    * out of combat and outside instances;
---    * the user has not turned tips off (EllesmereUIDB.loginTips ~= false).
+--    * the user turned tips on (EllesmereUIDB.loginTips == true; off by default).
 --  One tip per login at most. A printed tip is stamped seen and never repeats;
 --  /euitips reset clears that.
 --
@@ -66,7 +66,7 @@ local function CurrentMode()
 end
 
 local function Enabled()
-    return not (EllesmereUIDB and EllesmereUIDB.loginTips == false)
+    return EllesmereUIDB and EllesmereUIDB.loginTips == true or false
 end
 
 local function AddonLoaded(folder)
