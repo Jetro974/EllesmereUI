@@ -79,6 +79,8 @@ local function Shoot(job)
     shotID = shotID + 1
     local id = shotID
     inFlight = job
+    -- Scheduled first: the UI comes back even if anything below fails.
+    C_Timer.After(FAILSAFE, function() Finish(id, false) end)
     -- Out of combat only, even though SetAlpha is not a protected call.
     if not combat and (job.clean or On("autoShotHideUI")) then
         savedAlpha = UIParent:GetAlpha()
@@ -96,7 +98,6 @@ local function Shoot(job)
         EUI._autoShotResult = function(event) Finish(id, event == "SCREENSHOT_SUCCEEDED") end
         Screenshot()
     end)
-    C_Timer.After(FAILSAFE, function() Finish(id, false) end)
 end
 
 local function AfterDelay(job)
