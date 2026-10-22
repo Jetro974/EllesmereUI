@@ -7938,16 +7938,19 @@ end
 -- An item the player already has: its tooltip reads "Already known" (recipe,
 -- mount, toy...) or "Collected (x/y)" (a companion pet already in the
 -- journal). Cached per merchant index until the merchant's goods change.
-local PET_COLLECTED = "^" .. ITEM_PET_KNOWN:gsub("[%(%)%.%-%+%[%]]", "%%%0"):gsub("%%d", "%%d+") .. "$"
+-- Both globals and the tooltip API are guarded: a client missing one (WoW
+-- Forever's vanilla content) only loses that test, never the file.
+local PET_COLLECTED = ITEM_PET_KNOWN
+    and "^" .. ITEM_PET_KNOWN:gsub("[%(%)%.%-%+%[%]]", "%%%0"):gsub("%%d", "%%d+") .. "$"
 local knownCache = {}
 local function MerchantItemKnown(index)
     local known = knownCache[index]
     if known ~= nil then return known end
     known = false
-    local tip = C_TooltipInfo.GetMerchantItem(index)
+    local tip = C_TooltipInfo and C_TooltipInfo.GetMerchantItem and C_TooltipInfo.GetMerchantItem(index)
     for _, line in ipairs(tip and tip.lines or {}) do
         local text = line.leftText
-        if text == ITEM_SPELL_KNOWN or (text and text:find(PET_COLLECTED)) then
+        if text and (text == ITEM_SPELL_KNOWN or (PET_COLLECTED and text:find(PET_COLLECTED))) then
             known = true
             break
         end
@@ -8018,7 +8021,7 @@ local function WideFillMerchant(tile, slot, index)
     end
     MerchantFrameItem_UpdateQuality(tile, btn.link)
     local itemID = GetMerchantItemID(index)
-    local isHeirloom = itemID and C_Heirloom.IsItemHeirloom(itemID)
+    local isHeirloom = itemID and C_Heirloom and C_Heirloom.IsItemHeirloom(itemID)
     local knownHeirloom = isHeirloom and C_Heirloom.PlayerHasHeirloom(itemID)
     btn.showNonrefundablePrompt = not C_MerchantFrame.IsMerchantItemRefundable(index)
     -- An owned item (Flag/Hide Owned Items) reads red like one the player cannot use.
@@ -8131,9 +8134,16 @@ local function UpdateWideMerchant()
     if mark then SyncKnownButton(numKnown) end
 end
 
+-- A redraw of ours (page, owned items shown or hidden) moves items onto other
+-- tiles without a MerchantFrame_Update, so the item levels follow here.
+local function RedrawWideMerchant()
+    UpdateWideMerchant()
+    if EllesmereUI._Merchant_RefreshItemLevels then EllesmereUI._Merchant_RefreshItemLevels() end
+end
+
 local function WideTurnPage(delta)
     wide.page = wide.page + delta
-    UpdateWideMerchant()
+    RedrawWideMerchant()
 end
 
 -- A page arrow: the reskin's flat button, else Blizzard's own page art.
@@ -8197,7 +8207,7 @@ local function BuildWideMerchant(f)
     end
     known:SetScript("OnClick", function(self)
         EllesmereUIDB.merchantHideKnown = not EllesmereUIDB.merchantHideKnown
-        UpdateWideMerchant()
+        RedrawWideMerchant()
     end)
     known:SetScript("OnEnter", function(self)
         EllesmereUI.ShowWidgetTooltip(self, EllesmereUI.L("Items you already know, have learned or have collected (recipes, mounts, pets, toys...) are tinted red. Click to hide them from the list, or to show them again."))
@@ -8212,7 +8222,7 @@ end
 -- tab, purchases). Nothing is registered while the setting is off.
 -- Options entry point: Flag/Hide Owned Items applies to an open window at once.
 EllesmereUI._Merchant_RefreshWide = function()
-    if wide.built and _G.MerchantFrame:IsVisible() then UpdateWideMerchant() end
+    if wide.built and _G.MerchantFrame:IsVisible() then RedrawWideMerchant() end
 end
 
 local wideDriver = CreateFrame("Frame")
@@ -8223,6 +8233,9 @@ wideDriver:SetScript("OnEvent", function(self, event)
         -- Show As List wins, but it only runs while the merchant reskin is on.
         if not EllesmereUIDB.merchantWide
             or (EllesmereUIDB.merchantShowAsList and WideThemed()) then return end
+        -- WoW Forever's Gamepad style drives the merchant window from secure
+        -- code: like the skins, the wide window stands down for the session.
+        if EllesmereUI.BlizzSkinPadStandDown and EllesmereUI.BlizzSkinPadStandDown() then return end
         self:RegisterEvent("MERCHANT_SHOW")
         self:RegisterEvent("MERCHANT_UPDATE")
         hooksecurefunc("MerchantFrame_Update", function()
@@ -8371,10 +8384,12 @@ local function UpdateMerchantItemLevels()
     local show = EllesmereUIDB and EllesmereUIDB.merchantShowItemLevel == true
     local onSellTab = (f.selectedTab or 1) == 1
     local numItems
-    -- The wide merchant's tiles (only once built: the toggle needs a reload).
-    local isWide = not EllesmereUIDB.merchantShowAsList and EllesmereUIDB.merchantWide
-        and _G.EUI_MerchantWideItem1 ~= nil
-    if EllesmereUIDB.merchantShowAsList then
+    -- Whichever grid actually runs this session: the list only exists under the
+    -- reskin, and the wide tiles once built (under any style), so the saved
+    -- toggles alone can name a grid that is not there.
+    local isList = EllesmereUIDB.merchantShowAsList and f.wSkinScrollFrame ~= nil
+    local isWide = not isList and _G.EUI_MerchantWideItem1 ~= nil
+    if isList then
         -- GetNumBuybackItems is irrelevant: text only shows on the sell tab.
         numItems = GetMerchantNumItems()
     elseif isWide then
@@ -8385,7 +8400,7 @@ local function UpdateMerchantItemLevels()
     local render = show and onSellTab and f:IsVisible()
     for i = 1, numItems do
         local btn
-        if EllesmereUIDB.merchantShowAsList then
+        if isList then
             btn = _G["EUI_MerchantItem" .. i .. "ItemButton"]
         elseif isWide then
             btn = _G["EUI_MerchantWideItem" .. i .. "ItemButton"]
@@ -8402,7 +8417,7 @@ local function UpdateMerchantItemLevels()
             else
                 if not fs then
                     fs = btn:CreateFontString(nil, "OVERLAY", nil, 7)
-                    if EllesmereUIDB.merchantShowAsList then
+                    if isList then
                         fs:SetPoint("TOPLEFT", _G["EUI_MerchantItem" .. i .. "SlotTexture"], "TOPLEFT", 1, -1)
                     else
                         fs:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)

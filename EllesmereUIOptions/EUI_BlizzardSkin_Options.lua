@@ -1787,6 +1787,21 @@ initFrame:SetScript("OnEvent", function(self)
 
         _, h = WSCardSection(parent, "MERCHANT OPTIONS", y);  y = y - h
 
+        -- Show As List runs only under the merchant reskin, as the window
+        -- resolves its style (the master kill switch and WoW Forever's gamepad
+        -- stand-down turn it off too, not only the card's own toggle).
+        local function merchantListRuns()
+            if not (EllesmereUIDB and EllesmereUIDB.merchantShowAsList == true) then return false end
+            local style = EllesmereUI.GetBlizzWindowStyle and EllesmereUI.GetBlizzWindowStyle("merchant")
+            if style then return style ~= "off" end
+            return not themedOff()
+        end
+        -- The wide window runs under any style, but not under the gamepad stand-down.
+        local function merchantWideRuns()
+            if not (EllesmereUIDB and EllesmereUIDB.merchantWide == true) or merchantListRuns() then return false end
+            return not (EllesmereUI.BlizzSkinPadStandDown and EllesmereUI.BlizzSkinPadStandDown())
+        end
+
         local function merchantShowAsListOff()
             return EllesmereUIDB and EllesmereUIDB.merchantShowAsList == false
         end
@@ -1856,9 +1871,7 @@ initFrame:SetScript("OnEvent", function(self)
             { type="toggle", text="Wide Window",
               tooltip="Doubles the merchant window's width to show 20 items per page.",
               -- Locked only while Show As List actually runs (it needs the reskin).
-              disabled=function()
-                  return EllesmereUIDB and EllesmereUIDB.merchantShowAsList == true and not themedOff()
-              end,
+              disabled=merchantListRuns,
               disabledTooltip="Show As List", requireState="disabled",
               getValue=function()
                   return EllesmereUIDB and EllesmereUIDB.merchantWide == true
@@ -1882,7 +1895,7 @@ initFrame:SetScript("OnEvent", function(self)
               end },
             { type="toggle", text="Flag/Hide Owned Items",
               tooltip="In the wide window, tints red the items you already know, have learned or have collected (recipes, mounts, pets, toys...), and adds a button at the top right that hides them.",
-              disabled=function() return not (EllesmereUIDB and EllesmereUIDB.merchantWide == true) end,
+              disabled=function() return not merchantWideRuns() end,
               disabledTooltip="Wide Window",
               getValue=function()
                   return EllesmereUIDB and EllesmereUIDB.merchantMarkOwned == true
