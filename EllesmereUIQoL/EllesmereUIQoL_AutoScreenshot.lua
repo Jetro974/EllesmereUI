@@ -258,8 +258,9 @@ local function RaidEntry()
                        lines = { Big(name), Dim(Str(difficultyName)) } } })
 end
 
--- MAP_EXPLORATION_UPDATED has no payload: the player's map tells the place.
-local function Discovery()
+-- The player's map and, walking up the map tree, the zone, a capital and
+-- the continent around it.
+local function ZoneOf()
     local mapID = C_Map.GetBestMapForUnit("player")
     if not Known(mapID, "number") then return end
     local zoneID, zoneName, capital, continent
@@ -273,6 +274,13 @@ local function Discovery()
         id = info.parentMapID
         if not Known(id, "number") or id == 0 then break end
     end
+    return mapID, zoneID, zoneName, capital, continent
+end
+
+-- MAP_EXPLORATION_UPDATED has no payload: the player's map tells the place.
+local function Discovery()
+    local mapID, zoneID, zoneName, capital, continent = ZoneOf()
+    if not mapID then return end
     local mode = EllesmereUIDB and EllesmereUIDB.autoShotZoneMode or "capitals"
     local key
     if mode == "all" then
@@ -376,6 +384,9 @@ local TRIGGERS = {
     { "autoShotLogin",       false, { "PLAYER_ENTERING_WORLD" } },
     { "autoShotProf",        false, { "SKILL_LINES_CHANGED" } },
     { "autoShotGather",      false, { "CHAT_MSG_LOOT" } },
+    { "autoShotBigCatch",    false, { "LOOT_OPENED" } },
+    { "autoShotFirstCatch",  false, { "LOOT_OPENED" } },
+    { "autoShotContest",     false, { "QUEST_TURNED_IN" }, true },
     { "autoShotInterval",    false, {} },
 }
 
@@ -611,6 +622,77 @@ local function ScanProfessions()
             end
         end
     end
+end
+
+-------------------------------------------------------------------------------
+--  Fishing: fishing loot windows (IsFishingLoot at LOOT_OPENED, as
+--  Blizzard's LootFrame tells them apart).
+-------------------------------------------------------------------------------
+-- Retail: Old Ironjaw and Old Crafty (wago.tools ItemSparse) count as a Big
+-- Catch whatever their quality. Not in the WoW Forever item table.
+local NAMED_FISH = IS_FOREVER and {} or { [34484] = true, [34486] = true }
+-- Retail fishing contest quests (wago.tools QuestV2CliTask): Stranglethorn
+-- Fishing Extravaganza and the Hallowfall Fishing Derby.
+local CONTESTS = IS_FOREVER and {} or {
+    [44765] = true, [82778] = true, [83529] = true, [83530] = true, [83531] = true, [83532] = true,
+}
+local catches = 0   -- fishing loot windows this session, while a fishing trigger is on
+
+local function FishingSkill()
+    if not (GetProfessions and GetProfessionInfo) then return end
+    local fishing = select(4, GetProfessions())
+    if not Known(fishing, "number") then return end
+    local _, _, rank, _, _, _, _, modifier = GetProfessionInfo(fishing)
+    if not Known(rank, "number") then return end
+    return rank + (Known(modifier, "number") and modifier or 0)
+end
+
+local function FishingLoot()
+    if not (IsFishingLoot and IsFishingLoot()) then return end
+    catches = catches + 1
+    local big, firstOn = IsOn("autoShotBigCatch"), IsOn("autoShotFirstCatch")
+    local best, named
+    for i = 1, GetNumLootItems() do
+        local icon, name, _, _, quality = GetLootSlotInfo(i)
+        name = Str(name)
+        if name and Known(quality, "number") then
+            local slot = { name = name, icon = icon, q = quality }
+            if not best or quality > best.q then best = slot end
+            local link = GetLootSlotLink(i)
+            local itemID = Known(link, "string") and C_Item.GetItemInfoInstant(link)
+            if Known(itemID, "number") and NAMED_FISH[itemID] then named = slot end
+        end
+    end
+    local _, zoneID = ZoneOf()
+    local zoneKey = zoneID or Str(GetRealZoneText())
+    local first = false
+    if firstOn and zoneKey then
+        local zones = CharTable("autoShotFishZones")
+        if zones and not zones[zoneKey] then
+            zones[zoneKey] = true
+            first = true
+        end
+    end
+    local min = tonumber(EllesmereUIDB and EllesmereUIDB.autoShotFishQuality) or 3
+    local isBig = big and (named or (best and best.q >= min))
+    if not (isBig or first) then return end
+    local catch = named or best
+    local lines = {}
+    if catch then
+        local r, g, b = C_Item.GetItemQualityColor(catch.q)
+        lines[1] = { catch.name, r or 1, g or 1, b or 1, true }
+    end
+    if isBig and first then lines[#lines + 1] = Colored(EllesmereUI.L("First catch in this zone"), 0.3, 1, 0.3) end
+    -- Forever: the zone's fishing skill from Show Zone Levels' data.
+    local zl = EUI._ZoneLevels
+    local need = zoneID and zl and zl.Fishing and zl.Fishing(zoneID)
+    if need then lines[#lines + 1] = Dim(EllesmereUI.Lf("Zone fishing skill: %1$d", math.max(need, 1))) end
+    local skill = FishingSkill()
+    if skill then lines[#lines + 1] = Dim(EllesmereUI.Lf("Your fishing skill: %1$d", skill)) end
+    lines[#lines + 1] = Dim(EllesmereUI.Lf("Catches this session: %1$d", catches))
+    local title = isBig and EllesmereUI.L("Big Catch") or EllesmereUI.L("First Catch in a Zone")
+    Request({ label = catch and catch.name or title,
+              card = { title = title, icon = catch and catch.icon, lines = lines } })
 end
 
 local encounterStart = {}
@@ -886,6 +968,15 @@ local HANDLERS = {
     end,
 
     SKILL_LINES_CHANGED = ScanProfessions,
+    LOOT_OPENED = FishingLoot,
+
+    -- Retail: a fishing contest quest turned in.
+    QUEST_TURNED_IN = function(questID)
+        if not Known(questID, "number") or not CONTESTS[questID] then return end
+        local name = C_QuestLog and C_QuestLog.GetTitleForQuestID and Str(C_QuestLog.GetTitleForQuestID(questID))
+        Request({ label = name or EllesmereUI.L("Fishing Contest"),
+                  card = { title = EllesmereUI.L("Fishing Contest"), lines = { Big(name) } } })
+    end,
 
     -- The player's own loot lines: Special Loot on Forever, First Gather.
     CHAT_MSG_LOOT = function(text)

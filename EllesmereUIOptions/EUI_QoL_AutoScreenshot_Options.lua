@@ -262,6 +262,21 @@ local function FishSlots()
               get=function() return Get("autoShotGatherRare", false) == true end,
               set=function(v) Set("autoShotGatherRare", v or nil) end },
         }))
+    add(Toggle("Big Catch", "autoShotBigCatch", false,
+            EllesmereUI.IS_FOREVER and "A fish or other catch at or above the picked quality."
+                or "A fish or other catch at or above the picked quality. Old Ironjaw and Old Crafty always count."),
+        CogRow("Big Catch", "autoShotBigCatch", false, {
+            { type="dropdown", label="Minimum Quality", values=QUALITIES, order=QUALITY_ORDER,
+              get=function() return tostring(Get("autoShotFishQuality", "3")) end,
+              set=function(v) Set("autoShotFishQuality", v) end },
+        }))
+    add(Toggle("First Catch in a Zone", "autoShotFirstCatch", false,
+            "The first fish this character catches in each zone."))
+    -- The contest quests are verified for retail only.
+    if not EllesmereUI.IS_FOREVER then
+        add(Toggle("Fishing Contest", "autoShotContest", false,
+                "Stranglethorn Fishing Extravaganza or Hallowfall Fishing Derby quest turned in."))
+    end
     return list
 end
 

@@ -245,8 +245,10 @@ EllesmereUI._ZoneLevels = {
     Get = F.Get,
     Cfg = F.Cfg,
     Apply = Apply,
-    -- { min, max } for a zone's uiMapID (read-only; Auto Screenshots cards).
+    -- Read-only, for Auto Screenshots cards: a zone's { min, max } levels and
+    -- its base fishing skill, by uiMapID.
     Levels = function(uiMapID) return LEVELS[uiMapID] end,
+    Fishing = function(uiMapID) return FISHING[uiMapID] end,
 }
 
 F.Start(Apply)
