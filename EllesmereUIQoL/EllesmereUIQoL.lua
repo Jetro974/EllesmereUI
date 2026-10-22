@@ -852,11 +852,14 @@ qolFrame:SetScript("OnEvent", function(self)
         local ssFrame = CreateFrame("Frame")
         ssFrame:RegisterEvent("SCREENSHOT_SUCCEEDED")
         ssFrame:RegisterEvent("SCREENSHOT_FAILED")
-        ssFrame:SetScript("OnEvent", function()
+        ssFrame:SetScript("OnEvent", function(_, event)
             if not EllesmereUIDB or EllesmereUIDB.hideScreenshotStatus ~= false then
                 -- Hide on next frame so Blizzard's handler runs first
                 C_Timer.After(0, HideActionStatus)
             end
+            -- Set only while an Auto Screenshots capture waits for its result.
+            local autoShotResult = EllesmereUI._autoShotResult
+            if autoShotResult then autoShotResult(event) end
         end)
     end
 
