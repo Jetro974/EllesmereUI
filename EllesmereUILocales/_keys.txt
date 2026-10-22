@@ -154,7 +154,6 @@ Addon
 Addon authors: this guide shows how to add your settings to EllesmereUI.
 Addon not loaded
 Adjust Crop
-After a Mythic+ key, /ov opens a full run summary of your group.
 After anchoring, drag to an edge and choose a grow direction to maintain its corner spot as bars change size.
 After optimizing, the button changes to 'Restore My Graphics Settings', which reverts every change.
 Agi
@@ -1346,6 +1345,7 @@ Trinket 2
 Tune graphics for higher FPS and clarity.
 Turn It On
 Turn Off Tips
+Turn on Run Summary for a full recap of your group after each Mythic+ key (/ov).
 Turning it on reloads your UI. Group Finder is under UI Reskin Addons in /eui.
 Two action menus can share a keybind when Assign to Spec keeps them from ever loading in the same spec.
 Type /kb to bind keys by hovering an action button and pressing a key.

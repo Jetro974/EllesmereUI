@@ -5949,6 +5949,6 @@ L["No new tips: you already use everything they cover."] = "Aucune nouvelle astu
 L["Type /unlock to drag, anchor and size-match any EllesmereUI element."] = "Tapez /unlock pour déplacer, ancrer et aligner la taille de n'importe quel élément d'EllesmereUI."
 L["Type /kb to bind keys by hovering an action button and pressing a key."] = "Tapez /kb pour assigner vos raccourcis : survolez un bouton d'action et appuyez sur une touche."
 L["Spec Overrides give a setting a different value per spec, without a second profile."] = "Les remplacements de spécialisation donnent à un réglage une valeur différente par spécialisation, sans second profil."
-L["After a Mythic+ key, /ov opens a full run summary of your group."] = "Après une clé Mythique+, /ov ouvre un résumé complet de la partie de votre groupe."
+L["Turn on Run Summary for a full recap of your group after each Mythic+ key (/ov)."] = "Activez le résumé de fin de clé pour un récapitulatif complet de votre groupe après chaque clé Mythique+ (/ov)."
 L["Auto Uprank Spells swaps each new spell rank onto your action bars for you."] = "La mise à niveau automatique des sorts place chaque nouveau rang de sort sur vos barres d'action à votre place."
 L["EllesmereUI has a built-in threat meter, off until you turn it on."] = "EllesmereUI intègre un compteur de menace, désactivé tant que vous ne l'activez pas."
