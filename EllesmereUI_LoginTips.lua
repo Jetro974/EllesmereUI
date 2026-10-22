@@ -218,7 +218,18 @@ local function FirstLoadedCoreModule()
     return nil
 end
 
--- Both modes ------------------------------------------------------------------
+local function AtMaxLevel()
+    local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion()
+    return not maxLevel or UnitLevel("player") >= maxLevel
+end
+
+-- [Show Me] that deep-links an options row (section/row optional: page top).
+local function Goto(module, page, section, row)
+    return function() EllesmereUI:NavigateToElementSettings(module, page, section, nil, row) end
+end
+
+-- Tips, most useful first. Modes interleave: each player walks only the
+-- tips of the mode they are in (no "modes" = both).
 
 Register("unlock_mode", {
     text = function()
@@ -228,23 +239,8 @@ Register("unlock_mode", {
         -- Stamped by Unlock Mode's own how-to tip on its first open.
         return not (EllesmereUIDB and EllesmereUIDB.unlockTipSeen)
     end,
-    show = function()
-        SlashCmdList.EUIUNLOCK()
-    end,
+    show = function() SlashCmdList.EUIUNLOCK() end,
 })
-
-Register("quick_keybind", {
-    addon = "EllesmereUIActionBars",
-    text = function()
-        return EllesmereUI.L("Type /kb to bind keys by hovering an action button and pressing a key.")
-    end,
-    unused = function() return true end,   -- nothing to read: shows once
-    show = function()
-        SlashCmdList.EABQUICKKEYBIND()
-    end,
-})
-
--- Retail ----------------------------------------------------------------------
 
 Register("spec_overrides", {
     modes = RETAIL,
@@ -270,26 +266,6 @@ Register("spec_overrides", {
     end,
 })
 
-Register("run_summary", {
-    modes = RETAIL,
-    addon = "EllesmereUIMythicTimer",
-    text = function()
-        return EllesmereUI.L("Turn on Run Summary for a full recap of your group after each Mythic+ key (/ov).")
-    end,
-    unused = function()
-        local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion()
-        if maxLevel and UnitLevel("player") < maxLevel then return false end
-        -- Off by default; /ov only answers once it is on.
-        local rs = ModuleProfile("EllesmereUIMythicTimer").runSummary
-        return not (rs and rs.enabled == true)
-    end,
-    show = function()
-        EllesmereUI:NavigateToElementSettings("EllesmereUIMythicTimer", "Run Summary")
-    end,
-})
-
--- WoW Forever -----------------------------------------------------------------
-
 Register("auto_uprank", {
     modes = FOREVER,
     addon = "EllesmereUIForeverEssentials",
@@ -300,10 +276,35 @@ Register("auto_uprank", {
         local c = EllesmereUIDB and EllesmereUIDB.spellUprank
         return not (c and c.enabled)
     end,
-    show = function()
-        EllesmereUI:NavigateToElementSettings("EllesmereUIForeverEssentials", "General",
-            "SPELL RANKS", nil, "Auto Uprank Spells")
+    show = Goto("EllesmereUIForeverEssentials", "General", "SPELL RANKS", "Auto Uprank Spells"),
+})
+
+Register("hovercast", {
+    addon = "EllesmereUIRaidFrames",
+    text = function()
+        return EllesmereUI.L("HoverCast: bind spells to mouse clicks on your raid and party frames, no Clique needed.")
     end,
+    unused = function()
+        if AddonLoaded("Clique") then return false end   -- the page disables itself then
+        local cc = EllesmereUIDB and EllesmereUIDB.clickCast
+        return not (cc and cc.enabled)
+    end,
+    show = Goto("EllesmereUIRaidFrames", "HoverCast"),
+})
+
+Register("run_summary", {
+    modes = RETAIL,
+    addon = "EllesmereUIMythicTimer",
+    text = function()
+        return EllesmereUI.L("Turn on Run Summary for a full recap of your group after each Mythic+ key (/ov).")
+    end,
+    unused = function()
+        if not AtMaxLevel() then return false end
+        -- Off by default; /ov only answers once it is on.
+        local rs = ModuleProfile("EllesmereUIMythicTimer").runSummary
+        return not (rs and rs.enabled == true)
+    end,
+    show = Goto("EllesmereUIMythicTimer", "Run Summary", "RUN SUMMARY", "Enable Run Summary"),
 })
 
 Register("threat_meter", {
@@ -316,7 +317,301 @@ Register("threat_meter", {
         local c = EllesmereUIDB and EllesmereUIDB.threatMeter
         return not (c and c.enabled)
     end,
-    show = function()
-        EllesmereUI:NavigateToElementSettings("EllesmereUIForeverEssentials", "Threat")
+    show = Goto("EllesmereUIForeverEssentials", "Threat"),
+})
+
+Register("cdm_keybind", {
+    addon = "EllesmereUICooldownManager",
+    text = function()
+        return EllesmereUI.L("Show Keybind prints each ability's key on its Cooldown Manager icon.")
     end,
+    unused = function()
+        local bars = (ModuleProfile("EllesmereUICooldownManager").cdmBars or {}).bars or {}
+        for _, bar in ipairs(bars) do
+            if bar.barType ~= "buffs" and bar.showKeybind == true then return false end
+        end
+        return true
+    end,
+    show = Goto("EllesmereUICooldownManager", "CDM Bars", "EXTRAS", "Show Keybind"),
+})
+
+Register("out_of_range", {
+    addon = "EllesmereUIActionBars",
+    text = function()
+        return EllesmereUI.L("Out of Range Coloring tints an action button red while your target is out of range.")
+    end,
+    unused = function()
+        if not (C_ActionBar and C_ActionBar.EnableActionRangeCheck) then return false end
+        for _, bar in pairs(ModuleProfile("EllesmereUIActionBars").bars or {}) do
+            if type(bar) == "table" and bar.outOfRangeColoring == true then return false end
+        end
+        return true
+    end,
+    show = Goto("EllesmereUIActionBars", "Bar Display", "ICON EFFECTS", "Out of Range Coloring"),
+})
+
+Register("targeted_spell_bars", {
+    modes = RETAIL,
+    addon = "EllesmereUIMythicTimer",
+    text = function()
+        return EllesmereUI.L("Targeted Spell Bars list every enemy cast in one place, with its target and timer.")
+    end,
+    unused = function()
+        if not AtMaxLevel() then return false end
+        local tsb = ModuleProfile("EllesmereUIMythicTimer").tsb
+        return not (tsb and tsb.enabled == true)
+    end,
+    show = Goto("EllesmereUIMythicTimer", "Targeted Spell Bars", "TARGETED SPELL BARS", "Enable Targeted Spell Bars"),
+})
+
+Register("loot_feed", {
+    modes = FOREVER,
+    addon = "EllesmereUIForeverEssentials",
+    text = function()
+        return EllesmereUI.L("Loot Feed shows items, gold, reputation and skill-ups on screen as you gain them.")
+    end,
+    unused = function()
+        local c = EllesmereUIDB and EllesmereUIDB.lootFeed
+        return not (c and c.enabled == true)
+    end,
+    show = Goto("EllesmereUIForeverEssentials", "Loot", "LOOT FEED", "Enable Loot Feed"),
+})
+
+Register("auto_logging", {
+    addon = "EllesmereUIQoL",
+    text = function()
+        return EllesmereUI.L("Auto Combat Logging starts and stops the combat log for you in raids and dungeons, ready for Warcraft Logs.")
+    end,
+    unused = function()
+        local c = EllesmereUIDB and EllesmereUIDB.autoLogging
+        return not (c and c.enabled == true)
+    end,
+    show = Goto("EllesmereUIQoL", "QoL", "AUTO COMBAT LOGGING", "Enable Auto Logging"),
+})
+
+Register("talent_reminders", {
+    modes = RETAIL,
+    addon = "EllesmereUIAuraBuffReminders",
+    text = function()
+        return EllesmereUI.L("Talent Reminders warn you per dungeon or raid when a talent you want there is not picked.")
+    end,
+    unused = function()
+        if not AtMaxLevel() then return false end
+        local t = ModuleProfile("EllesmereUIAuraBuffReminders").talentReminders
+        return not t or #t == 0
+    end,
+    show = Goto("EllesmereUIAuraBuffReminders", "Talent Reminders"),
+})
+
+-- Melee and hunters: the classes whose damage rides the swing.
+local SWING_CLASSES = { WARRIOR = true, ROGUE = true, PALADIN = true, HUNTER = true, SHAMAN = true }
+
+Register("swing_timer", {
+    modes = FOREVER,
+    addon = "EllesmereUIResourceBars",
+    text = function()
+        return EllesmereUI.L("The Swing Timer shows the time to your next auto attack, with a Heroic Strike / Maul queue highlight.")
+    end,
+    unused = function()
+        if not C_SwingTimer or not SWING_CLASSES[select(2, UnitClass("player"))] then return false end
+        local st = ModuleProfile("EllesmereUIResourceBars").swingTimer
+        return not (st and st.enabled == true)
+    end,
+    show = Goto("EllesmereUIResourceBars", "Swing Timer", "LAYOUT", "Enable Swing Timer"),
+})
+
+Register("quick_keybind", {
+    addon = "EllesmereUIActionBars",
+    text = function()
+        return EllesmereUI.L("Type /kb to bind keys by hovering an action button and pressing a key.")
+    end,
+    unused = function() return true end,   -- nothing to read: shows once
+    show = function() SlashCmdList.EABQUICKKEYBIND() end,
+})
+
+Register("raid_tools", {
+    addon = "EllesmereUIQoL",
+    text = function()
+        return EllesmereUI.L("Raid Tools: ready check, pull timer and raid markers in one panel when you lead or assist.")
+    end,
+    unused = function()
+        local rt = ModuleProfile("EllesmereUIQoL").raidTools
+        return not rt or rt.mode == nil or rt.mode == "never"
+    end,
+    show = Goto("EllesmereUIQoL", "Raid Tools", "GENERAL", "Show Raid Tools"),
+})
+
+Register("heal_prediction", {
+    modes = RETAIL,
+    addon = "EllesmereUIUnitFrames",
+    text = function()
+        return EllesmereUI.L("Heal Prediction shows incoming heals on your unit frames' health bars.")
+    end,
+    unused = function()
+        local p = ModuleProfile("EllesmereUIUnitFrames")
+        for _, unit in ipairs({ "player", "target", "focus" }) do
+            if p[unit] and p[unit].healPrediction == true then return false end
+        end
+        return true
+    end,
+    show = Goto("EllesmereUIUnitFrames", "Main Frames", "ABSORBS AND HEALS", "Heal Prediction"),
+})
+
+Register("cast_latency", {
+    addon = "EllesmereUIResourceBars",
+    text = function()
+        return EllesmereUI.L("The Latency Overlay shades the end of your cast bar, so you know when to queue the next spell.")
+    end,
+    unused = function()
+        local cb = ModuleProfile("EllesmereUIResourceBars").castBar
+        return cb ~= nil and cb.enabled ~= false and cb.latencyEnabled ~= true
+    end,
+    show = Goto("EllesmereUIResourceBars", "Cast Bar", "LATENCY", "Enable Latency Overlay"),
+})
+
+Register("nameplate_range", {
+    addon = "EllesmereUINameplates",
+    text = function()
+        return EllesmereUI.L("Nameplates can show your distance to the target in yards (15+, 30+...).")
+    end,
+    unused = function() return ModuleProfile("EllesmereUINameplates").rangeTextEnabled ~= true end,
+    show = Goto("EllesmereUINameplates", "General", "TARGET AND FOCUS EFFECTS", "Distance to Target Text (Range)"),
+})
+
+Register("databars", {
+    addon = "EllesmereUIDataBars",
+    text = function()
+        if EllesmereUI.IS_FOREVER then
+            return EllesmereUI.L("DataBars: build an info bar (clock, gold, durability, micro menu...) from a one-click template.")
+        end
+        return EllesmereUI.L("DataBars: build an info bar (clock, gold, durability, Great Vault...) from a one-click template.")
+    end,
+    unused = function()
+        local bars = ModuleProfile("EllesmereUIDataBars").bars
+        return not bars or #bars == 0
+    end,
+    show = Goto("EllesmereUIDataBars", "DataBars"),
+})
+
+Register("quick_signup", {
+    modes = RETAIL,
+    addon = "EllesmereUIQoL",
+    text = function()
+        return EllesmereUI.L("Quick Signup: double-click a premade group to sign up instantly.")
+    end,
+    unused = function() return not (EllesmereUIDB and EllesmereUIDB.quickSignup) end,
+    show = Goto("EllesmereUIQoL", "QoL", "GROUP FINDER", "Quick Signup"),
+})
+
+Register("clock_hover", {
+    addon = "EllesmereUIMinimap",
+    text = function()
+        if EllesmereUI.IS_FOREVER then
+            return EllesmereUI.L("Hovering the minimap clock can show your instance lockouts.")
+        end
+        return EllesmereUI.L("Hovering the minimap clock can show your instance lockouts or Great Vault progress.")
+    end,
+    unused = function()
+        local mp = ModuleProfile("EllesmereUIMinimap").minimap
+        if not mp then return false end
+        local mode = mp.clockMode
+        if mode == nil then mode = (mp.showClock == false) and "none" or "inside" end
+        if mode == "none" then return false end   -- the row is disabled without a clock
+        return mp.clockHoverTooltip == nil or mp.clockHoverTooltip == "none"
+    end,
+    show = Goto("EllesmereUIMinimap", "Minimap", "TEXT", "Show on Clock Hover"),
+})
+
+Register("bank_sidebar", {
+    addon = "EllesmereUIBags",
+    text = function()
+        return EllesmereUI.L("The bank Category Sidebar lets you browse your bank by item type instead of tab by tab.")
+    end,
+    unused = function() return ModuleProfile("EllesmereUIBags").bankCategorySidebar ~= true end,
+    show = Goto("EllesmereUIBags", "Bank", "SIDEBAR", "Category Sidebar"),
+})
+
+Register("quest_item_hotkey", {
+    addon = "EllesmereUIQuestTracker",
+    text = function()
+        return EllesmereUI.L("Bind a Quest Item Hotkey to use your current quest's item with one key.")
+    end,
+    unused = function()
+        local qt = ModuleProfile("EllesmereUIQuestTracker").questTracker
+        return not qt or qt.questItemHotkey == nil or qt.questItemHotkey == ""
+    end,
+    -- The hotkey row is hand-built (no matchable label): land on its section.
+    show = Goto("EllesmereUIQuestTracker", "Quest Tracker", "EXTRAS"),
+})
+
+Register("movement_alert", {
+    addon = "EllesmereUIQoL",
+    text = function()
+        return EllesmereUI.L("Movement Cooldown Alert counts down your mobility spell (Blink, Disengage, Roll...) on screen.")
+    end,
+    unused = function()
+        local classes = (ModuleProfile("EllesmereUIQoL").movementAlert or {}).enabledClasses
+        return not (classes and classes[select(2, UnitClass("player"))])
+    end,
+    show = Goto("EllesmereUIQoL", "MoveAlert", "MOVEMENT COOLDOWN ALERT", "Enable Movement Alerts"),
+})
+
+Register("party_targets", {
+    addon = "EllesmereUIRaidFrames",
+    text = function()
+        return EllesmereUI.L("Party Targets shows each party member's target beside their frame; click it to assist.")
+    end,
+    unused = function() return ModuleProfile("EllesmereUIRaidFrames").partyShowTargets ~= true end,
+    show = Goto("EllesmereUIRaidFrames", "Party", "PARTY TARGETS", "Enable Party Targets"),
+})
+
+Register("spell_history", {
+    addon = "EllesmereUIDamageMeters",
+    text = function()
+        return EllesmereUI.L("Spell History shows your recent casts, including failed and interrupted ones.")
+    end,
+    unused = function()
+        local sh = (ModuleProfile("EllesmereUIDamageMeters").dm or {}).spellHistory
+        return not (sh and (sh.iconEnabled == true or sh.barEnabled == true))
+    end,
+    show = Goto("EllesmereUIDamageMeters", "Spell History", "ICON HISTORY", "Enable Icon History"),
+})
+
+Register("friend_invites", {
+    modes = RETAIL,
+    addon = "EllesmereUIFriends",
+    text = function()
+        return EllesmereUI.L("Group invites from your friends can be accepted automatically.")
+    end,
+    unused = function()
+        local f = ModuleProfile("EllesmereUIFriends").friends
+        return f ~= nil and f.enabled ~= false and f.autoAcceptFriendInvites ~= true
+    end,
+    show = Goto("EllesmereUIFriends", "Friends", "DISPLAY", "Auto-Accept Friend Invites"),
+})
+
+Register("auto_open_containers", {
+    addon = "EllesmereUIQoL",
+    text = function()
+        return EllesmereUI.L("Auto Open Containers opens bags, boxes and parcels as soon as they land in your inventory.")
+    end,
+    unused = function() return not (EllesmereUIDB and EllesmereUIDB.autoOpenContainers == true) end,
+    show = Goto("EllesmereUIQoL", "QoL", "UI", "Auto Open Containers"),
+})
+
+Register("macro_factory", {
+    modes = RETAIL,
+    addon = "EllesmereUIQoL",
+    text = function()
+        return EllesmereUI.L("Macro Factory creates smart macros (potions, healing, food, trinkets, focus) and keeps them up to date.")
+    end,
+    unused = function()
+        if not GetMacroIndexByName then return false end
+        for _, name in ipairs({ "EUI_Potion", "EUI_Health", "EUI_Food", "EUI_Trinket1", "EUI_Trinket2", "EUI_Focus" }) do
+            if GetMacroIndexByName(name) ~= 0 then return false end
+        end
+        return true
+    end,
+    -- First thing on the QoL page; its rows stay out of the search index.
+    show = Goto("EllesmereUIQoL", "QoL"),
 })
