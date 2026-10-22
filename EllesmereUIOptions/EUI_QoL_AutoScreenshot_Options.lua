@@ -59,6 +59,37 @@ local function CogRow(title, key, def, rows)
     return function(rgn) Cog(rgn, title, key, def, rows) end
 end
 
+-- A checkbox dropdown in place of a placeholder dropdown (keys default to
+-- def), grayed while offKey is off when given.
+local function CheckboxDropdown(items, def, offKey)
+    return function(rgn)
+        if rgn._control then rgn._control:Hide() end
+        local dd, refresh = EllesmereUI.BuildVisOptsCBDropdown(rgn, 210, rgn:GetFrameLevel() + 2, items,
+            function(k) return Get(k, def) == true end,
+            function(k, v) Set(k, v) end)
+        EllesmereUI.PanelPP.Point(dd, "RIGHT", rgn, "RIGHT", -20, 0)
+        rgn._control = dd
+        rgn._lastInline = nil
+        EllesmereUI.RegisterWidgetRefresh(refresh)
+        if offKey then
+            local function Gray()
+                local off = Get(offKey, false) ~= true
+                dd:SetAlpha(off and 0.3 or 1)
+                dd:EnableMouse(not off)
+                if rgn._label then rgn._label:SetAlpha(off and 0.3 or 1) end
+            end
+            Gray()
+            EllesmereUI.RegisterWidgetRefresh(Gray)
+        end
+    end
+end
+
+local function Placeholder(text, tooltip)
+    return { type="dropdown", text=text, tooltip=tooltip,
+             values={ __placeholder = "..." }, order={ "__placeholder" },
+             getValue=function() return "__placeholder" end, setValue=function() end }
+end
+
 -- The trigger and option slots, in order, each { cfg, post(region) }. They
 -- are paired two to a row; only the last row may keep an empty slot.
 local function Slots()
@@ -155,20 +186,8 @@ local function Slots()
     end
     if #items > 0 then
         -- A placeholder dropdown the post step swaps for a checkbox dropdown.
-        add({ type="dropdown", text="Collections",
-              tooltip="Something new in your collections: pick which kinds.",
-              values={ __placeholder = "..." }, order={ "__placeholder" },
-              getValue=function() return "__placeholder" end, setValue=function() end },
-            function(rgn)
-                if rgn._control then rgn._control:Hide() end
-                local dd, refresh = EllesmereUI.BuildVisOptsCBDropdown(rgn, 210, rgn:GetFrameLevel() + 2, items,
-                    function(k) return Get(k, false) == true end,
-                    function(k, v) Set(k, v or nil) end)
-                EllesmereUI.PanelPP.Point(dd, "RIGHT", rgn, "RIGHT", -20, 0)
-                rgn._control = dd
-                rgn._lastInline = nil
-                EllesmereUI.RegisterWidgetRefresh(refresh)
-            end)
+        add(Placeholder("Collections", "Something new in your collections: pick which kinds."),
+            CheckboxDropdown(items, false))
     end
     add(Toggle("Duel", "autoShotDuel", false,
             "A duel you fought. No API tells the winner, so every duel counts; a declined request does not."))
@@ -217,9 +236,43 @@ local function Slots()
     return list
 end
 
+local PROF_KINDS = {
+    { key = "autoShotProfCraft",  label = "Crafting" },
+    { key = "autoShotProfGather", label = "Gathering" },
+    { key = "autoShotProfSecond", label = "Secondary" },
+}
+
+-- FISHING & PROFESSIONS slots.
+local function FishSlots()
+    local list = {}
+    local function add(cfg, post) list[#list + 1] = { cfg, post } end
+    add(Toggle("Profession Milestones", "autoShotProf", false,
+            "A profession reaching the top of its rank or expansion tier, or a new rank learned. Each milestone counts once per character."),
+        CogRow("Profession Milestones", "autoShotProf", false, {
+            { type="toggle", label="Max Rank Only",
+              get=function() return Get("autoShotProfMaxOnly", false) == true end,
+              set=function(v) Set("autoShotProfMaxOnly", v or nil) end },
+        }))
+    add(Placeholder("Professions", "Which professions count for Profession Milestones."),
+        CheckboxDropdown(PROF_KINDS, true, "autoShotProf"))
+    return list
+end
+
+-- Lays slots out two to a row.
+local function PairRows(parent, y, W, slots)
+    for i = 1, #slots, 2 do
+        local left, right = slots[i], slots[i + 1]
+        local row, h = W:DualRow(parent, y, left[1], right and right[1] or EllesmereUI.BlankRowCfg())
+        y = y - h
+        if left[2] then left[2](row._leftRegion) end
+        if right and right[2] then right[2](row._rightRegion) end
+    end
+    return y
+end
+
 _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
     local y = yOffset
-    local _, h, row
+    local _, h
 
     _, h = W:SectionHeader(parent, "AUTO SCREENSHOTS", y); y = y - h
 
@@ -247,13 +300,11 @@ _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
           setValue=function(v) Set("autoShotDelay", v) end }
     ); y = y - h
 
-    local slots = Slots()
-    for i = 1, #slots, 2 do
-        local left, right = slots[i], slots[i + 1]
-        row, h = W:DualRow(parent, y, left[1], right and right[1] or EllesmereUI.BlankRowCfg()); y = y - h
-        if left[2] then left[2](row._leftRegion) end
-        if right and right[2] then right[2](row._rightRegion) end
-    end
+    y = PairRows(parent, y, W, Slots())
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
+    _, h = W:SectionHeader(parent, "FISHING & PROFESSIONS", y); y = y - h
+    y = PairRows(parent, y, W, FishSlots())
 
     return math.abs(y - yOffset)
 end

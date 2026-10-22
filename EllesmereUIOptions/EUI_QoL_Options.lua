@@ -2643,7 +2643,7 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.waypointCmd = nil
                 -- Auto Screenshots settings; what each character has seen
                 -- (autoShotKills, autoShotRaids, autoShotPlaces, autoShotPlayed,
-                -- autoShotRanks) is kept.
+                -- autoShotRanks, autoShotProfs) is kept.
                 for _, k in ipairs({ "autoShot", "autoShotDelay", "autoShotLevelUp",
                     "autoShotLevelMaxOnly", "autoShotAchievement", "autoShotAchGuild", "autoShotAchAccount",
                     "autoShotBoss", "autoShotWipe", "autoShotWipeRaidsOnly",
@@ -2654,7 +2654,8 @@ initFrame:SetScript("OnEvent", function(self)
                     "autoShotLoot", "autoShotLootQuality", "autoShotLootMoney", "autoShotLogin",
                     "autoShotInterval", "autoShotIntervalMin", "autoShotRaidEntry", "autoShotZone",
                     "autoShotZoneMode", "autoShotHideUI", "autoShotCaption", "autoShotRoster", "autoShotChat",
-                    "autoShotSound", "autoShotFormat", "autoShotQuality" }) do
+                    "autoShotSound", "autoShotFormat", "autoShotQuality", "autoShotProf", "autoShotProfMaxOnly",
+                    "autoShotProfCraft", "autoShotProfGather", "autoShotProfSecond" }) do
                     EllesmereUIDB[k] = nil
                 end
             end

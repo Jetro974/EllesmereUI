@@ -374,6 +374,7 @@ local TRIGGERS = {
     { "autoShotDecor",       false, { "NEW_HOUSING_ITEM_ACQUIRED" } },
     { "autoShotLoot",        false, { IS_FOREVER and "CHAT_MSG_LOOT" or "SHOW_LOOT_TOAST" } },
     { "autoShotLogin",       false, { "PLAYER_ENTERING_WORLD" } },
+    { "autoShotProf",        false, { "SKILL_LINES_CHANGED" } },
     { "autoShotInterval",    false, {} },
 }
 
@@ -512,6 +513,65 @@ local function OwnLootLink(text)
     for _, pat in ipairs(lootPatterns) do
         local link, count = text:match(pat)
         if link then return link, tonumber(count) or 1 end
+    end
+end
+
+-------------------------------------------------------------------------------
+--  Profession milestones: GetProfessions / GetProfessionInfo (both clients,
+--  as Blizzard_ProfessionsBook reads them) on SKILL_LINES_CHANGED. A cap
+--  reached (skill at the rank's maximum) or, on a raised maximum, a new rank
+--  learned. Kept per character; the first scan only records.
+-------------------------------------------------------------------------------
+-- Base skill lines: gathering and secondary; every other one is crafting.
+local PROF_KIND = {
+    [182] = "Gather", [186] = "Gather", [393] = "Gather",                    -- Herbalism, Mining, Skinning
+    [185] = "Second", [129] = "Second", [356] = "Second", [794] = "Second",  -- Cooking, First Aid, Fishing, Archaeology
+}
+-- WoW Forever rank names by maximum skill (Blizzard's PROFESSION_RANKS).
+local RANK_NAMES = { [75] = "APPRENTICE", [150] = "JOURNEYMAN", [225] = "EXPERT", [300] = "ARTISAN" }
+
+local function ProfessionShot(icon, name, lines)
+    Request({ label = name or EllesmereUI.L("Profession Milestone"),
+              card = { title = EllesmereUI.L("Profession Milestone"), icon = icon, lines = lines } })
+end
+
+-- Set when the trigger turns on: what changed while it was off is recorded only.
+local profSeedNext = false
+
+local function ScanProfessions()
+    if not (GetProfessions and GetProfessionInfo) then return end
+    local store = CharTable("autoShotProfs")
+    if not store then return end
+    local seed = profSeedNext or not store.seeded
+    store.seeded, profSeedNext = true, false
+    local list = { GetProfessions() }
+    for i = 1, 6 do
+        local index = list[i]
+        if Known(index, "number") then
+            local name, icon, rank, maxRank, _, _, line, _, _, _, tierName = GetProfessionInfo(index)
+            if Known(line, "number") and Known(rank, "number") and Known(maxRank, "number") and maxRank > 0 then
+                name = Str(name)
+                tierName = Str(tierName)
+                local rankName = tierName or _G[RANK_NAMES[maxRank] or ""]
+                local capKey = line .. ":" .. (tierName or "") .. ":" .. maxRank
+                local prevMax = store[line]
+                local capped = rank >= maxRank
+                local wanted = not seed and On("autoShotProf" .. (PROF_KIND[line] or "Craft"))
+                if wanted and capped and not store[capKey] then
+                    -- Forever: the top rank is Artisan; every retail tier cap is a maximum.
+                    if not Opt("autoShotProfMaxOnly") or not IS_FOREVER or maxRank >= 300 then
+                        ProfessionShot(icon, name, { Big(name), Colored(rankName, 0.3, 1, 0.3),
+                            Dim(EllesmereUI.Lf("Skill %1$d / %2$d", rank, maxRank)) })
+                    end
+                elseif wanted and type(prevMax) == "number" and maxRank > prevMax and not Opt("autoShotProfMaxOnly") then
+                    ProfessionShot(icon, name, { Big(name),
+                        Colored(EllesmereUI.Lf("New rank learned: %1$s", rankName or maxRank), 0.3, 1, 0.3),
+                        Dim(EllesmereUI.Lf("Skill %1$d / %2$d", rank, maxRank)) })
+                end
+                store[line] = maxRank
+                if capped then store[capKey] = true end
+            end
+        end
     end
 end
 
@@ -787,6 +847,8 @@ local HANDLERS = {
         end
     end,
 
+    SKILL_LINES_CHANGED = ScanProfessions,
+
     -- Forever: the player's own loot lines.
     CHAT_MSG_LOOT = function(text)
         if not Known(text, "string") then return end
@@ -842,6 +904,7 @@ local function Sync()
             if want ~= (registered[ev] == true) then
                 registered[ev] = want
                 if want then evFrame:RegisterEvent(ev) else evFrame:UnregisterEvent(ev) end
+                if want and ev == "SKILL_LINES_CHANGED" then profSeedNext = true end
             end
         end
     end
