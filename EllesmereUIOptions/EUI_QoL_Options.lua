@@ -2647,7 +2647,7 @@ initFrame:SetScript("OnEvent", function(self)
                     "autoShotLevelMaxOnly", "autoShotAchievement", "autoShotBoss",
                     "autoShotBossFirstOnly", "autoShotBossWait", "autoShotDeath",
                     "autoShotDeathWhere", "autoShotMythicPlus", "autoShotMythicPlusTimed",
-                    "autoShotPvP", "autoShotHideUI", "autoShotCaption", "autoShotChat" }) do
+                    "autoShotPvP", "autoShotHideUI", "autoShotCaption", "autoShotRoster", "autoShotChat" }) do
                     EllesmereUIDB[k] = nil
                 end
             end

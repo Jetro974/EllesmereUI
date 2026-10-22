@@ -137,6 +137,152 @@ function Card.Show(job)
     card:Show()
 end
 
+-------------------------------------------------------------------------------
+--  Group roster: the other players, class-colored with their role. A secret
+--  name (12.0.5+ instanced maps) only ever goes straight to SetText; a secret
+--  class or role is left out (uncolored, no icon).
+-------------------------------------------------------------------------------
+local ROLE_ATLAS = {
+    TANK    = "UI-LFG-RoleIcon-Tank-Micro-GroupFinder",
+    HEALER  = "UI-LFG-RoleIcon-Healer-Micro-GroupFinder",
+    DAMAGER = "UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
+}
+local COL_W, ROW_H, ROLE_S, PER_COL = 118, 16, 12, 5
+local issecretvalue = issecretvalue or function() return false end
+local roster
+local slots = {}                   -- { role, name } region pairs, reused
+local units, groups, perGroup, colOf = {}, {}, {}, {}
+
+local function Known(v, kind) return not issecretvalue(v) and type(v) == kind end
+
+local function Slot(i)
+    local s = slots[i]
+    if not s then
+        s = { role = roster:CreateTexture(nil, "ARTWORK"), name = roster:CreateFontString(nil, "OVERLAY") }
+        s.role:SetSize(ROLE_S, ROLE_S)
+        s.name:SetJustifyH("LEFT")
+        s.name:SetWordWrap(false)
+        s.name:SetWidth(COL_W - ROLE_S - 8)
+        slots[i] = s
+    end
+    return s
+end
+
+-- The other members now: units[1..n], groups[i] = raid subgroup or nil.
+local function ReadRoster()
+    local raid = IsInRaid()
+    local count = raid and GetNumGroupMembers() or GetNumSubgroupMembers()
+    if not Known(count, "number") then return 0, raid end
+    local me = raid and UnitInRaid("player")
+    if not Known(me, "number") then me = nil end
+    local n = 0
+    for i = 1, count do
+        local unit = (raid and "raid" or "party") .. i
+        local skip = false
+        if raid then
+            if me then
+                skip = i == me
+            else
+                local isMe = UnitIsUnit(unit, "player")
+                skip = not issecretvalue(isMe) and isMe == true
+            end
+        end
+        if not skip then
+            n = n + 1
+            units[n] = unit
+            local sub
+            if raid then
+                local _, _, g = GetRaidRosterInfo(i)
+                if Known(g, "number") and g >= 1 and g <= 8 then sub = g end
+            end
+            groups[n] = sub
+        end
+    end
+    return n, raid
+end
+
+function Card.ShowRoster()
+    local n, raid = ReadRoster()
+    if n == 0 then return end
+    if not roster then
+        roster = CreateFrame("Frame", nil, WorldFrame)
+        roster:SetFrameStrata("TOOLTIP")
+        roster:EnableMouse(false)
+        local bg = roster:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetColorTexture(0.05, 0.05, 0.05, 0.7)
+        roster.bar = roster:CreateTexture(nil, "ARTWORK")
+        roster.bar:SetPoint("TOPLEFT")
+        roster.bar:SetPoint("BOTTOMLEFT")
+        roster.bar:SetWidth(3)
+        roster.title = roster:CreateFontString(nil, "OVERLAY")
+        roster.title:SetPoint("TOPLEFT", PAD, -10)
+    end
+    Card.Scale(roster)
+    local r, g, b = EUI.GetAccentColor()
+    roster.bar:SetColorTexture(r, g, b)
+    EUI.ApplyModuleFont(roster.title, nil, 13, "extras")
+    roster.title:SetTextColor(r, g, b)
+    roster.title:SetText(raid and RAID or PARTY)
+
+    -- Columns: one per raid subgroup in use, members of an unknown subgroup
+    -- packed after them; a party is one column.
+    for i = 1, 8 do perGroup[i] = 0; colOf[i] = nil end
+    for i = 1, n do
+        local sub = groups[i]
+        if sub then perGroup[sub] = perGroup[sub] + 1 end
+    end
+    local cols = 0
+    for i = 1, 8 do
+        if perGroup[i] > 0 then cols = cols + 1; colOf[i] = cols end
+    end
+    local rowsIn, extra, maxRows = {}, 0, 0
+    local top = -10 - roster.title:GetStringHeight() - 6
+    for i = 1, n do
+        local col, row
+        if not raid then
+            col, row = 1, i
+        elseif groups[i] then
+            col = colOf[groups[i]]
+            rowsIn[col] = (rowsIn[col] or 0) + 1
+            row = rowsIn[col]
+        else
+            col = cols + 1 + math.floor(extra / PER_COL)
+            row = extra % PER_COL + 1
+            extra = extra + 1
+        end
+        if row > maxRows then maxRows = row end
+        local unit = units[i]
+        local s = Slot(i)
+        local x, y = PAD + (col - 1) * COL_W, top - (row - 1) * ROW_H
+        local role = EUI.UnitEffectiveRole(unit)
+        local atlas = Known(role, "string") and ROLE_ATLAS[role]
+        s.role:ClearAllPoints()
+        s.role:SetPoint("TOPLEFT", x, y - 1)
+        if atlas then s.role:SetAtlas(atlas); s.role:Show() else s.role:Hide() end
+        EUI.ApplyModuleFont(s.name, nil, 12, "extras")
+        s.name:ClearAllPoints()
+        s.name:SetPoint("TOPLEFT", x + ROLE_S + 4, y)
+        s.name:SetText((UnitName(unit)))
+        local _, class = UnitClass(unit)
+        if Known(class, "string") then
+            local c = EUI.GetClassColor(class)
+            s.name:SetTextColor(c.r, c.g, c.b)
+        else
+            s.name:SetTextColor(1, 1, 1)
+        end
+        s.name:Show()
+    end
+    for i = n + 1, #slots do slots[i].role:Hide(); slots[i].name:Hide() end
+    if raid and extra > 0 then cols = cols + math.ceil(extra / PER_COL) end
+    if not raid then cols = 1 end
+    roster:SetSize(2 * PAD + cols * COL_W - 8, -top + maxRows * ROW_H + 10)
+    roster:ClearAllPoints()
+    roster:SetPoint("BOTTOMLEFT", WorldFrame, "BOTTOMLEFT", 30, 30)
+    roster:Show()
+end
+
 function Card.Hide()
     if card then card:Hide() end
+    if roster then roster:Hide() end
 end

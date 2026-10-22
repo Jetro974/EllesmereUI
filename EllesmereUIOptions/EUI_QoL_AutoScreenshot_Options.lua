@@ -122,6 +122,10 @@ _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
           tooltip="Adds a card to the screenshot: the event, your character, the date and zone, and the details of that event.",
           get=function() return Get("autoShotCaption", true) == true end,
           set=function(v) Set("autoShotCaption", v) end },
+        { type="toggle", label="Group Roster",
+          tooltip="Lists the other players of your group, with class colors and roles, on boss kills, Mythic+ and first raid entries, and on any screenshot taken in a group inside a dungeon or raid.",
+          get=function() return Get("autoShotRoster", true) == true end,
+          set=function(v) Set("autoShotRoster", v) end },
     })
 
     return math.abs(y - yOffset)

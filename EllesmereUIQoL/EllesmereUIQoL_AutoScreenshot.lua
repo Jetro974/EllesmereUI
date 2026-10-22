@@ -61,6 +61,13 @@ local function Finish(id, ok)
     Done()
 end
 
+-- In a group inside a dungeon or raid.
+local function InGroupInstance()
+    if not IsInGroup() then return false end
+    local _, instanceType = IsInInstance()
+    return instanceType == "party" or instanceType == "raid"
+end
+
 local function Shoot(job)
     local combat = InCombatLockdown()
     if job.clean and combat then
@@ -76,6 +83,9 @@ local function Shoot(job)
         savedAlpha = UIParent:GetAlpha()
         UIParent:SetAlpha(0)
         if job.card and On("autoShotCaption") then ns.AutoShotCard.Show(job) end
+        if job.card and On("autoShotRoster") and (job.roster or InGroupInstance()) then
+            ns.AutoShotCard.ShowRoster()
+        end
     end
     -- One short wait so the hidden UI and the card are drawn first. The
     -- Hide Screenshot Status listener (EllesmereUIQoL.lua) hands the
@@ -288,7 +298,7 @@ local HANDLERS = {
         if started then
             lines[#lines + 1] = Dim(EllesmereUI.Lf("Duration: %1$s", Clock(GetTime() - started)))
         end
-        Request({ label = boss or EllesmereUI.L("Boss Kill"), waitCombat = true,
+        Request({ label = boss or EllesmereUI.L("Boss Kill"), waitCombat = true, roster = true,
                   card = { title = EllesmereUI.L("Boss Kill"), lines = lines } })
     end,
 
@@ -334,7 +344,8 @@ local HANDLERS = {
         elseif onTime == false then
             lines[#lines + 1] = Colored(EllesmereUI.L("Over time"), 1, 0.3, 0.3)
         end
-        Request({ label = label, card = { title = EllesmereUI.L("Mythic+ Completed"), lines = lines } })
+        Request({ label = label, roster = true,
+                  card = { title = EllesmereUI.L("Mythic+ Completed"), lines = lines } })
     end,
 
     -- Win test as PVPMatchResults.lua: the winner index against the player's team.
