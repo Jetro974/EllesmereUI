@@ -2,7 +2,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -------------------------------------------------------------------------------
 --  EllesmereUIQoL_AutoScreenshot.lua
 --  Auto Screenshots: a screenshot on level up, achievements, boss kills,
---  deaths, Mythic+ completions and PvP wins, optionally with the interface
+--  deaths, Mythic+ completions, PvP wins, first raid entries and zone
+--  discoveries, optionally with the interface
 --  hidden and a card of the event (EllesmereUIQoL_AutoScreenshotCard.lua).
 --  /euishot takes one clean screenshot now.
 --
@@ -180,6 +181,82 @@ local function SeenKill(difficultyID, encounterID)
     return seen
 end
 
+-- Places seen per character: EllesmereUIDB[store]["Name - Realm"][key]. True the first time.
+local function FirstVisit(store, key)
+    local db = EllesmereUIDB
+    if not db then return false end
+    if type(db[store]) ~= "table" then db[store] = {} end
+    local charKey = CharKey()
+    local mine = db[store][charKey]
+    if not mine then mine = {}; db[store][charKey] = mine end
+    if mine[key] then return false end
+    mine[key] = true
+    return true
+end
+
+-- Capital cities by uiMapID (wago.tools UiMap). WoW Forever uses the classic
+-- map IDs, the six capitals EllesmereUIForeverEssentials_ZoneLevels.lua lists.
+local CAPITALS = IS_FOREVER and {
+    [1453] = true, [1454] = true, [1455] = true, [1456] = true, [1457] = true, [1458] = true,
+} or {
+    [84] = true, [85] = true, [87] = true, [88] = true, [89] = true, [90] = true,   -- Stormwind .. Undercity
+    [103] = true, [110] = true, [111] = true,                                     -- Exodar, Silvermoon, Shattrath
+    [125] = true, [126] = true, [627] = true, [628] = true,                       -- Dalaran (Northrend, Broken Isles)
+    [1161] = true, [1165] = true,                                                 -- Boralus, Dazar'alor
+    [1670] = true, [1671] = true, [1672] = true, [1673] = true,                   -- Oribos
+    [2112] = true, [2339] = true, [2393] = true,                                   -- Valdrakken, Dornogal, Silvermoon (Midnight)
+}
+
+local function RaidEntry()
+    local name, instanceType, _, difficultyName, _, _, _, instanceID = GetInstanceInfo()
+    if issecretvalue(instanceType) or instanceType ~= "raid" or not Known(instanceID, "number") then return end
+    if not FirstVisit("autoShotRaids", instanceID) then return end
+    name = Str(name)
+    Request({ label = name or EllesmereUI.L("First Raid Entry"), roster = true, minDelay = 3,
+              card = { title = EllesmereUI.L("First Raid Entry"),
+                       lines = { Big(name), Dim(Str(difficultyName)) } } })
+end
+
+-- MAP_EXPLORATION_UPDATED has no payload: the player's map tells the place.
+local function Discovery()
+    local mapID = C_Map.GetBestMapForUnit("player")
+    if not Known(mapID, "number") then return end
+    local zoneID, zoneName, capital, continent
+    local id = mapID
+    for _ = 1, 10 do
+        local info = C_Map.GetMapInfo(id)
+        if not info then break end
+        if CAPITALS[id] then capital = id end
+        if not zoneID and info.mapType == Enum.UIMapType.Zone then zoneID, zoneName = id, info.name end
+        if info.mapType == Enum.UIMapType.Continent then continent = info.name; break end
+        id = info.parentMapID
+        if not Known(id, "number") or id == 0 then break end
+    end
+    local mode = EllesmereUIDB and EllesmereUIDB.autoShotZoneMode or "capitals"
+    local key
+    if mode == "all" then
+        local sub = GetSubZoneText()
+        key = "a" .. (zoneID or mapID) .. ":" .. (Str(sub) or "")
+    elseif mode == "zones" then
+        key = zoneID and ("z" .. zoneID)
+    else
+        key = capital and ("c" .. capital)
+    end
+    if not key or not FirstVisit("autoShotPlaces", key) then return end
+    if capital then
+        local info = C_Map.GetMapInfo(capital)
+        zoneName = info and info.name or zoneName
+    end
+    zoneName = Str(zoneName)
+    local lines = { Big(zoneName), Dim(Str(continent)) }
+    -- Forever: the level range Show Zone Levels knows (ForeverEssentials).
+    local zl = EUI._ZoneLevels
+    local lv = zoneID and zl and zl.Levels and zl.Levels(zoneID)
+    if lv then lines[#lines + 1] = Dim(EllesmereUI.Lf("Levels %1$d-%2$d", lv[1], lv[2])) end
+    Request({ label = zoneName or EllesmereUI.L("Zone Discovery"),
+              card = { title = EllesmereUI.L("Zone Discovery"), lines = lines } })
+end
+
 -- WoW Forever: achievements are Legacy challenges (Blizzard_LegacySystem).
 local LEGACY = IS_FOREVER and Constants and Constants.LegacyConsts
 
@@ -237,6 +314,10 @@ end
 local encounterStart = {}
 
 local HANDLERS = {
+    PLAYER_ENTERING_WORLD   = RaidEntry,
+    ZONE_CHANGED_NEW_AREA   = RaidEntry,
+    MAP_EXPLORATION_UPDATED = Discovery,
+
     PLAYER_LEVEL_UP = function(level)
         if not Known(level, "number") then level = nil end
         if Opt("autoShotLevelMaxOnly") then
@@ -374,6 +455,8 @@ local TRIGGERS = {
     { "autoShotDeath",       false, { "PLAYER_DEAD" } },
     { "autoShotMythicPlus",  false, { "CHALLENGE_MODE_COMPLETED" }, true },
     { "autoShotPvP",         false, { "PVP_MATCH_COMPLETE" }, true },
+    { "autoShotRaidEntry",   true,  { "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA" } },
+    { "autoShotZone",        false, { "MAP_EXPLORATION_UPDATED" } },
 }
 
 local function TriggerOn(t)

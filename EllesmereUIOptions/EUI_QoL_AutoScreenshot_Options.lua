@@ -36,6 +36,8 @@ end
 
 local DEATH_WHERE = { all = "Everywhere", instance = "Instances Only", world = "Open World Only" }
 local DEATH_ORDER = { "all", "instance", "world" }
+local ZONE_MODES = { capitals = "Capitals Only", zones = "Zones", all = "Every Discovery" }
+local ZONE_ORDER = { "capitals", "zones", "all" }
 
 _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
     local y = yOffset
@@ -111,6 +113,18 @@ _G._EUI_BuildAutoScreenshotSection = function(parent, yOffset, W)
               set=function(v) Set("autoShotMythicPlusTimed", v) end },
         })
     end
+
+    row, h = W:DualRow(parent, y,
+        Toggle("First Raid Entry", "autoShotRaidEntry", true,
+            "The first time this character enters each raid. Raids visited before you turn this on are not known, so the first visit after you turn this on also counts."),
+        Toggle("Zone Discovery", "autoShotZone", false,
+            "When you discover a new area. Use the cog to pick capitals only, each zone once, or every discovery. Each place counts once per character.")
+    ); y = y - h
+    Cog(row._rightRegion, "Zone Discovery", "autoShotZone", false, {
+        { type="dropdown", label="Discoveries", values=ZONE_MODES, order=ZONE_ORDER,
+          get=function() return Get("autoShotZoneMode", "capitals") end,
+          set=function(v) Set("autoShotZoneMode", v) end },
+    })
 
     row, h = W:DualRow(parent, y,
         Toggle("Hide Interface", "autoShotHideUI", true,

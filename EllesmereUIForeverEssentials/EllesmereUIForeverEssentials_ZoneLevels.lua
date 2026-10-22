@@ -245,6 +245,8 @@ EllesmereUI._ZoneLevels = {
     Get = F.Get,
     Cfg = F.Cfg,
     Apply = Apply,
+    -- { min, max } for a zone's uiMapID (read-only; Auto Screenshots cards).
+    Levels = function(uiMapID) return LEVELS[uiMapID] end,
 }
 
 F.Start(Apply)

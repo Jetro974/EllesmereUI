@@ -2641,13 +2641,13 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.keystonePopup = nil
                 EllesmereUIDB.teleportPrompt = nil
                 EllesmereUIDB.waypointCmd = nil
-                -- Auto Screenshots settings; the per-character first kills
-                -- (autoShotKills) are kept.
+                -- Auto Screenshots settings; what each character has seen
+                -- (autoShotKills, autoShotRaids, autoShotPlaces) is kept.
                 for _, k in ipairs({ "autoShot", "autoShotDelay", "autoShotLevelUp",
                     "autoShotLevelMaxOnly", "autoShotAchievement", "autoShotBoss",
                     "autoShotBossFirstOnly", "autoShotBossWait", "autoShotDeath",
                     "autoShotDeathWhere", "autoShotMythicPlus", "autoShotMythicPlusTimed",
-                    "autoShotPvP", "autoShotHideUI", "autoShotCaption", "autoShotRoster", "autoShotChat" }) do
+                    "autoShotPvP", "autoShotRaidEntry", "autoShotZone", "autoShotZoneMode", "autoShotHideUI", "autoShotCaption", "autoShotRoster", "autoShotChat" }) do
                     EllesmereUIDB[k] = nil
                 end
             end
