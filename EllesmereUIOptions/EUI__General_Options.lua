@@ -2702,8 +2702,9 @@ initFrame:SetScript("OnEvent", function(self)
         _, h = W:DualRow(parent, y,
             { type="toggle", text="Login Tips",
               tooltip="At login, prints one short chat tip about an EllesmereUI feature you have not used yet. Type /euitips to see one now.",
+              -- Off by default.
               getValue=function()
-                  return not (EllesmereUIDB and EllesmereUIDB.loginTips == false)
+                  return EllesmereUIDB and EllesmereUIDB.loginTips == true
               end,
               setValue=function(v)
                   if not EllesmereUIDB then EllesmereUIDB = {} end
