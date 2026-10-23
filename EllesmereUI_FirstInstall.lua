@@ -59,6 +59,7 @@ local GROUPS = {
         entries = {
             { label = "Quality of Life",     addon = "EllesmereUIQoL" },
             { label = "Forever Essentials",  addon = "EllesmereUIForeverEssentials" },
+            { label = "Forever Hardcore",    addon = "EllesmereUIForeverHardcore" },
             { label = "AuraBuff Reminders",  addon = "EllesmereUIAuraBuffReminders" },
             { label = "DataBars",            addon = "EllesmereUIDataBars" },
             { label = "Quickdraw",           addon = "EllesmereUIQuickdraw" },

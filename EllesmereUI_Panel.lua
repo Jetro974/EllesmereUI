@@ -4277,6 +4277,7 @@ do
         EllesmereUILoadoutManager = true,
         EllesmereUIGroupFinder = true,
         EllesmereUIForeverEssentials = true,
+        EllesmereUIForeverHardcore = true,
         EllesmereUISimpleLootCouncil = true,
     }
 

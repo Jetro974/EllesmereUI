@@ -1,0 +1,16 @@
+## Interface: 16001
+## AllowLoadGameType: camelot
+## Title: |cff0cd29fEllesmereUI|r Forever Hardcore
+## Category: |cff0cd29fEllesmere|rUI
+## Group: EllesmereUI
+## Notes: Hardcore companion for WoW Forever.
+## Author: Ellesmere
+## Version: 9.6.2
+## Dependencies: EllesmereUI
+## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga
+
+# Main Lua
+EllesmereUIForeverHardcore.lua
+
+# Deaths (death alert sound and chat line)
+EllesmereUIForeverHardcore_DeathAlerts.lua

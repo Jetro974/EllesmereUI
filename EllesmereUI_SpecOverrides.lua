@@ -200,6 +200,7 @@ local FOLDER_BLACKLIST = {
     EllesmereUIQoL               = true,
     EllesmereUIAuraBuffReminders = true,
     EllesmereUIForeverEssentials = true,
+    EllesmereUIForeverHardcore   = true,
     -- Each action menu picks its own specs (Assign to Spec) instead.
     EllesmereUIQuickdraw         = true,
     -- A per-character store outside the profiles; each assignment picks its

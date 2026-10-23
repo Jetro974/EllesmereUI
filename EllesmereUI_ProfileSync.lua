@@ -25,7 +25,7 @@ do
 
     -- Modules with a sync icon but no per-profile data (always "synced"). BlizzardSkin hosts
     -- Dragon Riding's per-profile DB; its sync icon routes to EllesmereUIDragonRiding via syncFolder.
-    local SYNC_GLOBAL_ONLY = { EllesmereUIForeverEssentials = true }
+    local SYNC_GLOBAL_ONLY = { EllesmereUIForeverEssentials = true, EllesmereUIForeverHardcore = true }
     EllesmereUI._syncGlobalOnly = SYNC_GLOBAL_ONLY
 
     -- Exclusion registry: keys NOT copied during sync (flat or dot-wildcard, see banner)

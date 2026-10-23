@@ -71,6 +71,7 @@ local EXCLUDED_CONTEXTS = {
     ["EllesmereUIQoL"]               = true,   -- whole module
     ["EllesmereUIAuraBuffReminders"] = true,
     ["EllesmereUIForeverEssentials"] = true,
+    ["EllesmereUIForeverHardcore"]   = true,
     ["EllesmereUIQuickdraw"]         = true,
     ["EllesmereUILoadoutManager"]    = true,
     ["EllesmereUIGroupFinder"]       = true,
