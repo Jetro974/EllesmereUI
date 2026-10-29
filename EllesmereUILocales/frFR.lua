@@ -6002,3 +6002,11 @@ L["Click for the collect menu (COD mail excluded)."] = "Cliquez pour le menu de 
 L["Collected %s from %d mail."] = "%s récupéré(s) dans %d courrier(s)."
 L["Returned %d mail."] = "%d courrier(s) renvoyé(s)."
 L["Nothing to take."] = "Rien à récupérer."
+
+-- Mail expiry (EllesmereUIQoL_MailExpiry.lua)
+L["Mail Expiry Warning"] = "Alerte d'expiration du courrier"
+L["When you open the mailbox, warns in chat about mail with gold or items that expires within 3 days."] = "À l'ouverture de la boîte aux lettres, signale dans la discussion le courrier contenant de l'or ou des objets qui expire dans moins de 3 jours."
+L["%d mail with gold or items expires within %d days (soonest: %s)."] = "%d courrier(s) avec de l'or ou des objets expire(nt) dans moins de %d jours (le plus proche : %s)."
+L["Alt Mail Expiry Reminder"] = "Rappel d'expiration du courrier des alts"
+L["The mailbox remembers when each character's first mail expires. At login, one chat line names the characters whose mail expires within 3 days. A character is remembered once its mailbox has been opened with this on."] = "La boîte aux lettres retient quand le premier courrier de chaque personnage expire. À la connexion, une ligne dans la discussion nomme les personnages dont le courrier expire dans moins de 3 jours. Un personnage est retenu une fois sa boîte aux lettres ouverte avec cette option activée."
+L["Mail expires soon on: %s."] = "Du courrier expire bientôt sur : %s."

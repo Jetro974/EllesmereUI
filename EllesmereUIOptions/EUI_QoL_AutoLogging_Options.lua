@@ -89,6 +89,21 @@ local function ApplyMailbox()
     if _G._EUI_ApplyMailbox then _G._EUI_ApplyMailbox() end
 end
 
+local function MailExpiryOn(key)
+    local db = EllesmereUIDB
+    return db ~= nil and db.mailExpiry ~= nil and db.mailExpiry[key] == true
+end
+
+local function MailExpiryCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.mailExpiry = EllesmereUIDB.mailExpiry or {}
+    return EllesmereUIDB.mailExpiry
+end
+
+local function ApplyMailExpiry()
+    if _G._EUI_ApplyMailExpiry then _G._EUI_ApplyMailExpiry() end
+end
+
 -- Built as the tail of the Quality of Life page (chained from BuildQoLPage),
 -- not as its own tab. Lays out from yOffset and returns the height used,
 -- like every other section builder.
@@ -390,6 +405,25 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
     _, h = W:DualRow(parent, y,
         MailToggle("fillSubject", "Fill Subject for Gold",
             "A mail that sends only gold, with no subject, gets the amount as its subject so it can be sent."),
+        { type    = "toggle",
+                  text    = "Mail Expiry Warning",
+                  tooltip = "When you open the mailbox, warns in chat about mail with gold or items that expires within 3 days.",
+                  getValue = function() return MailExpiryOn("warning") end,
+                  setValue = function(v)
+                      MailExpiryCfg().warning = v
+                      ApplyMailExpiry()
+                  end }
+    ); y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type    = "toggle",
+                  text    = "Alt Mail Expiry Reminder",
+                  tooltip = "The mailbox remembers when each character's first mail expires. At login, one chat line names the characters whose mail expires within 3 days. A character is remembered once its mailbox has been opened with this on.",
+                  getValue = function() return MailExpiryOn("alts") end,
+                  setValue = function(v)
+                      MailExpiryCfg().alts = v
+                      ApplyMailExpiry()
+                  end },
         EllesmereUI.BlankRowCfg()
     ); y = y - h
 
