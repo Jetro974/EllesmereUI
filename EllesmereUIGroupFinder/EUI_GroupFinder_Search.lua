@@ -2071,6 +2071,9 @@ XF.GROUP_MENU = {
       tip = EllesmereUI.L("Puts a small crown above the group leader's icon.") },
     { key = "classTooltip",   label = EllesmereUI.L("Members in Tooltip"),
       tip = EllesmereUI.L("Group tooltips add each member's name (dungeons and arenas, where Blizzard already lists the roles and classes), or a line per member with role, specialization, class and name (other groups).") },
+    { key = "playerZones",    label = EllesmereUI.L("Show Player Zones"),
+      tip = EllesmereUI.L("Shows the zone the group leader is in on the group's row and in its tooltip, when the game provides it."),
+      onToggle = function() XF.Redecorate(); ns.Zones_Refresh() end },
     { title = EllesmereUI.L("Sign Up") },
     { key = "cancelOldest",   label = EllesmereUI.L("Cancel Oldest Application"),
       tip = EllesmereUI.L("At the application limit, clicking a group cancels your oldest pending application so you can sign up.") },
@@ -3754,6 +3757,7 @@ local function Init()
         hooksecurefunc("LFGListUtil_SetSearchEntryTooltip", XF.CancelHint)
     end
     if LFGListSearchEntry_Update then hooksecurefunc("LFGListSearchEntry_Update", DecorateEntry) end
+    ns.Zones_Apply()
     -- Every search clears the 'filters changed' hint and starts the sweep;
     -- Blizzard's own filter reset searches too, so the row repaints here.
     hooksecurefunc("LFGListSearchPanel_DoSearch", function()

@@ -218,6 +218,7 @@ initFrame:SetScript("OnEvent", function(self)
             ns.ResetSettings()
             if ns.Enabled() then
                 ns.Search_Layout()
+                ns.Zones_Refresh()
                 ns.ApplyApplications()
             end
         end,

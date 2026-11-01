@@ -24,6 +24,7 @@ local DEFAULTS = {
     specIcons        = true,
     iconSize         = 125,
     cancelOldest     = false,
+    playerZones      = false,
     dungeonAbbr      = false,
     dungeonScore     = false,
 }

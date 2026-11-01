@@ -14,4 +14,5 @@
 # (EUI_GroupFinder_Options.lua), like every other module.
 EllesmereUIGroupFinder.lua
 EUI_GroupFinder_Search.lua
+EUI_GroupFinder_Zones.lua
 EUI_GroupFinder_Applications.lua
