@@ -1,14 +1,14 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
-if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
---  EllesmereUIForeverEssentials_Fishing.lua  (WoW Forever only)
+--  EllesmereUIQoL_Fishing.lua
 --  Fishing helpers, each its own setting (all off by default):
---  Fishing Key      one key casts; it first equips a pole when none is in
---                   hand and applies a lure (cog). With Reel In (cog), once
---                   soft interact targets the bobber the key reels in; the
---                   Bobber Indicator (cog) shows whether it does.
---  Double-Click     a pole in hand: a quick second right-click on the world
---                   casts (its own Apply Lure in its cog).
+--  Fishing Key      one key casts; it first equips a pole when none is
+--                   equipped and, on WoW Forever, applies a lure (cog). With
+--                   Reel In (cog), once soft interact targets the bobber the
+--                   key reels in; the Bobber Indicator (cog) shows whether it
+--                   does.
+--  Double-Click     a pole equipped: a quick second right-click on the world
+--                   casts (WoW Forever: its own Apply Lure in its cog).
 --  Fishing Sounds   music and ambience down, effects up, for the session.
 --
 --  Every action is a real key press or click on a secure button, bound out
@@ -16,21 +16,22 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  or a load; the CVars it changes go through EllesmereUI.HoldCVar, their
 --  values from before saved and put back at the next login after a reload.
 -------------------------------------------------------------------------------
-local _, module = ...
+local IS_FOREVER = EllesmereUI.IS_FOREVER
 local BUTTON_NAME = "EllesmereUIFishingCastButton"
 
 -- Settings live in EllesmereUIDB.fishing; unset keys read these. key: the
 -- Fishing Key (nil: none); held: [set] = { [cvar] = the value before };
 -- pos: where Unlock Mode put the Bobber Indicator.
-local F = module.Feature("fishing", {
+local F = EllesmereUI.NewFeature("fishing", {
     reel = true, indicator = true, lure = true,
     doubleClick = false, clickLure = false, sound = false,
-}, { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 })
+}, { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 },
+    { group = "Quality of Life", folder = "EllesmereUIQoL" })
 
--- The Fishing ranks, highest first.
-local FISHING_SPELLS = { 18248, 7732, 7731, 7620 }
+-- The Fishing spell known: retail first, then the WoW Forever ranks, highest first.
+local FISHING_SPELLS = { 131474, 18248, 7732, 7731, 7620 }
 
--- Lures, best first (item ID): Aquadynamic Fish Attractor, Bright Baubles,
+-- Lures (WoW Forever only), best first (item ID): Aquadynamic Fish Attractor, Bright Baubles,
 -- Flesh Eating Worm, Nightcrawlers, Aquadynamic Fish Lens, Shiny Bauble.
 local LURES = { 6533, 6532, 7307, 6530, 6811, 6529 }
 
@@ -87,14 +88,21 @@ local function ResolveFishing()
     end
 end
 
+-- A fishing pole: a weapon on WoW Forever, a profession tool on retail.
 local function IsPole(id)
     local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(id)
-    return classID == Enum.ItemClass.Weapon and subClassID == Enum.ItemWeaponSubclass.Fishingpole
+    if not classID then return false end
+    if classID == Enum.ItemClass.Weapon then return subClassID == Enum.ItemWeaponSubclass.Fishingpole end
+    return Enum.ItemProfessionSubclass ~= nil and classID == Enum.ItemClass.Profession
+        and subClassID == Enum.ItemProfessionSubclass.Fishing
 end
 
--- WoW Forever fishes with the pole in the main hand.
+-- Where the pole goes: the main hand on WoW Forever, the fishing tool slot on
+-- retail (FishingToolSlot in Blizzard_ProfessionsCrafting).
+local POLE_SLOT = IS_FOREVER and INVSLOT_MAINHAND or 28
+
 local function PoleInHand()
-    local id = GetInventoryItemID("player", INVSLOT_MAINHAND)
+    local id = GetInventoryItemID("player", POLE_SLOT)
     return id ~= nil and IsPole(id)
 end
 
@@ -140,7 +148,7 @@ local function Hold(set, cvars)
     for name, value in pairs(cvars) do
         local cur = C_CVar.GetCVar(name)
         local want = cur and CVarText(value(tonumber(cur) or 0))
-        if cur ~= nil and cur ~= want and EllesmereUI.HoldCVar(name, want, "EllesmereUIForeverEssentials") then
+        if cur ~= nil and cur ~= want and EllesmereUI.HoldCVar(name, want, "EllesmereUIQoL") then
             was[name] = cur
         end
     end
@@ -152,7 +160,7 @@ local function Release(set)
     local was = held and held[set]
     if not was then return end
     for name, value in pairs(was) do
-        EllesmereUI.ReleaseCVar(name, value, "EllesmereUIForeverEssentials")
+        EllesmereUI.ReleaseCVar(name, value, "EllesmereUIQoL")
     end
     held[set] = nil
 end
@@ -230,7 +238,7 @@ local function UpdateCastButton(viaClick)
             castButton:SetAttribute("item", "item:" .. pole)
             return
         end
-    elseif F.Get(viaClick and "clickLure" or "lure") and not GetWeaponEnchantInfo() then
+    elseif IS_FOREVER and F.Get(viaClick and "clickLure" or "lure") and not GetWeaponEnchantInfo() then
         local lure = BestLure()
         if lure then
             castButton:SetAttribute("type", "macro")

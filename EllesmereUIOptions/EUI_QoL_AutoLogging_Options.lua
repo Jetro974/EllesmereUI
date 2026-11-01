@@ -246,6 +246,104 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
     _, h = W:Spacer(parent, y, 20); y = y - h
 
     ---------------------------------------------------------------------------
+    --  FISHING (runtime in EllesmereUIQoL_Fishing.lua)
+    ---------------------------------------------------------------------------
+    local FI = EllesmereUI._Fishing
+    local function SetFish(key, v)
+        FI.Cfg()[key] = v
+        FI.Apply()
+    end
+
+    local hdr
+    hdr, h = W:SectionHeader(parent, "FISHING", y);  y = y - h
+    -- The Bobber Indicator's mover exists only while the indicator can show:
+    -- the Fishing Key bound with Reel In and Bobber Indicator on (the cog's
+    -- rows), so the button names whichever of the three is missing.
+    EllesmereUI.BuildSectionUnlockJump(hdr, { key = "EUI_FishingBobber",
+        disabled = function() return FI.Get("key") == nil or not FI.Get("reel") or not FI.Get("indicator") end,
+        disabledTooltip = function()
+            if FI.Get("key") == nil then return "Fishing Key" end
+            if not FI.Get("reel") then return "Reel In With the Key" end
+            return "Bobber Indicator"
+        end })
+
+    -- Fishing Key (keybind, its options in the cog) | Double-Click to Cast
+    local fishKeyRow
+    fishKeyRow, h = W:DualRow(parent, y,
+        { type = "label", text = "Fishing Key",
+          tooltip = EllesmereUI.IS_FOREVER
+              and "One key casts your line, equipping your best fishing pole first. Use the cog for reeling in, the bobber indicator and lures."
+              or "One key casts your line, equipping your best fishing pole first. Use the cog for reeling in and the bobber indicator." },
+        { type = "toggle", text = "Double-Click to Cast",
+          tooltip = "With a fishing pole in hand, double right-click the world to cast.",
+          disabled = function() return EllesmereUI.PadGamepadUI() end,
+          disabledTooltip = "This option does not work with the Gamepad interface style.",
+          getValue = function() return FI.Get("doubleClick") end,
+          setValue = function(v)
+              SetFish("doubleClick", v)
+              EllesmereUI:RefreshPage()  -- the cog's disabled state
+          end }
+    );  y = y - h
+    if not EllesmereUI._prebuilding then
+        local rgn = fishKeyRow._leftRegion
+        local kbBtn, refresh = EllesmereUI.BuildKeybindButton(rgn, {
+            w = 140, h = 30, font = 13,
+            get = function() return FI.Get("key") end,
+            set = function(v)
+                SetFish("key", v)
+                EllesmereUI:RefreshPage()  -- the cog's disabled state
+            end,
+            tooltip = "Left-click to set a keybind.\nRight-click to unbind.",
+        })
+        EllesmereUI.PanelPP.Point(kbBtn, "RIGHT", rgn, "RIGHT", -20, 0)
+        EllesmereUI.RegisterWidgetRefresh(refresh)
+
+        local function fishRow(label, tooltip, key)
+            return { type = "toggle", label = label, tooltip = tooltip,
+                get = function() return FI.Get(key) end,
+                set = function(v) SetFish(key, v) end }
+        end
+        -- A label half has no control: the cog sits left of the keybind
+        -- button, which also bounds the label.
+        local keyRows = {
+            fishRow("Reel In With the Key", "Once the bobber bites and is on screen, the Fishing Key reels it in.", "reel"),
+            fishRow("Bobber Indicator", "Shows whether the key will reel in. Place it in Unlock Mode.", "indicator"),
+        }
+        -- Lures are weapon enchants on the pole: WoW Forever only.
+        if EllesmereUI.IS_FOREVER then
+            keyRows[#keyRows + 1] = fishRow("Apply Lure", "With no lure on your pole, the key applies your best lure first.", "lure")
+        end
+        EllesmereUI.BuildInlineCog(rgn, {
+            title = "Fishing Key",
+            rows = keyRows,
+            anchorTo = kbBtn,
+            disabled = function() return FI.Get("key") == nil end,
+            disabledTooltip = "Fishing Key",
+        })
+        if EllesmereUI.IS_FOREVER then
+            EllesmereUI.BuildInlineCog(fishKeyRow._rightRegion, {
+                title = "Double-Click to Cast",
+                rows = { fishRow("Apply Lure", "With no lure on your pole, a double-click applies your best lure first.", "clickLure") },
+                disabled = function() return EllesmereUI.PadGamepadUI() or not FI.Get("doubleClick") end,
+                disabledTooltip = function()
+                    if EllesmereUI.PadGamepadUI() then return "This option does not work with the Gamepad interface style." end
+                    return "Double-Click to Cast"
+                end,
+            })
+        end
+    end
+
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Fishing Sounds",
+          tooltip = "While you fish: music and ambience down, effects up, sound on in the background.",
+          getValue = function() return FI.Get("sound") end,
+          setValue = function(v) SetFish("sound", v) end },
+        EllesmereUI.BlankRowCfg()
+    );  y = y - h
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
+
+    ---------------------------------------------------------------------------
     --  AUTO COMBAT LOGGING
     ---------------------------------------------------------------------------
     _, h = W:SectionHeader(parent, "AUTO COMBAT LOGGING", y); y = y - h
