@@ -1137,7 +1137,7 @@ EllesmereUI._WHATSNEW_PATCHES = {
                 module = "Forever Essentials",
                 title  = "Auto Summon Pet",
                 desc   = "Your companion pet comes back after loading screens, flights and deaths, from your favorites or this character's own",
-                nav    = EllesmereUI.IS_FOREVER and { module = "EllesmereUIForeverEssentials", page = "General",
+                nav    = EllesmereUI.IS_FOREVER and { module = "EllesmereUIQoL", page = "QoL",
                            section = "COMPANION PETS", highlight = "Auto Summon Pet" } or nil,
             },
             {
