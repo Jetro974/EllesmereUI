@@ -1,10 +1,10 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
-if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
---  EllesmereUIForeverEssentials_QuestRewards.lua  (WoW Forever only)
+--  EllesmereUIQoL_QuestRewards.lua
 --  Most Valuable Reward: among a quest's reward choices (quest window, quest
 --  log and map), a money bag (the minimap's banker icon) at the bottom right
---  of the one that sells for most, its count included.
+--  of the one that sells for most, its count included (WoW Forever: the
+--  minimap's banker icon; retail: a gold coin).
 --
 --  The game lays the rewards out within QuestInfo_Display (its templates
 --  hold their own reference to QuestInfo_ShowRewards, so that one cannot be
@@ -13,13 +13,15 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  Blizzard's is written. An item the client has not cached yet waits for
 --  its GET_ITEM_INFO_RECEIVED, then the choices are read again once.
 -------------------------------------------------------------------------------
-local _, module = ...
-
 -- Settings live in EllesmereUIDB.questRewards; unset keys read these.
-local F = module.Feature("questRewards", { enabled = false })
+local F = EllesmereUI.NewFeature("questRewards", { enabled = false }, nil,
+    { group = "Quality of Life", folder = "EllesmereUIQoL" })
 
--- The minimap's banker icon: a money bag drawn on transparency.
-local PURSE = "Interface\\Minimap\\Tracking\\Banker"
+-- The minimap's banker icon, a money bag drawn on transparency (WoW Forever);
+-- retail does not use that art any more, so a gold coin icon.
+local IS_FOREVER = EllesmereUI.IS_FOREVER
+local PURSE = IS_FOREVER and "Interface\\Minimap\\Tracking\\Banker"
+    or "Interface\\Icons\\INV_Misc_Coin_01"
 
 local hooked, waiter, Update
 local coins = setmetatable({}, { __mode = "k" })  -- reward button -> our coin
@@ -44,6 +46,7 @@ local function Coin(button)
     holder:SetFrameLevel(button:GetFrameLevel() + 2)
     coin = holder:CreateTexture(nil, "OVERLAY")
     coin:SetTexture(PURSE)
+    if not IS_FOREVER then coin:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
     coin:SetSize(18, 18)
     coin:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 2, 0)
     coins[button] = coin

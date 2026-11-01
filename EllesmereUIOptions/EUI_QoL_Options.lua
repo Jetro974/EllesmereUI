@@ -2577,7 +2577,7 @@ initFrame:SetScript("OnEvent", function(self)
     -- No item upgrade system on WoW Forever: the Upgrader tab is not offered there
     -- (its resident file returns at load, so the page builder never exists either).
     if not EllesmereUI.IS_FOREVER then pages[#pages + 1] = PAGE_UPGCALC end
-    local searchTerms = { "brez", "bres", "battle res", "combat res", "cursor", "macro", "fps", "logging", "combat log", "warcraft logs", "upgrade", "ilvl", "item level", "crest", "upgrade calculator", "upgrade tooltips", "tooltip", "shifter", "move", "drag", "position", "demodal", "drift", "combat alert", "enter combat", "leave combat", "in combat", "combat text", "combat notification", "transform", "transforms", "costume", "disguise", "chef's hat", "noggenfogger", "target distance", "distance to target", "range text", "yard", "yards", "movement", "mobility", "gap closer", "blink", "gateway", "warlock gateway", "control shard", "time spiral", "free movement", "raid tools", "raid", "pull timer", "pull", "ready check", "role check", "raid marker", "target marker", "world marker", "flare", "disband", "convert to raid", "countdown", "fishing", "fishing key", "fish", "bobber", "fishing pole", "lure", "double click", "pet", "companion", "auto summon", "summon pet", "favorite pet" }
+    local searchTerms = { "brez", "bres", "battle res", "combat res", "cursor", "macro", "fps", "logging", "combat log", "warcraft logs", "upgrade", "ilvl", "item level", "crest", "upgrade calculator", "upgrade tooltips", "tooltip", "shifter", "move", "drag", "position", "demodal", "drift", "combat alert", "enter combat", "leave combat", "in combat", "combat text", "combat notification", "transform", "transforms", "costume", "disguise", "chef's hat", "noggenfogger", "target distance", "distance to target", "range text", "yard", "yards", "movement", "mobility", "gap closer", "blink", "gateway", "warlock gateway", "control shard", "time spiral", "free movement", "raid tools", "raid", "pull timer", "pull", "ready check", "role check", "raid marker", "target marker", "world marker", "flare", "disband", "convert to raid", "countdown", "fishing", "fishing key", "fish", "bobber", "fishing pole", "lure", "double click", "pet", "companion", "auto summon", "summon pet", "favorite pet", "quest", "quest reward", "reward", "most valuable" }
     -- Terms for features WoW Forever does not have (the Battle Res indicator,
     -- the Macro Factory) are dropped there, so a sidebar search for them does
     -- not list this module; retail keeps the full list.
@@ -2733,6 +2733,7 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.fishing = fi and fi.held and { held = fi.held } or nil
                 -- The per-character favorites are the player's picks: only the switch resets.
                 if EllesmereUIDB.petSummon then EllesmereUIDB.petSummon.enabled = nil end
+                EllesmereUIDB.questRewards = nil
             end
             EllesmereUIDB.autoLogging = nil
             if _G._EUI_ResetUpgradeCalc then _G._EUI_ResetUpgradeCalc() end
@@ -2758,6 +2759,7 @@ initFrame:SetScript("OnEvent", function(self)
             if _G._EUI_AutoLogging_Check then _G._EUI_AutoLogging_Check() end
             if EllesmereUI._Fishing then EllesmereUI._Fishing.Apply() end
             if EllesmereUI._PetSummon then EllesmereUI._PetSummon.Apply() end
+            if EllesmereUI._QuestRewards then EllesmereUI._QuestRewards.Apply() end
             EllesmereUI._ModuleNS["EllesmereUIQoL"].SCT_Reset()
             EllesmereUI:InvalidatePageCache()
         end,

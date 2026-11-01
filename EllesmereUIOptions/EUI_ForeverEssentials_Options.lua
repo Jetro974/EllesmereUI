@@ -75,7 +75,6 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.classicSpellbook = nil
                 EllesmereUIDB.classicTalents = nil
                 EllesmereUIDB.macroManager = nil
-                EllesmereUIDB.questRewards = nil
                 EllesmereUIDB.zoneLevels = nil
                 EllesmereUIDB.mapTravel = nil
                 -- The game's mapFade from before stays, so Apply can give it back.
@@ -113,7 +112,6 @@ initFrame:SetScript("OnEvent", function(self)
             if EllesmereUI._ActiveForm then EllesmereUI._ActiveForm.Apply() end
             if EllesmereUI._ClassicSpellbook then EllesmereUI._ClassicSpellbook.Apply() end
             if EllesmereUI._ClassicTalents then EllesmereUI._ClassicTalents.Apply() end
-            if EllesmereUI._QuestRewards then EllesmereUI._QuestRewards.Apply() end
             if EllesmereUI._ZoneLevels then EllesmereUI._ZoneLevels.Apply() end
             if EllesmereUI._MapTravel then EllesmereUI._MapTravel.Apply() end
             if EllesmereUI._MapFade then EllesmereUI._MapFade.Apply() end
