@@ -1964,6 +1964,24 @@ initFrame:SetScript("OnEvent", function(self)
             BuildResCog(resRow._leftRegion)
         end
 
+        -- Row 7: Fade Map While Moving. Forever Essentials has its own on WoW Forever.
+        if not EllesmereUI.IS_FOREVER then
+            local MF = EllesmereUI._MapFade
+            if MF then
+                _, h = W:DualRow(parent, y,
+                    { type="toggle", text="Fade Map While Moving",
+                      tooltip="The world map fades while you move and comes back when you stop or hover it.",
+                      -- Off by default.
+                      getValue=function() return MF.Get("enabled") end,
+                      setValue=function(v)
+                          MF.Cfg().enabled = v
+                          MF.Apply()
+                      end },
+                    EllesmereUI.BlankRowCfg()
+                );  y = y - h
+            end
+        end
+
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
         ---------------------------------------------------------------------------
@@ -2577,12 +2595,12 @@ initFrame:SetScript("OnEvent", function(self)
     -- No item upgrade system on WoW Forever: the Upgrader tab is not offered there
     -- (its resident file returns at load, so the page builder never exists either).
     if not EllesmereUI.IS_FOREVER then pages[#pages + 1] = PAGE_UPGCALC end
-    local searchTerms = { "brez", "bres", "battle res", "combat res", "cursor", "macro", "fps", "logging", "combat log", "warcraft logs", "upgrade", "ilvl", "item level", "crest", "upgrade calculator", "upgrade tooltips", "tooltip", "shifter", "move", "drag", "position", "demodal", "drift", "combat alert", "enter combat", "leave combat", "in combat", "combat text", "combat notification", "transform", "transforms", "costume", "disguise", "chef's hat", "noggenfogger", "target distance", "distance to target", "range text", "yard", "yards", "movement", "mobility", "gap closer", "blink", "gateway", "warlock gateway", "control shard", "time spiral", "free movement", "raid tools", "raid", "pull timer", "pull", "ready check", "role check", "raid marker", "target marker", "world marker", "flare", "disband", "convert to raid", "countdown" }
+    local searchTerms = { "brez", "bres", "battle res", "combat res", "cursor", "macro", "fps", "logging", "combat log", "warcraft logs", "upgrade", "ilvl", "item level", "crest", "upgrade calculator", "upgrade tooltips", "tooltip", "shifter", "move", "drag", "position", "demodal", "drift", "combat alert", "enter combat", "leave combat", "in combat", "combat text", "combat notification", "transform", "transforms", "costume", "disguise", "chef's hat", "noggenfogger", "target distance", "distance to target", "range text", "yard", "yards", "movement", "mobility", "gap closer", "blink", "gateway", "warlock gateway", "control shard", "time spiral", "free movement", "raid tools", "raid", "pull timer", "pull", "ready check", "role check", "raid marker", "target marker", "world marker", "flare", "disband", "convert to raid", "countdown", "map fade", "fade map" }
     -- Terms for features WoW Forever does not have (the Battle Res indicator,
     -- the Macro Factory) are dropped there, so a sidebar search for them does
     -- not list this module; retail keeps the full list.
     if EllesmereUI.IS_FOREVER then
-        local foreverDrop = { ["brez"] = true, ["bres"] = true, ["battle res"] = true, ["combat res"] = true,
+        local foreverDrop = { ["brez"] = true, ["bres"] = true, ["battle res"] = true, ["combat res"] = true, ["map fade"] = true, ["fade map"] = true,
             ["macro"] = true }
         for i = #searchTerms, 1, -1 do
             if foreverDrop[searchTerms[i]] then table.remove(searchTerms, i) end
@@ -2728,6 +2746,11 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.keystonePopup = nil
                 EllesmereUIDB.teleportPrompt = nil
                 EllesmereUIDB.waypointCmd = nil
+                if not EllesmereUI.IS_FOREVER then
+                    -- The game's mapFade from before stays, so Apply can give it back.
+                    local mf = EllesmereUIDB.worldMapFade
+                    EllesmereUIDB.worldMapFade = mf and mf.mapFadeWas ~= nil and { mapFadeWas = mf.mapFadeWas } or nil
+                end
             end
             EllesmereUIDB.autoLogging = nil
             if _G._EUI_ResetUpgradeCalc then _G._EUI_ResetUpgradeCalc() end
@@ -2751,6 +2774,7 @@ initFrame:SetScript("OnEvent", function(self)
             if EllesmereUI._applyAutoOpenContainers then EllesmereUI._applyAutoOpenContainers() end
             if EllesmereUI._ShutdownShifter then EllesmereUI._ShutdownShifter() end
             if _G._EUI_AutoLogging_Check then _G._EUI_AutoLogging_Check() end
+            if not EllesmereUI.IS_FOREVER and EllesmereUI._MapFade then EllesmereUI._MapFade.Apply() end
             EllesmereUI._ModuleNS["EllesmereUIQoL"].SCT_Reset()
             EllesmereUI:InvalidatePageCache()
         end,
