@@ -40,9 +40,6 @@ EllesmereUIForeverEssentials_Window.lua
 EllesmereUIForeverEssentials_ThreatMeter.lua
 EllesmereUIForeverEssentials_ThreatFeed.lua
 
-# Companion pets (auto summon)
-EllesmereUIForeverEssentials_PetSummon.lua
-
 # Loot (loot feed)
 EllesmereUIForeverEssentials_LootFeed.lua
 

@@ -77,8 +77,6 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.macroManager = nil
                 EllesmereUIDB.questRewards = nil
                 EllesmereUIDB.zoneLevels = nil
-                -- The per-character favorites are the player's picks: only the switch resets.
-                if EllesmereUIDB.petSummon then EllesmereUIDB.petSummon.enabled = nil end
                 EllesmereUIDB.mapTravel = nil
                 -- The game's mapFade from before stays, so Apply can give it back.
                 local mf = EllesmereUIDB.worldMapFade
@@ -117,7 +115,6 @@ initFrame:SetScript("OnEvent", function(self)
             if EllesmereUI._ClassicTalents then EllesmereUI._ClassicTalents.Apply() end
             if EllesmereUI._QuestRewards then EllesmereUI._QuestRewards.Apply() end
             if EllesmereUI._ZoneLevels then EllesmereUI._ZoneLevels.Apply() end
-            if EllesmereUI._PetSummon then EllesmereUI._PetSummon.Apply() end
             if EllesmereUI._MapTravel then EllesmereUI._MapTravel.Apply() end
             if EllesmereUI._MapFade then EllesmereUI._MapFade.Apply() end
             if EllesmereUI._GatherSkill then EllesmereUI._GatherSkill.Apply() end

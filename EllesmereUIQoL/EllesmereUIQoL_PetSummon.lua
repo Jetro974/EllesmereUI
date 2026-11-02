@@ -1,7 +1,6 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
-if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
---  EllesmereUIForeverEssentials_PetSummon.lua  (WoW Forever only)
+--  EllesmereUIQoL_PetSummon.lua
 --  Auto Summon Pet: once the game takes the companion pet away (death,
 --  loading screen, taxi, vehicle...), summons one again a moment later: a
 --  random favorite, or any random pet while none is a favorite, as the
@@ -19,7 +18,6 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  in the client, so that pet comes back at the next of the events below.
 --  Events and hooks only exist once the feature has been on.
 -------------------------------------------------------------------------------
-local _, module = ...
 local DELAY = 2  -- seconds after a trigger: lets a load, landing or resurrection settle
 local STAR = "PetJournal-FavoritesIcon"   -- the journal's favorite star, tinted blue below
 
@@ -27,7 +25,8 @@ local STAR = "PetJournal-FavoritesIcon"   -- the journal's favorite star, tinted
 --   enabled                 Auto Summon Pet
 --   chars[player GUID]      own = Favorites per Character, favorites = { [pet GUID] = true },
 --                           dismissed = the player put the pet away (until they summon one)
-local F = module.Feature("petSummon", { enabled = false })
+local F = EllesmereUI.NewFeature("petSummon", { enabled = false }, nil,
+    { group = "Quality of Life", folder = "EllesmereUIQoL" })
 local IsEnabled = F.Enabled
 
 -- This character's settings; nil until written, unless create.
@@ -125,10 +124,12 @@ Queue = function()
 end
 
 -- After which a missing pet may come back (COMPANION_UPDATE: the pet out).
+-- UPDATE_SHAPESHIFT_FORM: a druid's flight and travel forms take the pet away
+-- without a mount event, so leaving the form is what brings it back.
 local EVENTS = {
     "COMPANION_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_ALIVE",
     "PLAYER_UNGHOST", "PLAYER_CONTROL_GAINED", "UNIT_EXITED_VEHICLE",
-    "UPDATE_STEALTH", "PLAYER_MOUNT_DISPLAY_CHANGED",
+    "UPDATE_STEALTH", "PLAYER_MOUNT_DISPLAY_CHANGED", "UPDATE_SHAPESHIFT_FORM",
 }
 
 ev:SetScript("OnEvent", function(_, event, arg1)
@@ -258,6 +259,25 @@ local function ApplyPetSummon(fresh)
     userDismissed = (c and c.dismissed) and true or false
     Queue()
 end
+-- Why a missing pet stays away: /run print(EllesmereUI._PetSummon.Why())
+local function Why()
+    if not IsEnabled() then return "Auto Summon Pet is off" end
+    if userDismissed then return "the pet was dismissed by the player" end
+    if C_PetJournal.GetSummonedPetGUID() then return "a pet is out" end
+    if InCombatLockdown() then return "in combat" end
+    if UnitIsDeadOrGhost("player") then return "dead" end
+    if UnitOnTaxi("player") then return "on a taxi" end
+    if UnitInVehicle("player") then return "in a vehicle" end
+    if IsMounted() then return "mounted (flight and travel forms count)" end
+    if IsStealthed() then return "stealthed" end
+    local _, kind = IsInInstance()
+    if kind == "party" or kind == "raid" or kind == "pvp" or kind == "arena" then
+        return "in " .. kind
+    end
+    if UnitCastingInfo("player") or UnitChannelInfo("player") then return "casting" end
+    return "nothing blocks it"
+end
+
 -- Options-page entry points. Favorites per Character changed: only the
 -- journal's stars and menu follow (RefreshJournal).
 EllesmereUI._PetSummon = {
@@ -265,6 +285,7 @@ EllesmereUI._PetSummon = {
     Cfg = F.Cfg,
     Apply = ApplyPetSummon,
     RefreshJournal = RefreshJournal,
+    Why = Why,
 }
 
 F.Start(ApplyPetSummon)
