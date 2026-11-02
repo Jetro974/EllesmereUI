@@ -1250,6 +1250,12 @@ local function BuildGeneralPage(pageName, parent, yOffset)
                     DB().questObjectiveTextSize = v
                     if ns.RefreshQuestObjective then ns.RefreshQuestObjective() end
                   end },
+                { type = "toggle", label = "Bag on Item Objectives",
+                  get = function() return DBVal("questObjectiveBag") == true end,
+                  set = function(v)
+                    DB().questObjectiveBag = v and true or false
+                    if ns.RefreshQuestObjective then ns.RefreshQuestObjective() end
+                  end },
             },
         })
     end
