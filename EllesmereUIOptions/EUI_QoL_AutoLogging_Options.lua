@@ -384,6 +384,28 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
 
 
     ---------------------------------------------------------------------------
+    --  QUEST REWARDS (runtime in EllesmereUIQoL_QuestRewards.lua)
+    ---------------------------------------------------------------------------
+    local QR = EllesmereUI._QuestRewards
+    _, h = W:SectionHeader(parent, "QUEST REWARDS", y);  y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Most Valuable Reward",
+          tooltip = EllesmereUI.IS_FOREVER
+              and "Among a quest's reward choices, a money bag marks the one that sells for most, its count included."
+              or "Among a quest's reward choices, a gold coin marks the one that sells for most, its count included.",
+          getValue = function() return QR.Get("enabled") end,
+          setValue = function(v)
+              QR.Cfg().enabled = v
+              QR.Apply()
+          end },
+        EllesmereUI.BlankRowCfg()
+    );  y = y - h
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
+
+
+    ---------------------------------------------------------------------------
     --  AUTO COMBAT LOGGING
     ---------------------------------------------------------------------------
     _, h = W:SectionHeader(parent, "AUTO COMBAT LOGGING", y); y = y - h

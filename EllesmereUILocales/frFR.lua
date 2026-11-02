@@ -5863,6 +5863,7 @@ L["Tints the areas you have not explored yet. White shows them as they are."] = 
 L["QUEST REWARDS"] = "RÉCOMPENSES DE QUÊTE"
 L["Most Valuable Reward"] = "Récompense la plus chère"
 L["Among a quest's reward choices, a money bag marks the one that sells for most, its count included."] = "Parmi les récompenses de quête au choix, une bourse marque celle qui se revend le plus cher, quantité comprise."
+L["Among a quest's reward choices, a gold coin marks the one that sells for most, its count included."] = "Parmi les récompenses de quête au choix, une pièce d'or marque celle qui se revend le plus cher, quantité comprise."
 -- Show Zone Levels (EllesmereUIForeverEssentials_ZoneLevels.lua)
 L["Show Zone Levels"] = "Afficher les niveaux des zones"
 L["Shows the level range of the zone you hover on a continent of the world map, under its name, colored by difficulty."] = "Affiche la tranche de niveaux de la zone survolée sur un continent de la carte du monde, sous son nom, colorée selon la difficulté."

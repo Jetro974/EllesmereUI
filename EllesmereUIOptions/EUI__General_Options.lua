@@ -1185,7 +1185,7 @@ EllesmereUI._WHATSNEW_PATCHES = {
                 module = "Forever Essentials",
                 title  = "Most Valuable Reward",
                 desc   = "A money bag marks the quest reward choice that sells for the most gold",
-                nav    = EllesmereUI.IS_FOREVER and { module = "EllesmereUIForeverEssentials", page = "General",
+                nav    = EllesmereUI.IS_FOREVER and { module = "EllesmereUIQoL", page = "QoL",
                            section = "QUEST REWARDS", highlight = "Most Valuable Reward" } or nil,
             },
             {
