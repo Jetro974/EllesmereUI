@@ -1145,7 +1145,7 @@ EllesmereUI._WHATSNEW_PATCHES = {
                 module = "Forever Essentials",
                 title  = "Fishing",
                 desc   = "A Fishing Key equips your pole, applies a lure, casts and reels in, a step per press, with optional double-click casting and a bobber indicator",
-                nav    = EllesmereUI.IS_FOREVER and { module = "EllesmereUIForeverEssentials", page = "General",
+                nav    = EllesmereUI.IS_FOREVER and { module = "EllesmereUIQoL", page = "QoL",
                            section = "FISHING", highlight = "Fishing Key" } or nil,
             },
             {
