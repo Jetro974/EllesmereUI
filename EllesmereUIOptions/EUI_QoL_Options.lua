@@ -1967,6 +1967,65 @@ initFrame:SetScript("OnEvent", function(self)
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
         ---------------------------------------------------------------------------
+        --  REQUESTS  (EllesmereUIQoL_Requests.lua)
+        ---------------------------------------------------------------------------
+        _, h = W:SectionHeader(parent, "REQUESTS", y);  y = y - h
+
+        local function RequestToggle(key, text, tooltip)
+            return { type="toggle", text=text, tooltip=tooltip,
+                getValue=function() return EllesmereUIDB and EllesmereUIDB[key] or false end,
+                setValue=function(v)
+                    if not EllesmereUIDB then EllesmereUIDB = {} end
+                    EllesmereUIDB[key] = v
+                    if EllesmereUI._applyRequests then EllesmereUI._applyRequests() end
+                    EllesmereUI:RefreshPage()
+                end }
+        end
+
+        -- Row 1: Decline Duels | Decline Guild Invitations
+        _, h = W:DualRow(parent, y,
+            RequestToggle("declineDuels", "Decline Duels",
+                "Duel challenges are declined right away."),
+            RequestToggle("declineGuildInvites", "Decline Guild Invitations",
+                "Invitations to join a guild are declined right away.")
+        );  y = y - h
+
+        -- Row 2: Decline Group Invitations | Invite on Whisper (cog: keyword, who)
+        local whisperRow
+        whisperRow, h = W:DualRow(parent, y,
+            RequestToggle("declineGroupInvites", "Decline Group Invitations",
+                "Group invitations from players who are not your friends or guild members are declined right away. Group Finder invitations are always left to you."),
+            RequestToggle("inviteOnWhisper", "Invite on Whisper",
+                "Whoever whispers you the keyword, and nothing else, is invited to your group. In a group, only the leader or an assistant invites. Use the cog to set the keyword.")
+        );  y = y - h
+        if not EllesmereUI._prebuilding then
+            EllesmereUI.BuildInlineCog(whisperRow._rightRegion, {
+                title = "Invite on Whisper",
+                rows = {
+                    { type="input", label="Keyword", inputWidth=90, commitOnBlur=true,
+                      tooltip="The whole whisper must be this word. Capitals do not matter.",
+                      get=function() return EllesmereUIDB and EllesmereUIDB.inviteKeyword or "inv" end,
+                      set=function(v)
+                          if not EllesmereUIDB then EllesmereUIDB = {} end
+                          v = strtrim(v or "")
+                          EllesmereUIDB.inviteKeyword = (v ~= "" and v) or nil
+                      end },
+                    { type="toggle", label="Friends and Guild Only",
+                      get=function() return not (EllesmereUIDB and EllesmereUIDB.inviteKnownOnly == false) end,
+                      set=function(v)
+                          if not EllesmereUIDB then EllesmereUIDB = {} end
+                          EllesmereUIDB.inviteKnownOnly = v
+                      end },
+                },
+                gap = 9,
+                disabled = function() return not (EllesmereUIDB and EllesmereUIDB.inviteOnWhisper) end,
+                disabledTooltip = "Invite on Whisper",
+            })
+        end
+
+        _, h = W:Spacer(parent, y, 20);  y = y - h
+
+        ---------------------------------------------------------------------------
         --  CROSSHAIR
         ---------------------------------------------------------------------------
         _, h = W:SectionHeader(parent, "CROSSHAIR", y);  y = y - h
@@ -2716,6 +2775,12 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.mapSidebarsOpacity = nil
                 EllesmereUIDB.autoAcceptRes = nil
                 EllesmereUIDB.autoAcceptResCombat = nil
+                EllesmereUIDB.declineDuels = nil
+                EllesmereUIDB.declineGuildInvites = nil
+                EllesmereUIDB.declineGroupInvites = nil
+                EllesmereUIDB.inviteOnWhisper = nil
+                EllesmereUIDB.inviteKeyword = nil
+                EllesmereUIDB.inviteKnownOnly = nil
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_TargetDistance = nil
                     EllesmereUIDB.unlockAnchors.EUI_CombatAlert = nil
