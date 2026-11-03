@@ -1,8 +1,8 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  EUI_QoL_Alerts_Options.lua
---  ALERTS section: Combat Alert, Potion Ready Alert, Unspent Talents Alert and
---  Announce Group Deaths. The first three share one movable anchor (Unlock Mode:
+--  ALERTS section: Combat Alert, Potion Ready Alert, Unspent Talents Alert,
+--  Craft Ready Alert, World Events Alert (WoW Forever) and Announce Group Deaths. The first three share one movable anchor (Unlock Mode:
 --  Alerts) and have their own text, size and color; their runtime is
 --  EllesmereUIQoL_Alerts.lua. Group Deaths keeps its own overlay (EllesmereUIQoL.lua).
 -------------------------------------------------------------------------------
@@ -107,6 +107,32 @@ _G._EUI_BuildAlertsSection = function(parent, yOffset, W, PP)
               if EllesmereUI._applyAnnounceGroupDeaths then EllesmereUI._applyAnnounceGroupDeaths() end
               EllesmereUI:RefreshPage()
           end }
+    );  y = y - h
+
+    local row3
+    row3, h = W:DualRow(parent, y,
+        { type="toggle", text="Craft Ready Alert",
+          tooltip="Shows on-screen text when a craft with a cooldown (a transmutation, a cloth of the day) is ready again. A craft is known once its profession window has been opened. Use the cog to set the text, size and color; use Unlock Mode to reposition the alerts.",
+          getValue=function()
+              return EllesmereUIDB and EllesmereUIDB.craftAlertEnabled or false
+          end,
+          setValue=function(v)
+              if not EllesmereUIDB then EllesmereUIDB = {} end
+              EllesmereUIDB.craftAlertEnabled = v
+              if EllesmereUI._applyCraftAlert then EllesmereUI._applyCraftAlert() end
+              EllesmereUI:RefreshPage()
+          end },
+        EllesmereUI.IS_FOREVER and { type="toggle", text="World Events Alert",
+          tooltip="Shows on-screen text for the last minutes before a world event of the server clock: the Gurubashi Arena Chest and the Stranglethorn Fishing Extravaganza. Use the cog to pick the events and how early; use Unlock Mode to reposition the alerts.",
+          getValue=function()
+              return EllesmereUIDB and EllesmereUIDB.worldEventAlertEnabled or false
+          end,
+          setValue=function(v)
+              if not EllesmereUIDB then EllesmereUIDB = {} end
+              EllesmereUIDB.worldEventAlertEnabled = v
+              if EllesmereUI._applyWorldEventAlert then EllesmereUI._applyWorldEventAlert() end
+              EllesmereUI:RefreshPage()
+          end } or EllesmereUI.BlankRowCfg()
     );  y = y - h
 
     -- Inline cog (text, size, colors, mode) on the Combat Alert toggle.
@@ -233,6 +259,53 @@ _G._EUI_BuildAlertsSection = function(parent, yOffset, W, PP)
             disabled = function() return not (EllesmereUIDB and EllesmereUIDB.talentAlertEnabled) end,
             disabledTooltip = "Unspent Talents Alert",
         })
+
+        EllesmereUI.BuildInlineCog(row3._leftRegion, {
+            title = "Craft Ready Alert Settings",
+            minWidth = 300,
+            rows = AlertCogRows("craftAlert", "_craftAlertFrame", "_craftAlertPreview"),
+            footer = { unlockKey = "EUI_CombatAlert" },
+            gap = 9,
+            disabled = function() return not (EllesmereUIDB and EllesmereUIDB.craftAlertEnabled) end,
+            disabledTooltip = "Craft Ready Alert",
+        })
+        if EllesmereUI.IS_FOREVER then
+            local WD = (EllesmereUI.Alerts and EllesmereUI.Alerts.WORLD_EVENT_DEFAULTS) or {}
+            local function wget(k)
+                local v = EllesmereUIDB and EllesmereUIDB[k]
+                if v == nil then return WD[k] end
+                return v
+            end
+            local function wset(k, v)
+                if not EllesmereUIDB then EllesmereUIDB = {} end
+                EllesmereUIDB[k] = v
+                if EllesmereUI._applyWorldEventAlert then EllesmereUI._applyWorldEventAlert() end
+            end
+            local rows = {
+                { type="toggle", label="Gurubashi Arena Chest",
+                  get=function() return wget("worldEventArena") end, set=function(v) wset("worldEventArena", v) end },
+                { type="toggle", label="Only in Stranglethorn Vale",
+                  get=function() return wget("worldEventArenaZoneOnly") end, set=function(v) wset("worldEventArenaZoneOnly", v) end },
+                { type="slider", label="Arena: Minutes Before", min=1, max=30, step=1,
+                  get=function() return wget("worldEventArenaLead") end, set=function(v) wset("worldEventArenaLead", v) end },
+                { type="toggle", label="Stranglethorn Fishing Extravaganza",
+                  get=function() return wget("worldEventFishing") end, set=function(v) wset("worldEventFishing", v) end },
+                { type="slider", label="Fishing: Minutes Before", min=5, max=120, step=5,
+                  get=function() return wget("worldEventFishingLead") end, set=function(v) wset("worldEventFishingLead", v) end },
+            }
+            for i, row in ipairs(AlertCogRows("worldEventAlert", "_worldEventAlertFrame", "_worldEventAlertPreview")) do
+                if i > 1 then rows[#rows + 1] = row end   -- (size and colors: the text is the event's own)
+            end
+            EllesmereUI.BuildInlineCog(row3._rightRegion, {
+                title = "World Events Alert Settings",
+                minWidth = 300,
+                rows = rows,
+                footer = { unlockKey = "EUI_CombatAlert" },
+                gap = 9,
+                disabled = function() return not (EllesmereUIDB and EllesmereUIDB.worldEventAlertEnabled) end,
+                disabledTooltip = "World Events Alert",
+            })
+        end
 
         -- Inline cog (Text Size, Sound) on the Announce Group Deaths toggle
         local function deathOff()
