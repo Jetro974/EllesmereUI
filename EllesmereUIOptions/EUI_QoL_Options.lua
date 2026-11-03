@@ -2346,11 +2346,18 @@ initFrame:SetScript("OnEvent", function(self)
                 "Dying in a battleground releases your spirit right away, unless a soulstone or an ankh can bring you back.")
         );  y = y - h
 
-        -- Row 2: Confirm Bind on Pickup Solo
+        -- Row 2: Confirm Bind on Pickup Solo | Dismount When Needed
         _, h = W:DualRow(parent, y,
             PromptToggle("confirmBopSolo", "Confirm Bind on Pickup Solo",
                 "Outside a group, looting an item that binds when picked up no longer asks you to confirm."),
-            EllesmereUI.BlankRowCfg()
+            { type="toggle", text="Dismount When Needed",
+              tooltip="When the game refuses an action because you are mounted (a spell, gathering, an attack, a flight path), you get off your mount. Never while flying or in combat.",
+              getValue=function() return EllesmereUIDB and EllesmereUIDB.dismountWhenNeeded or false end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.dismountWhenNeeded = v
+                  if EllesmereUI._applyDismount then EllesmereUI._applyDismount() end
+              end }
         );  y = y - h
 
         _, h = W:Spacer(parent, y, 20);  y = y - h
@@ -2751,6 +2758,7 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.acceptSummons = nil
                 EllesmereUIDB.releaseInBG = nil
                 EllesmereUIDB.confirmBopSolo = nil
+                EllesmereUIDB.dismountWhenNeeded = nil
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_TargetDistance = nil
                     EllesmereUIDB.unlockAnchors.EUI_CombatAlert = nil
