@@ -6027,3 +6027,8 @@ L["Talent Planner: %1$s (planned for level %2$d) cannot be learned yet; check yo
 L["Teleport Menu"] = "Menu de téléportation"
 L["Teleport Menu Scale"] = "Échelle du menu de téléportation"
 L["Scales the Teleport Menu the button opens."] = "Met à l'échelle le menu de téléportation ouvert par le bouton."
+-- Unspent Legacy Points alert (EllesmereUIQoL_Alerts.lua, WoW Forever)
+L["Unspent Legacy points"] = "Points Legacy non dépensés"
+L["Unspent Legacy Points Alert"] = "Alerte de points Legacy non dépensés"
+L["Unspent Legacy Points Alert Settings"] = "Réglages de l'alerte de points Legacy"
+L["Shows on-screen text while you have Legacy points to spend. It stays up until you spend them or open the Legacy window, and returns when you earn more. Use the cog to set the text, size and color; use Unlock Mode to reposition the alerts."] = "Affiche un texte à l'écran tant qu'il vous reste des points Legacy à dépenser. Il reste affiché jusqu'à ce que vous les dépensiez ou ouvriez la fenêtre Legacy, et revient quand vous en gagnez d'autres. Le rouage règle le texte, la taille et la couleur ; le mode déverrouillage permet de déplacer les alertes."
