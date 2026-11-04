@@ -135,9 +135,9 @@ _G._EUI_BuildAlertsSection = function(parent, yOffset, W, PP)
           end } or EllesmereUI.BlankRowCfg()
     );  y = y - h
 
-    local row4
+    local rowRare
     if EllesmereUI.IS_FOREVER then
-        row4, h = W:DualRow(parent, y,
+        rowRare, h = W:DualRow(parent, y,
             { type="toggle", text="Rare Mob Alert",
               tooltip="Shows on-screen text with a sound when a living rare comes into view: its nameplate shows, or you target or mouse over it. Each rare shows once, then not again for ten minutes. Use the cog to set the text, size, color and sound; use Unlock Mode to reposition the alerts.",
               getValue=function()
@@ -324,7 +324,7 @@ _G._EUI_BuildAlertsSection = function(parent, yOffset, W, PP)
                 disabledTooltip = "World Events Alert",
             })
         end
-        if row4 then
+        if rowRare then
             local rows = AlertCogRows("rareAlert", "_rareAlertFrame", "_rareAlertPreview")
             rows[#rows + 1] = { type="toggle", label="Play Sound",
                 get=function() return not (EllesmereUIDB and EllesmereUIDB.rareAlertSound == false) end,
@@ -332,7 +332,7 @@ _G._EUI_BuildAlertsSection = function(parent, yOffset, W, PP)
                     if not EllesmereUIDB then EllesmereUIDB = {} end
                     EllesmereUIDB.rareAlertSound = v
                 end }
-            EllesmereUI.BuildInlineCog(row4._leftRegion, {
+            EllesmereUI.BuildInlineCog(rowRare._leftRegion, {
                 title = "Rare Mob Alert Settings",
                 minWidth = 300,
                 rows = rows,
