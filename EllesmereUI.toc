@@ -106,6 +106,8 @@ EllesmereUI_StyleLaunchPopup.lua
 EllesmereUI_GroupFinderPopup.lua
 EllesmereUI_KickTrackerPopup.lua
 EllesmereUI_VideoGuides.lua
+# EUI Tips: one chat line at login about a feature the user never used
+EllesmereUI_LoginTips.lua
 
 # Spec Overrides (per-spec setting overrides within a profile)
 EllesmereUI_SpecOverrides.lua
