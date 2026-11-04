@@ -10,6 +10,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --    Potion Ready     (below)                short
 --    Unspent Talents  (below)                persistent
 --    Unspent Legacy   (below, WoW Forever)   persistent
+--    Craft Ready      (below)                short
+--    World Events     (below, WoW Forever)   persistent
 --  Nothing is built or registered for an alert until it is enabled.
 -------------------------------------------------------------------------------
 
@@ -33,6 +35,8 @@ local DEFS = {
     { id = "legacy", sizeKey = "legacyAlertTextSize", enabledKey = "legacyAlertEnabled", persistent = true },
     { id = "combat", sizeKey = "combatAlertTextSize", enabledKey = "combatAlertEnabled", hold = 1.2 },
     { id = "potion", sizeKey = "potionAlertTextSize", enabledKey = "potionAlertEnabled", hold = 3 },
+    { id = "craft", sizeKey = "craftAlertTextSize", enabledKey = "craftAlertEnabled", hold = 4 },
+    { id = "worldEvent", sizeKey = "worldEventAlertTextSize", enabledKey = "worldEventAlertEnabled", persistent = true },
 }
 local lines = {}
 local anchor
@@ -42,6 +46,8 @@ Alerts.DEFAULTS = {
     potionAlert = { text = "Potion Ready",          color = { r = 0.1, g = 1,    b = 0.1 } },
     talentAlert = { text = "Unspent talent points", color = { r = 1,   g = 0.82, b = 0   } },
     legacyAlert = { text = "Unspent Legacy points", color = { r = 0.4, g = 0.8,  b = 1   } },
+    craftAlert  = { text = "%s ready",              color = { r = 0.1, g = 1,    b = 0.1 } },
+    worldEventAlert = { text = "",                  color = { r = 1,   g = 0.82, b = 0   } },
 }
 
 local function SizeOf(def) return DB(def.sizeKey) or DEFAULT_SIZE end
@@ -661,6 +667,293 @@ if EUI.IS_FOREVER then
         -- A live alert gets its text/color refreshed; otherwise a short sample.
         local line = Line()
         ShowAlert(line.persistentShown and Available() or nil, not line.persistentShown)
+    end
+
+    local boot = CreateFrame("Frame")
+    boot:RegisterEvent("PLAYER_LOGIN")
+    boot:SetScript("OnEvent", function(self)
+        self:UnregisterAllEvents()
+        Apply()
+    end)
+end
+
+-------------------------------------------------------------------------------
+--  Craft Ready (short)
+--  A craft with a cooldown (a transmutation, a cloth of the day) of this
+--  character is ready again. The profession window tells which crafts have a
+--  cooldown (C_TradeSkillUI.GetRecipeCooldown, or GetTradeSkillCooldown on the
+--  older window); each one is kept per character in EllesmereUIDB.craftCooldowns
+--  with the server time it is ready, read again from its spell at login. One
+--  timer runs to the next one due; one that came back while logged out shows
+--  once at login. Nothing is registered while it is off.
+-------------------------------------------------------------------------------
+do
+    local watcher
+    local installed = false
+    local timer
+
+    local function CharKey() return (UnitName("player") or "?") .. " - " .. (GetRealmName() or "?") end
+
+    local function Store(create)
+        local db = EllesmereUIDB
+        if not db then return nil end
+        if create then db.craftCooldowns = db.craftCooldowns or {} end
+        local all = db.craftCooldowns
+        if not all then return nil end
+        local key = CharKey()
+        if create then all[key] = all[key] or {} end
+        return all[key]
+    end
+
+    local function ShowAlert(name, preview)
+        local D = Alerts.DEFAULTS.craftAlert
+        local r, g, b = Alerts.Color("craftAlert", D.color.r, D.color.g, D.color.b)
+        local text = DB("craftAlertText") or EllesmereUI.L(D.text)
+        if text:find("%s", 1, true) then text = text:format(name or EllesmereUI.L("Transmute")) end
+        Alerts.Line("craft").Show(text, r, g, b, preview)
+    end
+
+    -- Seconds left on a craft's own spell, or nil when it is ready or unreadable.
+    local function SpellLeft(spellID)
+        local info = C_Spell and C_Spell.GetSpellCooldown and C_Spell.GetSpellCooldown(spellID)
+        if type(info) ~= "table" or issecretvalue(info.startTime) or issecretvalue(info.duration) then return nil end
+        if not info.startTime or info.startTime == 0 or (info.duration or 0) <= 1.5 then return nil end
+        local left = info.startTime + info.duration - GetTime()
+        return left > 0 and left or nil
+    end
+
+    local Arm
+
+    -- The ones ready now that were not shown yet; then a timer to the next one.
+    local function Check()
+        if timer then timer:Cancel(); timer = nil end
+        if not installed then return end
+        local mine = Store()
+        if not mine then return end
+        local now, soonest = GetServerTime(), nil
+        local ready = {}
+        for _, cd in pairs(mine) do
+            if type(cd.at) == "number" then
+                if cd.at <= now then
+                    if cd.shown ~= cd.at then cd.shown = cd.at; ready[#ready + 1] = cd.name end
+                elseif not soonest or cd.at < soonest then
+                    soonest = cd.at
+                end
+            end
+        end
+        if #ready > 0 then table.sort(ready); ShowAlert(table.concat(ready, ", ")) end
+        if soonest then Arm(soonest - now) end
+    end
+
+    Arm = function(delay)
+        if timer then timer:Cancel() end
+        timer = C_Timer.NewTimer(math.max(delay, 0) + 1, Check)
+    end
+
+    local function Record(spellID, name, left)
+        local mine = Store(true)
+        if not mine then return end
+        local cd = mine[spellID] or {}
+        cd.name = name or cd.name
+        if left and left > 0 then cd.at = GetServerTime() + math.floor(left) end
+        mine[spellID] = cd
+    end
+
+    -- The open profession window: its learned crafts on cooldown.
+    local function ScanWindow()
+        local api = C_TradeSkillUI
+        if api and api.GetAllRecipeIDs and api.GetRecipeCooldown and api.GetRecipeInfo then
+            if api.IsTradeSkillLinked and api.IsTradeSkillLinked() then return end
+            if api.IsTradeSkillGuild and api.IsTradeSkillGuild() then return end
+            if api.IsNPCCrafting and api.IsNPCCrafting() then return end
+            local ok, ids = pcall(api.GetAllRecipeIDs)
+            if not ok or type(ids) ~= "table" then return end
+            for i = 1, math.min(#ids, 1500) do
+                local id = ids[i]
+                local left = api.GetRecipeCooldown(id)
+                if not issecretvalue(left) and type(left) == "number" and left > 0 then
+                    local info = api.GetRecipeInfo(id)
+                    if type(info) == "table" and info.learned then Record(id, info.name, left) end
+                end
+            end
+        elseif GetNumTradeSkills and GetTradeSkillCooldown and GetTradeSkillRecipeLink then
+            for i = 1, math.min(GetNumTradeSkills() or 0, 600) do
+                local name, kind = GetTradeSkillInfo(i)
+                local left = kind ~= "header" and GetTradeSkillCooldown(i)
+                local link = left and GetTradeSkillRecipeLink(i)
+                local spellID = link and tonumber(link:match("enchant:(%d+)"))
+                if spellID then Record(spellID, name, left) end
+            end
+        end
+        Check()
+    end
+
+    -- At login: each kept craft read again from its spell (a cooldown reset, a craft done elsewhere).
+    local function Reread()
+        local mine = Store()
+        if not mine then return end
+        local now = GetServerTime()
+        for spellID, cd in pairs(mine) do
+            local left = SpellLeft(spellID)
+            if left then cd.at = now + math.floor(left) end
+        end
+        Check()
+    end
+
+    local function Apply()
+        local on = DB("craftAlertEnabled")
+        if on and not installed then
+            watcher:RegisterEvent("TRADE_SKILL_LIST_UPDATE")
+            if C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid("TRADE_SKILL_UPDATE") then
+                watcher:RegisterEvent("TRADE_SKILL_UPDATE")
+            end
+            installed = true
+            Reread()
+        elseif not on and installed then
+            watcher:UnregisterAllEvents()
+            installed = false
+            if timer then timer:Cancel(); timer = nil end
+            Alerts.Hide("craft")
+        end
+        Alerts.Refresh()
+    end
+
+    watcher = CreateFrame("Frame")
+    local pending = false
+    watcher:SetScript("OnEvent", function()
+        -- A craft makes many updates: one scan a moment after the last.
+        if pending then return end
+        pending = true
+        C_Timer.After(1, function() pending = false; if installed then ScanWindow() end end)
+    end)
+
+    EUI._applyCraftAlert = Apply
+    EUI._craftAlertFrame = Alerts.Refresh
+    EUI._craftAlertPreview = function() ShowAlert(nil, true) end
+
+    local boot = CreateFrame("Frame")
+    boot:RegisterEvent("PLAYER_LOGIN")
+    boot:SetScript("OnEvent", function(self)
+        self:UnregisterAllEvents()
+        -- After the login burst, so the spell cooldowns are known.
+        C_Timer.After(5, Apply)
+    end)
+end
+
+-------------------------------------------------------------------------------
+--  World Events (persistent, WoW Forever only)
+--  The events of the server clock, each its own switch: the Gurubashi Arena
+--  Chest (every three hours from midnight; only in Stranglethorn Vale unless
+--  that is turned off) and the Stranglethorn Fishing Extravaganza (Sundays,
+--  2 PM). The line shows for the last minutes before an event, with its start
+--  time as the game clock shows it. One timer runs to the next time a line
+--  comes or goes; nothing polls.
+-------------------------------------------------------------------------------
+do
+    local HOUR, DAY = 3600, 86400
+    local WEEK = 7 * DAY
+    local SUNDAY = 3 * DAY           -- C_DateAndTime.GetServerTimeLocal starts on a Thursday
+    local ARENA_PERIOD = 3 * HOUR
+    local ARENA_AREA = 33            -- Stranglethorn Vale
+
+    -- Unset keys read these (the master is worldEventAlertEnabled).
+    local DEFAULTS = { worldEventArena = true, worldEventArenaZoneOnly = true, worldEventArenaLead = 10,
+        worldEventFishing = true, worldEventFishingLead = 30 }
+    local function Get(key)
+        local v = DB(key)
+        if v == nil then return DEFAULTS[key] end
+        return v
+    end
+    Alerts.WORLD_EVENT_DEFAULTS = DEFAULTS
+
+    local arenaZone
+    local EVENTS = {
+        { key = "worldEventArena", lead = "worldEventArenaLead", name = "Gurubashi Arena Chest",
+          Next = function(now) return now - now % ARENA_PERIOD + ARENA_PERIOD end,
+          Here = function()
+              if not Get("worldEventArenaZoneOnly") then return true end
+              if arenaZone == nil then arenaZone = (C_Map.GetAreaInfo and C_Map.GetAreaInfo(ARENA_AREA)) or false end
+              return GetRealZoneText() == arenaZone
+          end },
+        { key = "worldEventFishing", lead = "worldEventFishingLead", name = "Stranglethorn Fishing Extravaganza",
+          Next = function(now)
+              local start = now - (now - SUNDAY) % WEEK + 14 * HOUR
+              if start <= now then start = start + WEEK end
+              return start
+          end },
+    }
+
+    -- A server clock time as the game clock shows it (local or server, 24 or 12 hours).
+    local function Clock(at, now)
+        local h, m
+        if GetCVar("timeMgrUseLocalTime") == "1" then
+            local t = date("*t", time() + at - now)
+            h, m = t.hour, t.min
+        else
+            local s = at % DAY
+            h, m = math.floor(s / HOUR), math.floor(s % HOUR / 60)
+        end
+        if GetCVar("timeMgrUseMilitaryTime") == "1" then return format("%02d:%02d", h, m) end
+        return format("%d:%02d %s", (h - 1) % 12 + 1, m, h >= 12 and "PM" or "AM")
+    end
+
+    local watcher
+    local installed = false
+    local timer
+
+    local function Text(parts)
+        return table.concat(parts, "   ")
+    end
+
+    local function ShowAlert(text, preview)
+        local D = Alerts.DEFAULTS.worldEventAlert
+        local r, g, b = Alerts.Color("worldEventAlert", D.color.r, D.color.g, D.color.b)
+        Alerts.Line("worldEvent").Show(text, r, g, b, preview)
+    end
+
+    local function Refresh()
+        if timer then timer:Cancel(); timer = nil end
+        if not installed then return end
+        local now = C_DateAndTime.GetServerTimeLocal()
+        local parts, edge = {}, nil
+        for _, e in ipairs(EVENTS) do
+            if Get(e.key) and (not e.Here or e.Here()) then
+                local start = e.Next(now)
+                local due = start - (tonumber(Get(e.lead)) or 10) * 60
+                if now >= due then
+                    parts[#parts + 1] = EllesmereUI.Lf("%1$s at %2$s", EllesmereUI.L(e.name), Clock(start, now))
+                    due = start
+                end
+                if not edge or due < edge then edge = due end
+            end
+        end
+        if #parts > 0 then ShowAlert(Text(parts)) else Alerts.Hide("worldEvent") end
+        if edge then timer = C_Timer.NewTimer(edge - now + 1, Refresh) end
+    end
+
+    local function Apply()
+        local on = EUI.IS_FOREVER and DB("worldEventAlertEnabled")
+        if on and not installed then
+            installed = true
+            watcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+            watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+        elseif not on and installed then
+            installed = false
+            watcher:UnregisterAllEvents()
+            if timer then timer:Cancel(); timer = nil end
+            Alerts.Hide("worldEvent")
+        end
+        if installed then Refresh() end
+        Alerts.Refresh()
+    end
+
+    watcher = CreateFrame("Frame")
+    watcher:SetScript("OnEvent", function() Refresh() end)
+
+    EUI._applyWorldEventAlert = Apply
+    EUI._worldEventAlertFrame = Alerts.Refresh
+    EUI._worldEventAlertPreview = function()
+        ShowAlert(EllesmereUI.Lf("%1$s at %2$s", EllesmereUI.L("Gurubashi Arena Chest"), Clock(C_DateAndTime.GetServerTimeLocal() + 600, C_DateAndTime.GetServerTimeLocal())), true)
     end
 
     local boot = CreateFrame("Frame")
