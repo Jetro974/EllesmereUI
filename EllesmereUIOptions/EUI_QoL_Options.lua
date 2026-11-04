@@ -2336,6 +2336,45 @@ initFrame:SetScript("OnEvent", function(self)
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
         ---------------------------------------------------------------------------
+        --  PROMPTS  (EllesmereUIQoL_Prompts.lua)
+        ---------------------------------------------------------------------------
+        _, h = W:SectionHeader(parent, "PROMPTS", y);  y = y - h
+
+        local function PromptToggle(key, text, tooltip)
+            return { type="toggle", text=text, tooltip=tooltip,
+                getValue=function() return EllesmereUIDB and EllesmereUIDB[key] or false end,
+                setValue=function(v)
+                    if not EllesmereUIDB then EllesmereUIDB = {} end
+                    EllesmereUIDB[key] = v
+                    if EllesmereUI._applyPrompts then EllesmereUI._applyPrompts() end
+                end }
+        end
+
+        -- Row 1: Accept Summons | Release in Battlegrounds
+        _, h = W:DualRow(parent, y,
+            PromptToggle("acceptSummons", "Accept Summons",
+                "Summons are accepted right away. One that arrives in combat is left to you."),
+            PromptToggle("releaseInBG", "Release in Battlegrounds",
+                "Dying in a battleground releases your spirit right away, unless a soulstone or an ankh can bring you back.")
+        );  y = y - h
+
+        -- Row 2: Confirm Bind on Pickup Solo | Dismount When Needed
+        _, h = W:DualRow(parent, y,
+            PromptToggle("confirmBopSolo", "Confirm Bind on Pickup Solo",
+                "Outside a group, looting an item that binds when picked up no longer asks you to confirm."),
+            { type="toggle", text="Dismount When Needed",
+              tooltip="When the game refuses an action because you are mounted (a spell, gathering, an attack, a flight path), you get off your mount. Never while flying or in combat.",
+              getValue=function() return EllesmereUIDB and EllesmereUIDB.dismountWhenNeeded or false end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.dismountWhenNeeded = v
+                  if EllesmereUI._applyDismount then EllesmereUI._applyDismount() end
+              end }
+        );  y = y - h
+
+        _, h = W:Spacer(parent, y, 20);  y = y - h
+
+        ---------------------------------------------------------------------------
         --  GROUP FINDER
         ---------------------------------------------------------------------------
         _, h = W:SectionHeader(parent, "GROUP FINDER", y);  y = y - h
@@ -2752,6 +2791,10 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.mapSidebarsOpacity = nil
                 EllesmereUIDB.autoAcceptRes = nil
                 EllesmereUIDB.autoAcceptResCombat = nil
+                EllesmereUIDB.acceptSummons = nil
+                EllesmereUIDB.releaseInBG = nil
+                EllesmereUIDB.confirmBopSolo = nil
+                EllesmereUIDB.dismountWhenNeeded = nil
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_TargetDistance = nil
                     EllesmereUIDB.unlockAnchors.EUI_CombatAlert = nil
