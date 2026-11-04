@@ -78,6 +78,37 @@ local function SetWay(key, value)
     EllesmereUIDB.waypointCmd[key] = value
 end
 
+-- Reading creates nothing; only a change writes the table.
+local function MailOn(key)
+    local db = EllesmereUIDB
+    return db ~= nil and db.mailbox ~= nil and db.mailbox[key] == true
+end
+
+local function MailCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.mailbox = EllesmereUIDB.mailbox or {}
+    return EllesmereUIDB.mailbox
+end
+
+local function ApplyMailbox()
+    if _G._EUI_ApplyMailbox then _G._EUI_ApplyMailbox() end
+end
+
+local function MailExpiryOn(key)
+    local db = EllesmereUIDB
+    return db ~= nil and db.mailExpiry ~= nil and db.mailExpiry[key] == true
+end
+
+local function MailExpiryCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.mailExpiry = EllesmereUIDB.mailExpiry or {}
+    return EllesmereUIDB.mailExpiry
+end
+
+local function ApplyMailExpiry()
+    if _G._EUI_ApplyMailExpiry then _G._EUI_ApplyMailExpiry() end
+end
+
 -- Built as the tail of the Quality of Life page (chained from BuildQoLPage),
 -- not as its own tab. Lays out from yOffset and returns the height used,
 -- like every other section builder.
@@ -343,6 +374,71 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         local alertsH = _G._EUI_BuildAlertsSection(parent, y, W, EllesmereUI.PP)
         y = y - alertsH
     end
+
+    ---------------------------------------------------------------------------
+    --  MAILBOX (runtime in EllesmereUIQoL_Mailbox.lua)
+    ---------------------------------------------------------------------------
+    _, h = W:SectionHeader(parent, "MAILBOX", y); y = y - h
+
+    local function MailToggle(key, text, tooltip)
+        return { type    = "toggle",
+                 text    = text,
+                 tooltip = tooltip,
+                 getValue = function() return MailOn(key) end,
+                 setValue = function(v)
+                     MailCfg()[key] = v
+                     ApplyMailbox()
+                 end }
+    end
+
+    local mailRow
+    mailRow, h = W:DualRow(parent, y,
+        MailToggle("collect", "Mail Collector",
+            "Adds a coin button next to Open All Mail. Hover it for a summary of your inbox; click it for a menu that takes the gold, the items, both or the auction mail, one take at a time."),
+        MailToggle("select", "Select Mail",
+            "Adds a checkbox to every mail in your inbox. The Mail Collector menu can then open or return the checked mail.")
+    ); y = y - h
+
+    if not EllesmereUI._prebuilding then
+        EllesmereUI.BuildInlineCog(mailRow._leftRegion, {
+            title = "Mail Collector",
+            disabled = function() return not MailOn("collect") end,
+            disabledTooltip = "Mail Collector",
+            rows = {
+                { type="toggle", label="Collect Gold on Open",
+                  tooltip="Takes the gold as soon as the mailbox opens, without a click.",
+                  get=function() return MailOn("collectOnOpen") end,
+                  set=function(v) MailCfg().collectOnOpen = v end },
+            },
+        })
+    end
+
+    _, h = W:DualRow(parent, y,
+        MailToggle("fillSubject", "Fill Subject for Gold",
+            "A mail that sends only gold, with no subject, gets the amount as its subject so it can be sent."),
+        { type    = "toggle",
+                  text    = "Mail Expiry Warning",
+                  tooltip = "When you open the mailbox, warns in chat about mail with gold or items that expires within 3 days.",
+                  getValue = function() return MailExpiryOn("warning") end,
+                  setValue = function(v)
+                      MailExpiryCfg().warning = v
+                      ApplyMailExpiry()
+                  end }
+    ); y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type    = "toggle",
+                  text    = "Alt Mail Expiry Reminder",
+                  tooltip = "The mailbox remembers when each character's first mail expires. At login, one chat line names the characters whose mail expires within 3 days. A character is remembered once its mailbox has been opened with this on.",
+                  getValue = function() return MailExpiryOn("alts") end,
+                  setValue = function(v)
+                      MailExpiryCfg().alts = v
+                      ApplyMailExpiry()
+                  end },
+        EllesmereUI.BlankRowCfg()
+    ); y = y - h
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
 
     ---------------------------------------------------------------------------
     --  BATTLE RES (no shared battle res charges on WoW Forever: the indicator
