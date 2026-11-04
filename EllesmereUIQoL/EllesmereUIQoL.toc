@@ -29,6 +29,7 @@ EllesmereUIQoL_SelfCombatText.lua
 EllesmereUIQoL_Alerts.lua
 EllesmereUIQoL_Prompts.lua
 EllesmereUIQoL_Dismount.lua
+EllesmereUIQoL_Requests.lua
 EllesmereUIQoL_UpgradeTooltip.lua
 EUI_UpgradeCalc.lua
 
