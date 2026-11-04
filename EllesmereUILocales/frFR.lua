@@ -6218,3 +6218,11 @@ L["Tints red the vendor items you already know, have learned or have collected (
 L["Hide Owned (%d)"] = "Masquer les acquis (%d)"
 L["Show Owned (%d)"] = "Afficher les acquis (%d)"
 L["Items you already know, have learned or have collected (recipes, mounts, pets, toys...) are tinted red. Click to hide them from the list, or to show them again."] = "Les objets que vous connaissez, avez appris ou collectionnés (recettes, montures, mascottes, jouets...) sont teintés en rouge. Cliquez pour les masquer de la liste, ou pour les afficher à nouveau."
+
+-- Rare Mob Alert (EllesmereUIQoL_Alerts.lua)
+L["Rare Mob Alert"] = "Alerte de monstre rare"
+L["Shows on-screen text with a sound when a living rare comes into view: its nameplate shows, or you target or mouse over it. Each rare shows once, then not again for ten minutes. Use the cog to set the text, size, color and sound; use Unlock Mode to reposition the alerts."] = "Affiche un texte à l'écran avec un son quand un rare vivant entre en vue : sa barre de nom apparaît, ou vous le ciblez ou le survolez. Chaque rare s'affiche une fois, puis plus pendant dix minutes. Utilisez la roue dentée pour régler le texte, la taille, la couleur et le son ; utilisez le mode Déverrouillage pour déplacer les alertes."
+L["Rare Mob Alert Settings"] = "Réglages de l'alerte de monstre rare"
+L["Rare: %s"] = "Rare : %s"
+L["Rare"] = "Rare"
+L["Play Sound"] = "Jouer un son"

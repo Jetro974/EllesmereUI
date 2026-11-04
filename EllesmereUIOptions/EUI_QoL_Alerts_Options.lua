@@ -3,8 +3,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  EUI_QoL_Alerts_Options.lua
 --  ALERTS section: Combat Alert, Potion Ready Alert, Unspent Talents Alert,
 --  Unspent Legacy Points Alert (WoW Forever), Craft Ready Alert,
---  World Events Alert (WoW Forever) and Announce Group Deaths. The first five
---  share one movable anchor (Unlock Mode:
+--  World Events and Rare Mob Alerts (WoW Forever) and Announce Group Deaths.
+--  All but Group Deaths share one movable anchor (Unlock Mode:
 --  Alerts) and have their own text, size and color; their runtime is
 --  EllesmereUIQoL_Alerts.lua. Group Deaths keeps its own overlay (EllesmereUIQoL.lua).
 -------------------------------------------------------------------------------
@@ -154,6 +154,24 @@ _G._EUI_BuildAlertsSection = function(parent, yOffset, W, PP)
               EllesmereUI:RefreshPage()
           end } or EllesmereUI.BlankRowCfg()
     );  y = y - h
+
+    local rowRare
+    if EllesmereUI.IS_FOREVER then
+        rowRare, h = W:DualRow(parent, y,
+            { type="toggle", text="Rare Mob Alert",
+              tooltip="Shows on-screen text with a sound when a living rare comes into view: its nameplate shows, or you target or mouse over it. Each rare shows once, then not again for ten minutes. Use the cog to set the text, size, color and sound; use Unlock Mode to reposition the alerts.",
+              getValue=function()
+                  return EllesmereUIDB and EllesmereUIDB.rareAlertEnabled or false
+              end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.rareAlertEnabled = v
+                  if EllesmereUI._applyRareAlert then EllesmereUI._applyRareAlert() end
+                  EllesmereUI:RefreshPage()
+              end },
+            EllesmereUI.BlankRowCfg()
+        );  y = y - h
+    end
 
     -- Inline cog (text, size, colors, mode) on the Combat Alert toggle.
     if not EllesmereUI._prebuilding then
@@ -335,6 +353,24 @@ _G._EUI_BuildAlertsSection = function(parent, yOffset, W, PP)
                 gap = 9,
                 disabled = function() return not (EllesmereUIDB and EllesmereUIDB.worldEventAlertEnabled) end,
                 disabledTooltip = "World Events Alert",
+            })
+        end
+        if rowRare then
+            local rows = AlertCogRows("rareAlert", "_rareAlertFrame", "_rareAlertPreview")
+            rows[#rows + 1] = { type="toggle", label="Play Sound",
+                get=function() return not (EllesmereUIDB and EllesmereUIDB.rareAlertSound == false) end,
+                set=function(v)
+                    if not EllesmereUIDB then EllesmereUIDB = {} end
+                    EllesmereUIDB.rareAlertSound = v
+                end }
+            EllesmereUI.BuildInlineCog(rowRare._leftRegion, {
+                title = "Rare Mob Alert Settings",
+                minWidth = 300,
+                rows = rows,
+                footer = { unlockKey = "EUI_CombatAlert" },
+                gap = 9,
+                disabled = function() return not (EllesmereUIDB and EllesmereUIDB.rareAlertEnabled) end,
+                disabledTooltip = "Rare Mob Alert",
             })
         end
 

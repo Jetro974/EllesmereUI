@@ -2906,6 +2906,12 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.worldEventArenaLead = nil
                 EllesmereUIDB.worldEventFishing = nil
                 EllesmereUIDB.worldEventFishingLead = nil
+                EllesmereUIDB.rareAlertEnabled = false
+                EllesmereUIDB.rareAlertText = nil
+                EllesmereUIDB.rareAlertTextSize = nil
+                EllesmereUIDB.rareAlertColor = nil
+                EllesmereUIDB.rareAlertUseClassColor = nil
+                EllesmereUIDB.rareAlertSound = nil
                 EllesmereUIDB.targetDistanceEnabled = false
                 EllesmereUIDB.targetDistanceFormat = nil
                 EllesmereUIDB.targetDistanceAlign = nil
