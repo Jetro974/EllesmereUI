@@ -13,6 +13,11 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  visit to a class trainer or weapon master records for the account, under
 --  the visitor's class and by spell, whatever it teaches that the trainer
 --  data lacks.
+--  Hunters and warlocks also get what their pets learn (PetTrainingData.lua):
+--  the Beast Training ranks with the pet families that learn each one (the
+--  ones a pet trainer was seen teaching say so), and for each demon the
+--  grimoires of the demon trainer with their price. A demon's spells are
+--  known only while it is out: the ones seen are kept per character.
 --
 --  The panel is a frame of our own anchored to the spellbook's side; the
 --  spellbook's OnShow/OnHide (HookScript) show and hide it. Nothing of
@@ -24,7 +29,9 @@ local _, module = ...
 -- unlisted: classFile = { [spellID] = level }, taught but not in the data
 -- absent: classFile = { [spellID] = level }, in the data but neither shown by
 --   the trainer nor known by the visitor: not taught there
--- collapsed: section key = true/false; unset, Already Trained and Talents are folded
+-- collapsed: section key = true/false; unset, Already Trained, Talents and the pet sections are folded
+-- petTrainer: { [spellID] = true }, what a pet trainer was seen teaching
+-- demonKnown: "Name-Realm" = { [spellID] = true }, the demon spells seen known
 local F = module.Feature("trainingPlanner", { enabled = false })
 
 local PANEL_W = 290
@@ -47,6 +54,7 @@ local function Tint(c, tint)
 end
 
 local events, waiter, hooked, panel, shownClass, reloading
+local PetEntries, DEMON_FAMILY
 local rows, headers, sections = {}, {}, {}
 
 local function PlayerClass()
@@ -69,8 +77,21 @@ end
 -- Riding is taught by the riding trainers, never by the class trainer.
 local OTHER_TRAINER = { [33388] = true, [33391] = true }
 
+-- A pet trainer's list: what it teaches, kept for the account.
+local function CapturePet()
+    local seen = Sub(F.Cfg(), "petTrainer")
+    for i = 1, GetNumTrainerServices() do
+        local _, kind = GetTrainerServiceInfo(i)
+        local info = kind ~= "header" and C_TooltipInfo.GetTrainerService(i)
+        if info and info.id then seen[info.id] = true end
+    end
+end
+
 local function Capture()
-    if IsTradeskillTrainer() or C_Trainer.GetTrainerType() ~= Enum.TrainerType.General then return end
+    if IsTradeskillTrainer() then return end
+    local kind = C_Trainer.GetTrainerType()
+    if kind == Enum.TrainerType.Pet then CapturePet() return end
+    if kind ~= Enum.TrainerType.General then return end
     local class = PlayerClass()
     local data = module.TrainerSpells(class)
     local listed = {}
@@ -190,13 +211,33 @@ local function RaceNames(mask)
     return table.concat(names, ", ")
 end
 
+local function FamilyName(id)
+    local info = C_CreatureInfo.GetCreatureFamilyInfo(id)
+    return info and info.name
+end
+
+-- The names of the pet families of a Beast Training rank, by name.
+local function FamilyNames(families)
+    local names = {}
+    for _, id in ipairs(families) do
+        names[#names + 1] = FamilyName(id)
+    end
+    table.sort(names)
+    return names
+end
+
 -- A row's tooltip: the spell's own, with the races that learn it when it is
--- racial, "Talent" when it comes with a talent, or for a weapon skill the
--- cities of the player's faction that teach it.
+-- racial, "Talent" when it comes with a talent, for a weapon skill the
+-- cities of the player's faction that teach it, or for a Beast Training rank
+-- the pet families that learn it.
 local function RowEnter(row)
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetSpellByID(row.spellID)
-    if row.races then
+    if row.families then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(EllesmereUI.L("Pet families:"), 1, 0.82, 0)
+        GameTooltip:AddLine(table.concat(FamilyNames(row.families), ", "), 1, 1, 1, true)
+    elseif row.races then
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(EllesmereUI.Lf("Race: %s", RaceNames(row.races)), RACIAL[1], RACIAL[2], RACIAL[3])
     elseif row.talent then
@@ -254,12 +295,100 @@ local function Header(i)
     return fs
 end
 
--- A folding section: unset, Already Trained and Talents start folded.
+-- A folding section: unset, Already Trained, Talents and the pet sections start folded.
 local function Collapsed(key)
     local all = F.Get("collapsed")
     local v = all and all[key]
-    if v == nil then return key == "trained" or key == "talents" end
+    if v == nil then return key == "trained" or key == "talents" or key:sub(1, 3) == "pet" end
     return v
+end
+
+-- The demons' pet families (CreatureFamily ids).
+DEMON_FAMILY = { IMP = 23, VOIDWALKER = 16, SUCCUBUS = 17, FELHUNTER = 15, FELGUARD = 310 }
+
+local function CharKey()
+    return (UnitName("player") or "?") .. "-" .. (GetNormalizedRealmName() or "?")
+end
+
+local function Money(copper)
+    return C_CurrencyInfo.GetCoinTextureString(copper)
+end
+
+-- A demon's spells are known only while it is out: the ones it knows now are
+-- kept for this character.
+local function RecordDemon()
+    if not UnitExists("pet") then return end
+    local mine
+    for _, levels in pairs(module.DemonTraining()) do
+        for _, spells in pairs(levels) do
+            for i = 1, #spells do
+                local id = spells[i][1]
+                if IsSpellKnown(id, true) then
+                    mine = mine or Sub(Sub(F.Cfg(), "demonKnown"), CharKey())
+                    mine[id] = true
+                end
+            end
+        end
+    end
+end
+
+-- "beast": the Beast Training ranks; a demon key: that demon's grimoires. Each
+-- entry by level then name; known is set for the player's own class. A spell
+-- whose data the client has not loaded yet is asked for and left out.
+function PetEntries(which, own)
+    local out = {}
+    local seen = F.Get("petTrainer") or {}
+    local demonKnown = own and which ~= "beast" and (F.Get("demonKnown") or {})[CharKey()] or {}
+    local levels = which == "beast" and module.BeastTraining() or module.DemonTraining()[which] or {}
+    for level, spells in pairs(levels) do
+        for i = 1, #spells do
+            local s = spells[i]
+            local id = s[1]
+            local name = C_Spell.GetSpellName(id)
+            if name then
+                local e = { spellID = id, name = name, rank = Rank(id), level = level, icon = C_Spell.GetSpellTexture(id) }
+                if which == "beast" then
+                    e.known = own and IsPlayerSpell(id) or nil
+                    e.families = s[2]
+                    local where
+                    if not s[2] then
+                        where = EllesmereUI.L("All pets")
+                    elseif #s[2] <= 3 then
+                        where = table.concat(FamilyNames(s[2]), ", ")
+                    else
+                        where = EllesmereUI.Lf("%d pet families", #s[2])
+                    end
+                    if seen[id] then where = EllesmereUI.L("Pet trainer") .. " - " .. where end
+                    e.sub = "|cffaaaaaa" .. where .. "|r"
+                else
+                    e.known = own and (demonKnown[id] or IsSpellKnown(id, true)) or nil
+                    e.sub = "|cffaaaaaa" .. EllesmereUI.L("Grimoire") .. " - " .. Money(s[3]) .. "|r"
+                end
+                out[#out + 1] = e
+            else
+                C_Spell.RequestLoadSpellData(id)
+                panel.missing = true
+            end
+        end
+    end
+    -- A rank at or under a known rank of the same spell counts as known.
+    if own then
+        local top = {}
+        for _, e in ipairs(out) do
+            local n = e.known and e.rank and tonumber(e.rank:match("%d+"))
+            if n and n > (top[e.name] or 0) then top[e.name] = n end
+        end
+        for _, e in ipairs(out) do
+            local n = not e.known and e.rank and tonumber(e.rank:match("%d+"))
+            if n and n <= (top[e.name] or 0) then e.known = true end
+        end
+    end
+    table.sort(out, function(a, b)
+        if a.level ~= b.level then return a.level < b.level end
+        if a.name ~= b.name then return a.name < b.name end
+        return (a.rank or "") < (b.rank or "")
+    end)
+    return out
 end
 
 local Refresh
@@ -307,6 +436,7 @@ function Refresh()
     panel.class:SetWidth(panel.class.text:GetStringWidth() + 18)
     local list, missing = List(shownClass)
     panel.missing = missing
+    if shownClass == "WARLOCK" and shownClass == PlayerClass() then RecordDemon() end
     local playerLevel = UnitLevel("player")
     local own = shownClass == PlayerClass()
     local count = 0
@@ -371,6 +501,7 @@ function Refresh()
         end
         row.sub:SetText(sub or "")
         row.spellID, row.weapon, row.races, row.talent = e.spellID, e.weapon, e.races, e.talent
+        row.families = e.families
         row.icon:SetTexture(e.icon)
         row.icon:SetDesaturated(e.known or false)
         row.name:SetText(e.rank and (e.name .. " |cffaaaaaa(" .. e.rank .. ")|r") or e.name)
@@ -401,14 +532,17 @@ function Refresh()
         end
     end
 
-    -- entries (by level) under their level's line, in color.
+    -- entries (by level) under their level's line, in color (or color(entry)).
     local function PlaceLevels(entries, color)
         local i = 1
         while entries[i] do
             local level, j = entries[i].level, i
             while entries[j] and entries[j].level == level do j = j + 1 end
             PlaceHeader(EllesmereUI.Lf("Level %d", level))
-            for k = i, j - 1 do PlaceRow(entries[k], color) end
+            for k = i, j - 1 do
+                local e = entries[k]
+                PlaceRow(e, type(color) == "function" and color(e) or color, e.sub)
+            end
             i = j
         end
     end
@@ -457,6 +591,26 @@ function Refresh()
             PlaceLevels(spells, WHITE)
         end
         PlaceTalents()
+    end
+
+    -- What the pets learn: trained grey, at the player's level green, the rest white.
+    local function PetColor(e)
+        if e.known then return GREY end
+        if own and e.level <= playerLevel then return GREEN end
+        return WHITE
+    end
+    if shownClass == "HUNTER" then
+        local beast = PetEntries("beast", own)
+        if #beast > 0 and PlaceSection("petBeast", EllesmereUI.L("Beast Training"), #beast) then
+            PlaceLevels(beast, PetColor)
+        end
+    elseif shownClass == "WARLOCK" then
+        for _, demon in ipairs(module.DEMON_ORDER) do
+            local list = PetEntries(demon, own)
+            if #list > 0 and PlaceSection("pet" .. demon, FamilyName(DEMON_FAMILY[demon]) or demon, #list) then
+                PlaceLevels(list, PetColor)
+            end
+        end
     end
     for k = nRows + 1, #rows do rows[k]:Hide() end
     for k = nHeaders + 1, #headers do headers[k]:Hide() end
@@ -555,6 +709,7 @@ local function Build()
         self:RegisterEvent("SPELLS_CHANGED")
         self:RegisterEvent("PLAYER_LEVEL_UP")
         self:RegisterEvent("SPELL_DATA_LOAD_RESULT")
+        self:RegisterUnitEvent("UNIT_PET", "player")   -- a demon summoned: its spells
         Refresh()
     end)
     panel:SetScript("OnHide", function(self)
