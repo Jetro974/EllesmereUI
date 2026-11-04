@@ -271,6 +271,14 @@ EllesmereUI._WHATSNEW_PATCHES = {
                            section = "MERCHANT OPTIONS", highlight = "Expand Vendor UI" },
             },
             {
+                -- The MERCHANT OPTIONS section of the Merchant card in Window Skins (both clients).
+                module = "Blizzard Skins+",
+                title  = "Flag/Hide Owned Items",
+                desc   = "Vendor items you already know or have collected (recipes, mounts, pets, toys) are tinted red, and with Expand Vendor UI a button hides them",
+                nav    = { module = "EllesmereUIBlizzardSkin", page = "Blizzard Window Skins",
+                           section = "MERCHANT OPTIONS", highlight = "Flag/Hide Owned Items" },
+            },
+            {
                 -- The Tooltip Extras dropdown in the BLIZZARD TOOLTIP section of Tooltips & Menus (both clients).
                 module = "Blizzard Skins+",
                 title  = "Tooltip Colors and Tags",
