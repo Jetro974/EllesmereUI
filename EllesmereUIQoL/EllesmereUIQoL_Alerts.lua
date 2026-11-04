@@ -12,6 +12,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --    Unspent Legacy   (below, WoW Forever)   persistent
 --    Craft Ready      (below)                short
 --    World Events     (below, WoW Forever)   persistent
+--    Ignored Player   (EllesmereUIQoL_AccountIgnore.lua)  short
 --  Nothing is built or registered for an alert until it is enabled.
 -------------------------------------------------------------------------------
 
@@ -37,6 +38,7 @@ local DEFS = {
     { id = "potion", sizeKey = "potionAlertTextSize", enabledKey = "potionAlertEnabled", hold = 3 },
     { id = "craft", sizeKey = "craftAlertTextSize", enabledKey = "craftAlertEnabled", hold = 4 },
     { id = "worldEvent", sizeKey = "worldEventAlertTextSize", enabledKey = "worldEventAlertEnabled", persistent = true },
+    { id = "ignored", sizeKey = "ignoredAlertTextSize", enabledKey = "ignoredAlertEnabled", hold = 5 },
 }
 local lines = {}
 local anchor
