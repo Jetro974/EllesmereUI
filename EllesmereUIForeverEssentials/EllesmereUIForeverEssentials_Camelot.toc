@@ -48,6 +48,7 @@ EllesmereUIForeverEssentials_LootFeed.lua
 
 # Training (training book)
 EllesmereUIForeverEssentials_TrainerData.lua
+EllesmereUIForeverEssentials_PetTrainingData.lua
 EllesmereUIForeverEssentials_Training.lua
 
 # Macros (macro manager)
