@@ -6032,3 +6032,7 @@ L["Unspent Legacy points"] = "Points Legacy non dépensés"
 L["Unspent Legacy Points Alert"] = "Alerte de points Legacy non dépensés"
 L["Unspent Legacy Points Alert Settings"] = "Réglages de l'alerte de points Legacy"
 L["Shows on-screen text while you have Legacy points to spend. It stays up until you spend them or open the Legacy window, and returns when you earn more. Use the cog to set the text, size and color; use Unlock Mode to reposition the alerts."] = "Affiche un texte à l'écran tant qu'il vous reste des points Legacy à dépenser. Il reste affiché jusqu'à ce que vous les dépensiez ou ouvriez la fenêtre Legacy, et revient quand vous en gagnez d'autres. Le rouage règle le texte, la taille et la couleur ; le mode déverrouillage permet de déplacer les alertes."
+-- Show Waypoints in the World (EllesmereUIForeverEssentials_InGameNavigation.lua)
+L["Show Waypoints in the World"] = "Afficher les points de repère dans le monde"
+L["Shows the game's own waypoint marker in the world: an icon with the distance, and an arrow at the screen edge while the destination is out of sight. It goes away when you get close."] = "Affiche le marqueur de repère du jeu dans le monde : une icône avec la distance, et une flèche au bord de l'écran tant que la destination est hors de vue. Il disparaît quand vous vous en approchez."
+L["Close the world map first."] = "Fermez d'abord la carte du monde."
