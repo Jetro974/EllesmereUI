@@ -2658,7 +2658,7 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.skipCinematics = false
                 EllesmereUIDB.skipCinematicsAuto = false
                 EllesmereUIDB.autoFillDelete = false
-                EllesmereUIDB.autoInsertKeystone = false
+                EllesmereUIDB.autoInsertKeystone = nil      -- on by default
                 EllesmereUIDB.instanceResetAnnounce = false
                 EllesmereUIDB.instanceResetAnnounceMsg = ""
                 EllesmereUIDB.quickSignup = false
@@ -2667,7 +2667,7 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.ahCurrentExpansion = false
                 EllesmereUIDB.hideTalkingHead = false
                 EllesmereUIDB.muteTalkingHead = nil
-                EllesmereUIDB.hideScreenshotStatus = false
+                EllesmereUIDB.hideScreenshotStatus = nil    -- on by default
                 EllesmereUIDB.trainAllButton = false
                 EllesmereUIDB.autoUnwrapCollections = false
                 EllesmereUIDB.autoOpenContainers = false
@@ -2675,7 +2675,9 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.bonusRollOnly = true
                 EllesmereUIDB.autoOpenContainersExcludeWarbound = true
                 EllesmereUIDB.autoOpenContainersHoldCappedArtisanPayouts = false
-                EllesmereUIDB.autoRepairGuild = false
+                EllesmereUIDB.autoRepair = nil              -- on by default
+                EllesmereUIDB.autoRepairGuild = nil         -- on by default
+                EllesmereUIDB.autoSellJunk = nil            -- on by default
                 EllesmereUIDB.shifterEnabled = false
                 EllesmereUIDB.shifterPositions = nil
                 EllesmereUIDB.hideErrorMessages = false
