@@ -5990,3 +5990,11 @@ L["Arena: Minutes Before"] = "Arène : minutes avant"
 L["Stranglethorn Fishing Extravaganza"] = "Concours de pêche de Strangleronce"
 L["Fishing: Minutes Before"] = "Pêche : minutes avant"
 L["%1$s at %2$s"] = "%1$s à %2$s"
+
+-- Rare Mob Alert (EllesmereUIQoL_Alerts.lua)
+L["Rare Mob Alert"] = "Alerte de monstre rare"
+L["Shows on-screen text with a sound when a living rare comes into view: its nameplate shows, or you target or mouse over it. Each rare shows once, then not again for ten minutes. Use the cog to set the text, size, color and sound; use Unlock Mode to reposition the alerts."] = "Affiche un texte à l'écran avec un son quand un rare vivant entre en vue : sa barre de nom apparaît, ou vous le ciblez ou le survolez. Chaque rare s'affiche une fois, puis plus pendant dix minutes. Utilisez la roue dentée pour régler le texte, la taille, la couleur et le son ; utilisez le mode Déverrouillage pour déplacer les alertes."
+L["Rare Mob Alert Settings"] = "Réglages de l'alerte de monstre rare"
+L["Rare: %s"] = "Rare : %s"
+L["Rare"] = "Rare"
+L["Play Sound"] = "Jouer un son"

@@ -11,6 +11,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --    Unspent Talents  (below)                persistent
 --    Craft Ready      (below)                short
 --    World Events     (below, WoW Forever)   persistent
+--    Rare Mob         (below, WoW Forever)   short
 --  Nothing is built or registered for an alert until it is enabled.
 -------------------------------------------------------------------------------
 
@@ -35,6 +36,7 @@ local DEFS = {
     { id = "potion", sizeKey = "potionAlertTextSize", enabledKey = "potionAlertEnabled", hold = 3 },
     { id = "craft", sizeKey = "craftAlertTextSize", enabledKey = "craftAlertEnabled", hold = 4 },
     { id = "worldEvent", sizeKey = "worldEventAlertTextSize", enabledKey = "worldEventAlertEnabled", persistent = true },
+    { id = "rare", sizeKey = "rareAlertTextSize", enabledKey = "rareAlertEnabled", hold = 4 },
 }
 local lines = {}
 local anchor
@@ -45,6 +47,7 @@ Alerts.DEFAULTS = {
     talentAlert = { text = "Unspent talent points", color = { r = 1,   g = 0.82, b = 0   } },
     craftAlert  = { text = "%s ready",              color = { r = 0.1, g = 1,    b = 0.1 } },
     worldEventAlert = { text = "",                  color = { r = 1,   g = 0.82, b = 0   } },
+    rareAlert   = { text = "Rare: %s",              color = { r = 0.8, g = 0.8,  b = 1   } },
 }
 
 local function SizeOf(def) return DB(def.sizeKey) or DEFAULT_SIZE end
@@ -832,6 +835,77 @@ do
     EUI._worldEventAlertPreview = function()
         ShowAlert(EllesmereUI.Lf("%1$s at %2$s", EllesmereUI.L("Gurubashi Arena Chest"), Clock(C_DateAndTime.GetServerTimeLocal() + 600, C_DateAndTime.GetServerTimeLocal())), true)
     end
+
+    local boot = CreateFrame("Frame")
+    boot:RegisterEvent("PLAYER_LOGIN")
+    boot:SetScript("OnEvent", function(self)
+        self:UnregisterAllEvents()
+        Apply()
+    end)
+end
+
+-------------------------------------------------------------------------------
+--  Rare Mob (short, WoW Forever only)
+--  A living rare (silver dragon, elite or not) comes into view: its nameplate
+--  shows, or it becomes the target or the mouseover. The game marks no rare on
+--  the minimap there, so this is the warning. Each one shows once, then not
+--  again for ten minutes (by creature, so a respawn of the same rare waits
+--  too). With the sound on, the raid warning sound plays with it.
+-------------------------------------------------------------------------------
+do
+    local AGAIN = 600
+    local watcher
+    local installed = false
+    local seen = {}
+
+    local function ShowAlert(name, preview)
+        local D = Alerts.DEFAULTS.rareAlert
+        local r, g, b = Alerts.Color("rareAlert", D.color.r, D.color.g, D.color.b)
+        local text = DB("rareAlertText") or EllesmereUI.L(D.text)
+        if text:find("%s", 1, true) then text = text:format(name or EllesmereUI.L("Rare")) end
+        Alerts.Line("rare").Show(text, r, g, b, preview)
+        if DB("rareAlertSound") ~= false then PlaySound(SOUNDKIT.RAID_WARNING, "Master") end
+    end
+
+    local function Check(unit)
+        if not UnitExists(unit) or UnitIsPlayer(unit) or UnitIsDead(unit) then return end
+        local c = UnitClassification(unit)
+        if issecretvalue(c) or (c ~= "rare" and c ~= "rareelite") then return end
+        local guid, name = UnitGUID(unit), UnitName(unit)
+        if issecretvalue(guid) or issecretvalue(name) or not name then return end
+        -- The creature's id (the sixth part of its GUID), else its name.
+        local key = guid and select(6, strsplit("-", guid)) or name
+        local now = GetTime()
+        if seen[key] and now - seen[key] < AGAIN then return end
+        seen[key] = now
+        ShowAlert(name)
+    end
+
+    local function Apply()
+        local on = EUI.IS_FOREVER and DB("rareAlertEnabled")
+        if on and not installed then
+            installed = true
+            watcher:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+            watcher:RegisterEvent("PLAYER_TARGET_CHANGED")
+            watcher:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+        elseif not on and installed then
+            installed = false
+            watcher:UnregisterAllEvents()
+            Alerts.Hide("rare")
+        end
+        Alerts.Refresh()
+    end
+
+    watcher = CreateFrame("Frame")
+    watcher:SetScript("OnEvent", function(_, event, unit)
+        if event == "PLAYER_TARGET_CHANGED" then unit = "target"
+        elseif event == "UPDATE_MOUSEOVER_UNIT" then unit = "mouseover" end
+        if unit then Check(unit) end
+    end)
+
+    EUI._applyRareAlert = Apply
+    EUI._rareAlertFrame = Alerts.Refresh
+    EUI._rareAlertPreview = function() ShowAlert(nil, true) end
 
     local boot = CreateFrame("Frame")
     boot:RegisterEvent("PLAYER_LOGIN")
