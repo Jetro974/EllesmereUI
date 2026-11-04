@@ -162,14 +162,30 @@ function NameplateFrame:UpdateClassification()
             -- was already verified clean (issecretvalue + ^%d+/%d+$) before caching.
             self.classText:SetFormattedText("%s", objText)
             self.classText:Show()
+            -- Item objective (Quest Objective cog > Bag on Item Objectives): a small bag
+            -- beside the count, drawn on our own classFrame.
+            if p and p.questObjectiveBag == true and ns.GetQuestObjectiveBag(self.unit) then
+                if not self.classBag then
+                    self.classBag = self.classFrame:CreateTexture(nil, "OVERLAY")
+                    self.classBag:SetTexture("Interface\\Icons\\INV_Misc_Bag_08")
+                    self.classBag:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                    self.classBag:SetPoint("LEFT", self.classText, "RIGHT", 1, 0)
+                end
+                self.classBag:SetSize(fsz, fsz)
+                self.classBag:Show()
+            elseif self.classBag then
+                self.classBag:Hide()
+            end
         else
             -- No clean count (quest-giver / percent / secret value) -> icon.
             if self.classText then self.classText:Hide() end
+            if self.classBag then self.classBag:Hide() end
             self.class:Show()
             self.class:SetAtlas("Crosshair_Quest_64")
         end
     else
         if self.classText then self.classText:Hide() end
+        if self.classBag then self.classBag:Hide() end
         -- Elite/Rare Indicator off: no elite or rare marks (the WoW Forever
         -- look starts with it off, NP_SeedForever).
         if p and p.classificationHideRare then

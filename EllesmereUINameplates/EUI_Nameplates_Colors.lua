@@ -295,6 +295,35 @@ local questMobCache = {}
 -- Parallel cache of verified-clean "objectives remaining" strings, keyed by unit. Populated
 -- only when replaceQuestIconWithObjective is ON; same invalidation lifecycle. On ns (cap).
 ns._questObjText = ns._questObjText or {}
+-- Same lifecycle: true when the unit's objective is an item to collect (bag option).
+ns._questObjBag = ns._questObjBag or {}
+-- Is the objective behind this tooltip line an item to collect (not a kill)? The quest log
+-- types every objective ("item", "monster", "object"...); the tooltip line is matched to one
+-- by its text, falling back to "every unfinished objective of the quest is an item". Any
+-- secret value, an unreadable quest or no match answers false, so the bag is simply not
+-- drawn. On ns (file is at the 200-local cap).
+function ns.QuestObjectiveIsItem(questID, lineText)
+    local get = C_QuestLog and C_QuestLog.GetQuestObjectives
+    local objs = questID and get and get(questID)
+    if type(objs) ~= "table" then return false end
+    local want
+    if type(lineText) == "string" and not (issecretvalue and issecretvalue(lineText)) then
+        want = lineText
+    end
+    local nItem, nOther = 0, 0
+    for _, o in ipairs(objs) do
+        local txt, otype, fin = o.text, o.type, o.finished
+        if not (issecretvalue and (issecretvalue(txt) or issecretvalue(otype) or issecretvalue(fin))) then
+            if want and type(txt) == "string" and txt ~= "" and want:find(txt, 1, true) then
+                return otype == "item"
+            end
+            if not fin then
+                if otype == "item" then nItem = nItem + 1 else nOther = nOther + 1 end
+            end
+        end
+    end
+    return nItem > 0 and nOther == 0
+end
 -- Is this unit one of the local player's active quest objectives with work remaining? Read
 -- from the tooltip's structured data: a QuestObjective line carries `completed` plus
 -- numFulfilled/numRequired, a QuestTitle line the quest id, so completion needs no
@@ -327,7 +356,8 @@ local function IsQuestMob(unit)
     local onQuest = C_QuestLog and C_QuestLog.IsOnQuest
     local wantText = (p and p.replaceQuestIconWithObjective == true) or false
     local questID  -- id carried by the most recent QuestTitle line
-    local isQuest, objText = false, nil
+    local wantBag = wantText and p and p.questObjectiveBag == true
+    local isQuest, objText, isItem = false, nil, false
 
     for _, line in ipairs(info.lines) do
         local kind = line.type
@@ -362,6 +392,7 @@ local function IsQuestMob(unit)
                             pct = lt:match("(%d+)%s*%%")
                         end
                         objText = pct and (pct .. "%") or (have .. "/" .. need)
+                        if wantBag then isItem = ns.QuestObjectiveIsItem(questID, lt) end
                     end
                 end
                 break
@@ -372,6 +403,7 @@ local function IsQuestMob(unit)
     questMobCache[unit] = isQuest
     if wantText then
         ns._questObjText[unit] = isQuest and objText or nil
+        ns._questObjBag[unit] = (wantBag and isQuest and objText and isItem) or nil
     end
     return isQuest
 end
@@ -382,11 +414,17 @@ function ns.GetQuestObjectiveText(unit)
     return ns._questObjText[unit]
 end
 
+-- True when the objective counted by GetQuestObjectiveText is an item to collect.
+function ns.GetQuestObjectiveBag(unit)
+    return ns._questObjBag[unit] == true
+end
+
 -- Live refresh for the options toggle. Wiping BOTH caches is required: IsQuestMob short-circuits
 -- on questMobCache[unit] ~= nil, so a unit cached while OFF never gets objective text extracted.
 function ns.RefreshQuestObjective()
     wipe(questMobCache)
     wipe(ns._questObjText)
+    wipe(ns._questObjBag)
     for _, plate in pairs(ns.plates) do
         if plate.UpdateClassification then
             plate:UpdateClassification()
@@ -402,6 +440,7 @@ ns._questDirty = false
 questCacheWatcher:SetScript("OnEvent", function()
     wipe(questMobCache)
     wipe(ns._questObjText)
+    wipe(ns._questObjBag)
     if not ns._questDirty then
         ns._questDirty = true
         C_Timer.After(0.5, function()

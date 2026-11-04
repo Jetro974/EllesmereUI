@@ -506,6 +506,7 @@ local defaults = {
     questMobColor = { r = 0.157, g = 0.855, b = 0.475 },
     replaceQuestIconWithObjective = (EllesmereUI.IS_FOREVER == true) and true or false,
     questObjectiveTextSize = 14,
+    questObjectiveBag = false,  -- small bag beside the objective count when the objective is an item to collect
     showCastIcon = true,
     castIconScale = 1,
     castIconOffsetX = 0,
