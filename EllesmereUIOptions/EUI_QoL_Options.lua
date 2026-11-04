@@ -1886,7 +1886,36 @@ initFrame:SetScript("OnEvent", function(self)
             EllesmereUI.RegisterWidgetRefresh(refresh)
         end
 
-        -- Auto-Accept Resurrection: right of Row 6, or its own row on WoW Forever.
+        -- Prompts (EllesmereUIQoL_Prompts.lua, _Dismount.lua): they complete
+        -- the list after Auto-Accept Resurrection.
+        local function PromptToggle(key, text, tooltip)
+            return { type="toggle", text=text, tooltip=tooltip,
+                getValue=function() return EllesmereUIDB and EllesmereUIDB[key] or false end,
+                setValue=function(v)
+                    if not EllesmereUIDB then EllesmereUIDB = {} end
+                    EllesmereUIDB[key] = v
+                    if EllesmereUI._applyPrompts then EllesmereUI._applyPrompts() end
+                end }
+        end
+        local prompts = {
+            PromptToggle("acceptSummons", "Accept Summons",
+                "Summons are accepted right away. One that arrives in combat is left to you."),
+            PromptToggle("releaseInBG", "Release in Battlegrounds",
+                "Dying in a battleground releases your spirit right away, unless a soulstone or an ankh can bring you back."),
+            PromptToggle("confirmBopSolo", "Confirm Bind on Pickup Solo",
+                "Outside a group, looting an item that binds when picked up no longer asks you to confirm."),
+            { type="toggle", text="Dismount When Needed",
+              tooltip="When the game refuses an action because you are mounted (a spell, gathering, an attack, a flight path), you get off your mount. Never while flying or in combat.",
+              getValue=function() return EllesmereUIDB and EllesmereUIDB.dismountWhenNeeded or false end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.dismountWhenNeeded = v
+                  if EllesmereUI._applyDismount then EllesmereUI._applyDismount() end
+              end },
+        }
+
+        -- Auto-Accept Resurrection: right of Row 6, or its own row on WoW Forever
+        -- (with Accept Summons beside it).
         local resCfg = { type="toggle", text="Auto-Accept Resurrection",
             tooltip="Automatically accepts resurrections from players who are out of combat, such as raid resses after a wipe. Use the cog to also accept combat resurrections.",
             getValue=function()
@@ -1960,8 +1989,11 @@ initFrame:SetScript("OnEvent", function(self)
             end
         else
             local resRow
-            resRow, h = W:DualRow(parent, y, resCfg, EllesmereUI.BlankRowCfg());  y = y - h
+            resRow, h = W:DualRow(parent, y, resCfg, prompts[1]);  y = y - h
             BuildResCog(resRow._leftRegion)
+        end
+        for i = EllesmereUI.IS_FOREVER and 2 or 1, #prompts, 2 do
+            _, h = W:DualRow(parent, y, prompts[i], prompts[i + 1] or EllesmereUI.BlankRowCfg());  y = y - h
         end
 
         _, h = W:Spacer(parent, y, 20);  y = y - h
@@ -2321,45 +2353,6 @@ initFrame:SetScript("OnEvent", function(self)
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
         y = BuildSelfCombatTextSection(parent, y)
-        _, h = W:Spacer(parent, y, 20);  y = y - h
-
-        ---------------------------------------------------------------------------
-        --  PROMPTS  (EllesmereUIQoL_Prompts.lua)
-        ---------------------------------------------------------------------------
-        _, h = W:SectionHeader(parent, "PROMPTS", y);  y = y - h
-
-        local function PromptToggle(key, text, tooltip)
-            return { type="toggle", text=text, tooltip=tooltip,
-                getValue=function() return EllesmereUIDB and EllesmereUIDB[key] or false end,
-                setValue=function(v)
-                    if not EllesmereUIDB then EllesmereUIDB = {} end
-                    EllesmereUIDB[key] = v
-                    if EllesmereUI._applyPrompts then EllesmereUI._applyPrompts() end
-                end }
-        end
-
-        -- Row 1: Accept Summons | Release in Battlegrounds
-        _, h = W:DualRow(parent, y,
-            PromptToggle("acceptSummons", "Accept Summons",
-                "Summons are accepted right away. One that arrives in combat is left to you."),
-            PromptToggle("releaseInBG", "Release in Battlegrounds",
-                "Dying in a battleground releases your spirit right away, unless a soulstone or an ankh can bring you back.")
-        );  y = y - h
-
-        -- Row 2: Confirm Bind on Pickup Solo | Dismount When Needed
-        _, h = W:DualRow(parent, y,
-            PromptToggle("confirmBopSolo", "Confirm Bind on Pickup Solo",
-                "Outside a group, looting an item that binds when picked up no longer asks you to confirm."),
-            { type="toggle", text="Dismount When Needed",
-              tooltip="When the game refuses an action because you are mounted (a spell, gathering, an attack, a flight path), you get off your mount. Never while flying or in combat.",
-              getValue=function() return EllesmereUIDB and EllesmereUIDB.dismountWhenNeeded or false end,
-              setValue=function(v)
-                  if not EllesmereUIDB then EllesmereUIDB = {} end
-                  EllesmereUIDB.dismountWhenNeeded = v
-                  if EllesmereUI._applyDismount then EllesmereUI._applyDismount() end
-              end }
-        );  y = y - h
-
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
         ---------------------------------------------------------------------------
