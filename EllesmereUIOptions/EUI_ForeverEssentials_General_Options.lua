@@ -228,6 +228,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
           setValue = function(v)
               SU.Cfg().enabled = v
               SU.Apply()
+              EllesmereUI:RefreshPage()  -- the cog's disabled state
           end },
         { type = "label", text = CW_LABEL,
           tooltip = "Choose which windows open in their classic version." }

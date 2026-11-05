@@ -44,21 +44,30 @@ local function Report(msg)
     EllesmereUI.Print(EllesmereUI.COLOR_CODES.BRAND .. "EllesmereUI:|r " .. msg)
 end
 
--- The main bar's twelve buttons and the slots they show right now: a stance,
+-- The main bar's shown buttons and the slots they show right now: a stance,
 -- form or stealth pages the bar (a warrior never shows slots 1-12), so the
--- slot is read off the button (EUI's bars, then Blizzard's). Another bar
--- addon: slots 1-12 and no button.
+-- slot is read off the button (EUI's bars, then Blizzard's), up to the last
+-- button shown (a bar can show fewer than 12). In a vehicle, or with another
+-- bar addon: slots 1-12 and no button.
 local function MainBar()
     local list = {}
-    for i = 1, MAIN_BAR_SLOTS do
-        local btn, slot = _G["EABButton" .. i], nil
-        if btn and btn:IsVisible() then
-            slot = Plain(btn:GetAttribute("action"))
-        else
-            btn = _G["ActionButton" .. i]
-            if btn and btn:IsVisible() then slot = Plain(btn.action) else btn = nil end
+    local vehicle = (HasVehicleActionBar and HasVehicleActionBar())
+        or (HasOverrideActionBar and HasOverrideActionBar())
+    if not vehicle then
+        for i = 1, MAIN_BAR_SLOTS do
+            local btn, slot = _G["EABButton" .. i], nil
+            if btn and btn:IsVisible() then
+                slot = Plain(btn:GetAttribute("action"))
+            else
+                btn = _G["ActionButton" .. i]
+                if btn and btn:IsVisible() then slot = Plain(btn.action) end
+            end
+            if not slot then break end
+            list[i] = { index = i, slot = slot, button = btn }
         end
-        list[i] = { slot = slot or i, button = slot and btn or nil }
+    end
+    if #list == 0 then
+        for i = 1, MAIN_BAR_SLOTS do list[i] = { index = i, slot = i } end
     end
     return list
 end
@@ -78,30 +87,50 @@ local function Center(frame)
     return x * s, y * s, frame:GetWidth() * s
 end
 
+local function Step(g, kind, order, secs)
+    local a = g:CreateAnimation(kind)
+    a:SetOrder(order)
+    a:SetDuration(secs)
+    return a
+end
+
+-- The outer frame only moves; the inner one only scales and fades, so the
+-- scaling never bends the path and the icon lands exactly on the button.
 local function NewFlyer()
     local f = CreateFrame("Frame", nil, UIParent)
     f:SetFrameStrata("FULLSCREEN_DIALOG")
-    f:SetSize(FLY_SIZE, FLY_SIZE)
     f:Hide()
-    f.icon = f:CreateTexture(nil, "ARTWORK")
+    local inner = CreateFrame("Frame", nil, f)
+    inner:SetAllPoints()
+    f.icon = inner:CreateTexture(nil, "ARTWORK")
     f.icon:SetAllPoints()
     f.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    local g = f:CreateAnimationGroup()
-    local fadeIn = g:CreateAnimation("Alpha")
-    fadeIn:SetFromAlpha(0); fadeIn:SetToAlpha(1); fadeIn:SetDuration(0.15); fadeIn:SetOrder(1)
-    f.move = g:CreateAnimation("Translation")
-    f.move:SetDuration(0.6); f.move:SetSmoothing("IN_OUT"); f.move:SetOrder(2)
-    f.shrink = g:CreateAnimation("Scale")
-    f.shrink:SetDuration(0.6); f.shrink:SetSmoothing("IN_OUT"); f.shrink:SetOrder(2)
-    local pop = g:CreateAnimation("Scale")
-    pop:SetScaleFrom(1, 1); pop:SetScaleTo(1.35, 1.35); pop:SetDuration(0.25); pop:SetOrder(3)
-    local fadeOut = g:CreateAnimation("Alpha")
-    fadeOut:SetFromAlpha(1); fadeOut:SetToAlpha(0); fadeOut:SetDuration(0.25); fadeOut:SetOrder(3)
-    g:SetScript("OnFinished", function()
+
+    local path = f:CreateAnimationGroup()
+    -- Alpha 1 -> 1: holds the frame while the icon appears, then while it pops.
+    local hold = Step(path, "Alpha", 1, 0.15)
+    hold:SetFromAlpha(1); hold:SetToAlpha(1)
+    f.move = Step(path, "Translation", 2, 0.6)
+    f.move:SetSmoothing("IN_OUT")
+    hold = Step(path, "Alpha", 3, 0.25)
+    hold:SetFromAlpha(1); hold:SetToAlpha(1)
+    path:SetScript("OnFinished", function()
         f:Hide()
         flyers[#flyers + 1] = f
     end)
-    f.anim = g
+
+    local look = inner:CreateAnimationGroup()
+    look:SetToFinalAlpha(true)
+    local fadeIn = Step(look, "Alpha", 1, 0.15)
+    fadeIn:SetFromAlpha(0); fadeIn:SetToAlpha(1)
+    f.shrink = Step(look, "Scale", 2, 0.6)
+    f.shrink:SetSmoothing("IN_OUT")
+    local pop = Step(look, "Scale", 3, 0.25)
+    pop:SetScaleFrom(1, 1); pop:SetScaleTo(1.35, 1.35)
+    local fadeOut = Step(look, "Alpha", 3, 0.25)
+    fadeOut:SetFromAlpha(1); fadeOut:SetToAlpha(0)
+
+    f.path, f.look = path, look
     return f
 end
 
@@ -116,15 +145,15 @@ local function Fly(spellID, button)
     f.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
     f:ClearAllPoints()
     f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", sx, sy)
+    f:SetSize(tw, tw)
     f.move:SetOffset(tx - sx, ty - sy)
-    local r = tw / FLY_SIZE
-    f.shrink:SetScaleFrom(1, 1); f.shrink:SetScaleTo(r, r)
-    f:SetAlpha(0)
+    local r = FLY_SIZE / tw
+    f.shrink:SetScaleFrom(r, r); f.shrink:SetScaleTo(1, 1)
     flights = flights + 1
     C_Timer.After((flights - 1) * 0.2, function()
-        f:SetAlpha(1)
         f:Show()
-        f.anim:Play()
+        f.path:Play()
+        f.look:Play()
     end)
 end
 
@@ -135,9 +164,12 @@ local function PlaceNew(newID, line, spell)
     for _, item in ipairs(MainBar()) do
         if not HasAction(item.slot) then
             C_Spell.PickupSpell(newID)
+            if GetCursorInfo() ~= "spell" then ClearCursor(); return end
             PlaceAction(item.slot)
             ClearCursor()
-            Report(EllesmereUI.Lf("Placed %1$s on action slot %2$d.", spell, item.slot))
+            if not HasAction(item.slot) then return end
+            -- The button's number on the bar, not the paged slot (73 in a stance).
+            Report(EllesmereUI.Lf("Placed %1$s on action slot %2$d.", spell, item.index))
             if item.button then Fly(newID, item.button) end
             return
         end
