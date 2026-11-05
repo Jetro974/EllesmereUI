@@ -1,326 +1,337 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -- EUI_ResourceBars_MirrorTimer.lua
--- Mirror Timers: the breath, fatigue and feign death bars, on EUI's own frames.
+-- Mirror Timers: the Breath, Fatigue and Feign Death bars, on EUI's own frames.
 --
--- Blizzard calls them mirror timers (Blizzard_MirrorTimer): up to three at once,
--- each started by MIRROR_TIMER_START(timer, value, maxValue, scale, paused,
--- label), paused by MIRROR_TIMER_PAUSE(timer, paused) and ended by
--- MIRROR_TIMER_STOP(timer). Blizzard's own bars read GetMirrorTimerProgress on
--- every frame for as long as one runs, which is also what follows a breath bar
--- refilling once the player surfaces. This file reads the same call at 20 Hz,
--- only while an unpaused timer is up; nothing at all runs the rest of the time.
+-- Blizzard calls them mirror timers (Blizzard_MirrorTimer): started by
+-- MIRROR_TIMER_START(timer, value, maxValue, scale, paused, label), paused by
+-- MIRROR_TIMER_PAUSE(timer, paused) and ended by MIRROR_TIMER_STOP(timer).
+-- Blizzard's own bars read GetMirrorTimerProgress on every frame for as long as
+-- one runs, which is also what follows a breath bar refilling once the player
+-- surfaces. This file reads the same call at 20 Hz, only while an unpaused
+-- timer is up; nothing at all runs the rest of the time.
 --
--- One frame, one ROW per running timer, stacked top to bottom in a fixed order
--- (breath, fatigue, feign death, death). Each row: bg, PP border, a StatusBar
--- in a clip frame and two FontStrings (the game's own label on the left, the
--- seconds left on the right).
+-- Three bars, each with its own settings, position and Unlock Mode mover, the
+-- way the action bars are one per bar: Breath (BREATH), Fatigue (EXHAUSTION)
+-- and Feign Death (FEIGNDEATH, and DEATH, which Blizzard paints the same way).
+-- They are configured on the Cast Bar page, picked from its bar selector.
 --
--- Low Warning (optional): below Warning Starts At, a draining bar slides from
--- its own colour to red as it empties, and pulses over the last half of that
--- range. A bar that is refilling (breath at the surface) never warns. Both
--- ride the 20 Hz read the fill already pays for.
+-- Each bar: bg, border (every border style), a StatusBar in a clip frame, an
+-- optional spark and two texts (the game's label, the seconds left), each
+-- placed left, right or center with its own size, offsets and colour.
 --
--- Blizzard's bars are only made invisible (alpha 0) while this one is on and
--- Hide Blizzard Bars is set; they keep running untouched, and get their alpha
--- back the moment either is turned off. Off by default: nothing is built,
--- registered or hidden until it is turned on.
+-- Low Warning (optional, per bar): below Warning Starts At a draining bar
+-- slides from its colour to red as it empties, and pulses over the last half
+-- of that range. A refilling bar never warns. Both ride the 20 Hz read.
+--
+-- Blizzard's own bar for a timer is made invisible (alpha 0, never a reparent
+-- or an unregister) while ours for that timer is on with Hide Blizzard Bar;
+-- the others keep showing. Off by default: nothing is built, registered or
+-- hidden until a bar is turned on.
+--
+-- The build and style code is shared with the options preview (ns.MT_*).
 
 local _, ns = ...
 local EllesmereUI = _G.EllesmereUI
 
 if not (GetMirrorTimerProgress and GetMirrorTimerInfo) then return end
 
-local UNLOCK_KEY = "ERB_MirrorTimer"
-local MAX_TIMERS = 3   -- the client runs at most three at once
-
--- Display order, top to bottom. `key` is the colour-key prefix in the store
--- (breathR/G/B/A, ...). DEATH shares the feign death colour, as Blizzard's does.
-local TIMERS = {
-    BREATH     = { order = 1, key = "breath" },
-    EXHAUSTION = { order = 2, key = "fatigue" },
-    FEIGNDEATH = { order = 3, key = "feign" },
-    DEATH      = { order = 4, key = "feign" },
+-- id: the settings table under profile.mirrorTimer; timers: the client's
+-- timer names this bar shows; name: the selector and mover name; sampleFrac:
+-- the fill the Unlock Mode and options previews show.
+local KINDS = {
+    { id = "breath",  unlock = "ERB_MirrorBreath",  name = "Breath",      sampleFrac = 0.7,  order = 509,
+      timers = { BREATH = true } },
+    { id = "fatigue", unlock = "ERB_MirrorFatigue", name = "Fatigue",     sampleFrac = 0.45, order = 510,
+      timers = { EXHAUSTION = true } },
+    { id = "feign",   unlock = "ERB_MirrorFeign",   name = "Feign Death", sampleFrac = 0.6,  order = 511,
+      timers = { FEIGNDEATH = true, DEATH = true } },
 }
+local KIND_OF = {}     -- client timer name -> kind
+local KIND_BY_ID = {}
+for _, K in ipairs(KINDS) do
+    KIND_BY_ID[K.id] = K
+    for timer in pairs(K.timers) do KIND_OF[timer] = K end
+end
+ns.MT_KINDS, ns.MT_KIND_BY_ID = KINDS, KIND_BY_ID
 
--- Shell + ticker host at FILE SCOPE (attribution rule, see _erbEventFrame in the
--- main file): the OnEvent and OnLoop work bills ResourceBars. Children stay lazy.
-local shell = CreateFrame("Frame", "ERB_MirrorTimerFrame", UIParent)
-shell:Hide()
+-- Bar shells + ticker host at FILE SCOPE (attribution rule, see _erbEventFrame
+-- in the main file): the OnEvent and OnLoop work bills ResourceBars. Children
+-- stay lazy.
+for _, K in ipairs(KINDS) do
+    K.frame = CreateFrame("Frame", "ERB_Mirror_" .. K.id, UIParent)
+    K.frame:Hide()
+end
+local eventFrame = CreateFrame("Frame")
 local tickFrame = CreateFrame("Frame")
 
--- built, rows[i], active[timer] = { row, max, paused, label }, sample (unlock
--- mode preview on), unlockHooked, blizzHidden, events
-local S = { rows = {}, active = {} }
+local S = {}   -- events, blizzHidden, unlockHooked
 
 -------------------------------------------------------------------------------
 --  Settings access
 -------------------------------------------------------------------------------
 
-local function P()
+local function Cfg(id)
     local ERB = ns.ERB
     local db = ERB and ERB.db
     local p = db and db.profile
-    return p and p.mirrorTimer or nil
+    local m = p and p.mirrorTimer
+    return m and m[id] or nil
 end
+ns.MT_Cfg = Cfg
 
--- A restricted answer is no answer: the row keeps what it last showed.
+-- A restricted answer is no answer: the bar keeps what it last showed.
 local function Plain(v)
     return not (issecretvalue and issecretvalue(v))
 end
 
-local function ActiveCount()
-    if S.sample then return 2 end
-    local n = 0
-    for _ in pairs(S.active) do n = n + 1 end
-    return n
-end
-
--- Frame size: width x (rows * height + gaps), one row at least for the mover.
-local function Size(cfg)
-    cfg = cfg or P()
-    if not cfg then return 220, 16 end
-    local n = math.max(ActiveCount(), 1)
-    local h = cfg.height or 16
-    local sp = cfg.rowSpacing or 2
-    return cfg.width or 220, n * h + (n - 1) * sp
-end
-
-local function TimerColor(cfg, timer)
-    local def = TIMERS[timer] or TIMERS.EXHAUSTION
-    local k = def.key
-    return cfg[k .. "R"] or 1, cfg[k .. "G"] or 1, cfg[k .. "B"] or 1, cfg[k .. "A"] or 1
-end
-
 -------------------------------------------------------------------------------
---  Rows
+--  One bar: build, look, paint (shared with the options preview)
 -------------------------------------------------------------------------------
 
-local function BuildRow()
-    local row = CreateFrame("Frame", nil, shell)
-
-    local bg = row:CreateTexture(nil, "BACKGROUND")
+-- Builds the children of obj.frame. obj is a KINDS entry, or a preview table
+-- the options page makes ({ frame = <its container> }); mk is its frame maker
+-- (the options page pool's CreateFrame there, so a rebuilt page reuses them).
+local function BuildBar(obj, mk)
+    local CreateFrame = mk or CreateFrame
+    local f = obj.frame
+    local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    row._bg = bg
+    obj.bg = bg
 
-    local bdr = CreateFrame("Frame", nil, row)
-    bdr:SetAllPoints(row)
-    bdr:SetFrameLevel(row:GetFrameLevel() + 5)
-    row._border = bdr
+    local bdr = CreateFrame("Frame", nil, f)
+    bdr:SetAllPoints(f)
+    bdr:SetFrameLevel(f:GetFrameLevel() + 5)
+    obj.border = bdr
     local PP = EllesmereUI.PP
     if PP then PP.CreateBorder(bdr, 0, 0, 0, 1, 1) end
 
-    local clip = CreateFrame("Frame", nil, row)
+    local clip = CreateFrame("Frame", nil, f)
     clip:SetClipsChildren(true)
-    row._clip = clip
+    obj.clip = clip
 
     local bar = CreateFrame("StatusBar", nil, clip)
     bar:SetMinMaxValues(0, 1)
     bar:SetValue(0)
-    row._bar = bar
+    obj.bar = bar
 
-    local textFrame = CreateFrame("Frame", nil, row)
-    textFrame:SetAllPoints(row)
+    local sparkFrame = CreateFrame("Frame", nil, clip)
+    sparkFrame:SetAllPoints(bar)
+    sparkFrame:SetFrameLevel(bar:GetFrameLevel() + 2)
+    local spark = sparkFrame:CreateTexture(nil, "OVERLAY", nil, 1)
+    spark:SetTexture(ns.SPARK_TEX)
+    spark:SetBlendMode("ADD")
+    obj.spark = spark
+
+    local textFrame = CreateFrame("Frame", nil, f)
+    textFrame:SetAllPoints(f)
     textFrame:SetFrameLevel(bar:GetFrameLevel() + 3)
     -- Font before any SetText (a FontString with no font errors on SetText).
     local label = textFrame:CreateFontString(nil, "OVERLAY")
     ns.SetRBFont(label, ns.GetRBFont(), 11)
-    label:SetJustifyH("LEFT")
     label:SetWordWrap(false)
     label:SetText("")
-    row._label = label
+    obj.label = label
     local time = textFrame:CreateFontString(nil, "OVERLAY")
     ns.SetRBFont(time, ns.GetRBFont(), 11)
-    time:SetJustifyH("RIGHT")
     time:SetWordWrap(false)
     time:SetText("")
-    row._time = time
+    obj.time = time
+    obj.built = true
+end
+ns.MT_BuildBar = BuildBar
 
-    row:Hide()
-    return row
+-- A text on its side of the bar: left, right or center (none hides it).
+local function PlaceText(fs, f, side, size, x, y, r, g, b, a)
+    if side == "none" then fs:Hide(); return end
+    ns.SetRBFont(fs, ns.GetRBFont(), size)
+    fs:ClearAllPoints()
+    if side == "center" then
+        fs:SetPoint("CENTER", f, "CENTER", x, y)
+        fs:SetJustifyH("CENTER")
+    elseif side == "right" then
+        fs:SetPoint("RIGHT", f, "RIGHT", -4 + x, y)
+        fs:SetJustifyH("RIGHT")
+    else
+        fs:SetPoint("LEFT", f, "LEFT", 4 + x, y)
+        fs:SetJustifyH("LEFT")
+    end
+    fs:SetTextColor(r, g, b, a)
+    fs:Show()
 end
 
-local function ApplyRowLook(row, cfg)
+-- Size, border, texture, background, spark and texts from cfg.
+local function ApplyLook(obj, cfg, onePx)
+    local f = obj.frame
     local PP = EllesmereUI.PP
-    local bs = cfg.borderSize or 1
-    local bdr = row._border
-    if not bdr:GetLeft() then bdr:SetAllPoints(row) end
+    local bs = cfg.borderSize or 0
+    local bdr = obj.border
+    local pl = f:GetFrameLevel()
+    bdr:SetFrameLevel(cfg.borderBehind and math.max(0, pl - 1) or (pl + 5))
+    if not bdr:GetLeft() then bdr:SetAllPoints(f) end
     EllesmereUI.ApplyBorderStyle(bdr, bs,
         cfg.borderR or 0, cfg.borderG or 0, cfg.borderB or 0, cfg.borderA or 1,
-        "solid", nil, nil, nil, nil, "resourcebars", bs)
+        cfg.borderTexture or "solid", cfg.borderTextureOffset, cfg.borderTextureOffsetY,
+        cfg.borderTextureShiftX, cfg.borderTextureShiftY, "resourcebars", bs,
+        nil, EllesmereUI.BorderPx(cfg.borderSizePx, bs, cfg.borderTexture or "solid"))
 
-    local clip, bar = row._clip, row._bar
-    local inset = (bs > 0 and PP and PP.mult) or 0
+    -- The 1px inset keeps the fill from bleeding past the border.
+    local clip, bar = obj.clip, obj.bar
+    local inset = (bs > 0 and (onePx or (PP and PP.mult))) or 0
     clip:ClearAllPoints()
-    clip:SetPoint("TOPLEFT", row, "TOPLEFT", inset, -inset)
-    clip:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -inset, inset)
-    clip:SetFrameLevel(row:GetFrameLevel() + 1)
+    clip:SetPoint("TOPLEFT", f, "TOPLEFT", inset, -inset)
+    clip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -inset, inset)
+    clip:SetFrameLevel(pl + 1)
     bar:ClearAllPoints()
     bar:SetAllPoints(clip)
-
-    local texPath = EllesmereUI.ResolveTexturePath(_G._ERB_BarTextures, cfg.texture, "Interface\\Buttons\\WHITE8x8")
-    bar:SetStatusBarTexture(texPath)
+    bar:SetStatusBarTexture(EllesmereUI.ResolveTexturePath(_G._ERB_BarTextures, cfg.texture, "Interface\\Buttons\\WHITE8x8"))
     bar:SetOrientation("HORIZONTAL")
-    row._bg:SetTexture(nil)
-    row._bg:SetColorTexture(cfg.bgR or 0, cfg.bgG or 0, cfg.bgB or 0, cfg.bgA or 0.7)
-    if row._timer then bar:SetStatusBarColor(TimerColor(cfg, row._timer)) end
+    bar:SetReverseFill(false)
+    obj.bg:SetTexture(nil)
+    obj.bg:SetColorTexture(cfg.bgR or 0, cfg.bgG or 0, cfg.bgB or 0, cfg.bgA or 0.7)
 
-    local size = cfg.textSize or 11
-    ns.SetRBFont(row._label, ns.GetRBFont(), size)
-    ns.SetRBFont(row._time, ns.GetRBFont(), size)
-    row._label:ClearAllPoints()
-    row._label:SetPoint("LEFT", row, "LEFT", 4, 0)
-    row._time:ClearAllPoints()
-    row._time:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-    if cfg.showLabel ~= false then row._label:Show() else row._label:Hide() end
-    if cfg.showTime ~= false then row._time:Show() else row._time:Hide() end
+    local spark = obj.spark
+    if cfg.showSpark then
+        spark:ClearAllPoints()
+        spark:SetSize(8, cfg.height or 20)
+        spark:SetPoint("CENTER", bar:GetStatusBarTexture(), "RIGHT", 0, 0)
+        spark:Show()
+    else
+        spark:Hide()
+    end
+
+    PlaceText(obj.label, f, cfg.labelSide or "left", cfg.labelSize or 11, cfg.labelX or 0, cfg.labelY or 0,
+        cfg.labelR or 1, cfg.labelG or 1, cfg.labelB or 1, cfg.labelA or 1)
+    PlaceText(obj.time, f, cfg.timeSide or "right", cfg.timeSize or 11, cfg.timeX or 0, cfg.timeY or 0,
+        cfg.timeR or 1, cfg.timeG or 1, cfg.timeB or 1, cfg.timeA or 1)
 end
+ns.MT_ApplyLook = ApplyLook
 
 local WARN_R, WARN_G, WARN_B = 1, 0.1, 0.1
 local PULSE_PERIOD = 0.6   -- seconds per blink
 
--- The low-warning look for a row at fill fraction `frac`: its colour slid
--- toward red under the threshold, and a pulsing alpha in the last half of it.
--- `rising` (refilling) and Low Warning off both give the plain look.
-local function PaintWarning(row, cfg, frac, rising)
-    local r, g, b, a = TimerColor(cfg, row._timer)
-    local start = (cfg.lowWarnAt or 30) / 100
+-- Fill, seconds and colour for a bar at fraction `frac` of its maximum.
+-- `still`: the previews, which nothing ticks, so no pulse (it would freeze
+-- half-faded).
+local function Paint(obj, cfg, frac, seconds, rising, still)
+    frac = math.max(0, math.min(frac or 0, 1))
+    obj.bar:SetMinMaxValues(0, 1)
+    obj.bar:SetValue(frac)
+    obj.time:SetText(string.format("%d", math.max(0, math.floor((seconds or 0) + 0.5))))
+
+    local r, g, b, a = cfg.fillR or 1, cfg.fillG or 1, cfg.fillB or 1, cfg.fillA or 1
     local alpha = 1
+    local start = (cfg.lowWarnAt or 30) / 100
     if cfg.lowWarn and not rising and start > 0 and frac < start then
-        local t = 1 - math.max(frac, 0) / start   -- 0 at the threshold, 1 empty
+        local t = 1 - frac / start   -- 0 at the threshold, 1 empty
         r = r + (WARN_R - r) * t
         g = g + (WARN_G - g) * t
         b = b + (WARN_B - b) * t
-        if frac < start / 2 then
+        if frac < start / 2 and not still then
             local s = math.sin(GetTime() * math.pi * 2 / PULSE_PERIOD)
             alpha = 0.35 + 0.65 * math.abs(s)
         end
     end
-    row._bar:SetStatusBarColor(r, g, b, a)
-    row:SetAlpha(alpha)
-end
-
--- Paints one row's fill and seconds from a value in milliseconds.
-local function PaintValue(row, ms, cfg, maxMs, rising)
-    if not (Plain(ms) and type(ms) == "number") then return end
-    row._bar:SetValue(ms / 1000)
-    row._time:SetText(string.format("%d", math.max(0, math.floor(ms / 1000 + 0.5))))
-    if cfg and row._timer and maxMs and maxMs > 0 then
-        PaintWarning(row, cfg, ms / maxMs, rising)
-    end
-end
-
--------------------------------------------------------------------------------
---  Layout and position
--------------------------------------------------------------------------------
-
--- The running timers in display order.
-local function Ordered()
-    local list = {}
-    for timer in pairs(S.active) do list[#list + 1] = timer end
-    table.sort(list, function(a, b)
-        return (TIMERS[a] and TIMERS[a].order or 9) < (TIMERS[b] and TIMERS[b].order or 9)
-    end)
-    return list
-end
-
-local function Layout(cfg)
-    local h = cfg.height or 16
-    local sp = cfg.rowSpacing or 2
-    local w = cfg.width or 220
-    for i = 1, MAX_TIMERS do S.rows[i]:Hide() end
-    local list
-    if S.sample then
-        list = { "BREATH", "EXHAUSTION" }
+    local tex = obj.bar:GetStatusBarTexture()
+    if cfg.gradientEnabled then
+        tex:SetGradient(cfg.gradientDir or "HORIZONTAL", CreateColor(r, g, b, a),
+            CreateColor(cfg.gradientR or 0.2, cfg.gradientG or 0.2, cfg.gradientB or 0.8, cfg.gradientA or 1))
     else
-        list = Ordered()
+        tex:SetVertexColor(1, 1, 1, 1)
+        obj.bar:SetStatusBarColor(r, g, b, a)
     end
-    for i = 1, math.min(#list, MAX_TIMERS) do
-        local timer = list[i]
-        local row = S.rows[i]
-        row._timer = timer
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", shell, "TOPLEFT", 0, -(i - 1) * (h + sp))
-        row:SetSize(w, h)
-        row:Show()
-        ApplyRowLook(row, cfg)
-        local a = S.active[timer]
-        if S.sample then
-            row._bar:SetMinMaxValues(0, 60)
-            row._label:SetText(timer == "BREATH" and (BREATH_LABEL or "Breath") or (EXHAUSTION_LABEL or "Fatigue"))
-            -- The fatigue sample sits in the warning range, so Low Warning
-            -- shows while the movers are up.
-            PaintValue(row, timer == "BREATH" and 60000 or 9000, cfg, 60000, false)
-            -- Nothing ticks a sample row: hold it opaque rather than freeze a
-            -- pulse half-faded.
-            row:SetAlpha(1)
-        elseif a then
-            a.row = row
-            row._bar:SetMinMaxValues(0, math.max(a.max / 1000, 0.001))
-            row._label:SetText(a.label or "")
-            PaintValue(row, a.value, cfg, a.max, a.rising)
-        end
+    obj.frame:SetAlpha(alpha)
+end
+ns.MT_Paint = Paint
+
+-------------------------------------------------------------------------------
+--  The live bars
+-------------------------------------------------------------------------------
+
+local function PaintLive(K, cfg)
+    if K.sample then
+        K.label:SetText(EllesmereUI.L(K.name))
+        Paint(K, cfg, K.sampleFrac, 60 * K.sampleFrac, false, true)
+        return
     end
-    local n = math.max(math.min(#list, MAX_TIMERS), 1)
-    local newH = n * h + (n - 1) * sp
-    local changed = S.lastH ~= newH
-    S.lastH = newH
-    shell:SetSize(w, newH)
-    if changed and EllesmereUI.NotifyElementResized then
-        EllesmereUI.NotifyElementResized(UNLOCK_KEY)
-    end
+    local a = K.active
+    if not a then return end
+    K.label:SetText(a.label or "")
+    local max = (a.max and a.max > 0) and a.max or 1
+    Paint(K, cfg, (a.value or 0) / max, (a.value or 0) / 1000, a.rising, a.paused)
 end
 
 -- Position: the unlock anchor chain first, then a saved unlock position, then
 -- the CENTER offsets (the GCD bar's three-way split).
-local function ApplyPosition(cfg)
-    local w, h = Size(cfg)
-    shell:SetSize(w, h)
-    if EllesmereUI._TryOverrideAnchor and EllesmereUI._TryOverrideAnchor(UNLOCK_KEY, shell) then
+local function ApplyPosition(K, cfg)
+    local f = K.frame
+    f:SetSize(cfg.width or 200, cfg.height or 20)
+    if EllesmereUI._TryOverrideAnchor and EllesmereUI._TryOverrideAnchor(K.unlock, f) then
         return
     end
     if EllesmereUI._unlockActive then return end
     local pos = cfg.unlockPos
     if pos and pos.point then
-        local anchored = EllesmereUI.IsUnlockAnchored and EllesmereUI.IsUnlockAnchored(UNLOCK_KEY)
-        if anchored and shell:GetLeft() then return end
-        local rp = pos.relPoint or pos.point
-        local sx, sy = ns.SnapXY(pos.x or 0, pos.y or 0, shell, pos)
-        shell:ClearAllPoints()
-        shell:SetPoint(pos.point, UIParent, rp, sx, sy)
+        local anchored = EllesmereUI.IsUnlockAnchored and EllesmereUI.IsUnlockAnchored(K.unlock)
+        if anchored and f:GetLeft() then return end
+        local sx, sy = ns.SnapXY(pos.x or 0, pos.y or 0, f, pos)
+        f:ClearAllPoints()
+        f:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, sx, sy)
     else
-        shell:ClearAllPoints()
-        shell:SetPoint("CENTER", UIParent, "CENTER", cfg.anchorX or 0, cfg.anchorY or 300)
+        f:ClearAllPoints()
+        f:SetPoint("CENTER", UIParent, "CENTER", cfg.anchorX or 0, cfg.anchorY or 300)
     end
 end
 
--------------------------------------------------------------------------------
---  Following the timers
--------------------------------------------------------------------------------
+local function UpdateVisibility(K)
+    if not K.built then return end
+    local cfg = Cfg(K.id)
+    local on = cfg and cfg.enabled and (K.sample or K.active) and true or false
+    EllesmereUI.SetElementVisibility(K.frame, on)
+end
 
-local function UpdateVisibility()
-    if not S.built then return end
-    EllesmereUI.SetElementVisibility(shell, S.sample or next(S.active) ~= nil)
+-- Blizzard's bar for each timer: invisible while ours for that timer is on with
+-- Hide Blizzard Bar, shown otherwise. Its frames are handed out to timers as
+-- they start, so this runs one frame after every start, once Blizzard's own
+-- handler has given the frame its timer.
+local function ApplyBlizzard()
+    local blizz = _G.MirrorTimerContainer
+    local frames = blizz and blizz.mirrorTimers
+    if not frames then return end
+    local any = false
+    for _, tf in ipairs(frames) do
+        local K = tf.timer and KIND_OF[tf.timer]
+        local cfg = K and Cfg(K.id)
+        local hide = cfg and cfg.enabled and cfg.hideBlizzard ~= false
+        if hide then
+            tf:SetAlpha(0)
+            any = true
+        elseif S.blizzHidden then
+            tf:SetAlpha(1)
+        end
+    end
+    S.blizzHidden = any or nil
 end
 
 local function AnyRunning()
-    for _, a in pairs(S.active) do
-        if not a.paused then return true end
+    for _, K in ipairs(KINDS) do
+        if K.active and not K.active.paused then return true end
     end
     return false
 end
 
 local ticker = EllesmereUI.Tick.NewAnimTicker(tickFrame, function()
     local running = false
-    local cfg = P()
-    for timer, a in pairs(S.active) do
-        if not a.paused then
+    for _, K in ipairs(KINDS) do
+        local a = K.active
+        if a and not a.paused then
             running = true
-            local ms = GetMirrorTimerProgress(timer)
+            local ms = GetMirrorTimerProgress(a.timer)
             if Plain(ms) and type(ms) == "number" then
                 -- Refilling: the value went up since the last read.
                 if a.value and ms ~= a.value then a.rising = ms > a.value end
                 a.value = ms
-                if a.row and not S.sample then PaintValue(a.row, ms, cfg, a.max, a.rising) end
+                local cfg = Cfg(K.id)
+                if cfg and K.built and not K.sample then PaintLive(K, cfg) end
             end
         end
     end
@@ -331,187 +342,176 @@ local function Restart()
     if AnyRunning() then ticker.Start() else ticker.Stop() end
 end
 
-local function StartTimer(cfg, timer, value, maxValue, paused, label)
+local function IsPaused(v)
+    return v == true or (type(v) == "number" and v > 0)
+end
+
+local function StartTimer(timer, value, maxValue, paused, label)
     if not (Plain(timer) and Plain(value) and Plain(maxValue) and Plain(paused) and Plain(label)) then return end
-    if type(timer) ~= "string" or timer == "UNKNOWN" or type(maxValue) ~= "number" then return end
-    S.active[timer] = {
-        value = value, max = maxValue, label = label, rising = false,
-        paused = (paused == true or (type(paused) == "number" and paused > 0)),
-    }
-    Layout(cfg)
-    UpdateVisibility()
+    local K = type(timer) == "string" and KIND_OF[timer]
+    if not K or type(maxValue) ~= "number" then return end
+    local cfg = Cfg(K.id)
+    if not (cfg and cfg.enabled and K.built) then return end
+    K.active = { timer = timer, value = value, max = maxValue, label = label,
+                 paused = IsPaused(paused), rising = false }
+    PaintLive(K, cfg)
+    UpdateVisibility(K)
     Restart()
 end
 
--- The timers already running when the bar comes up (a /reload under water).
-local function Resync(cfg)
-    for timer in pairs(S.active) do S.active[timer] = nil end
-    for i = 1, MAX_TIMERS do
+local function StopTimer(timer)
+    local K = Plain(timer) and type(timer) == "string" and KIND_OF[timer]
+    if not (K and K.active and K.active.timer == timer) then return end
+    K.active = nil
+    UpdateVisibility(K)
+    Restart()
+end
+
+-- The timers already running when a bar comes up (a /reload under water).
+local function Resync()
+    for _, K in ipairs(KINDS) do K.active = nil end
+    for i = 1, 3 do
         local timer, value, maxValue, _, paused, label = GetMirrorTimerInfo(i)
         if Plain(timer) and timer and timer ~= "UNKNOWN" then
-            StartTimer(cfg, timer, value, maxValue, paused, label)
+            StartTimer(timer, value, maxValue, paused, label)
         end
     end
-    Layout(cfg)
-    UpdateVisibility()
+    for _, K in ipairs(KINDS) do UpdateVisibility(K) end
     Restart()
 end
 
-shell:SetScript("OnEvent", function(_, event, a1, a2, a3, a4, a5, a6)
-    local cfg = P()
-    if not (cfg and cfg.enabled and S.built) then return end
+eventFrame:SetScript("OnEvent", function(_, event, a1, a2, a3, _, a5, a6)
     if event == "MIRROR_TIMER_START" then
         -- timer, value, maxValue, scale, paused, label
-        StartTimer(cfg, a1, a2, a3, a5, a6)
+        StartTimer(a1, a2, a3, a5, a6)
+        C_Timer.After(0, ApplyBlizzard)
     elseif event == "MIRROR_TIMER_PAUSE" then
-        local a = Plain(a1) and S.active[a1]
-        if a and Plain(a2) then
-            a.paused = (a2 == true or (type(a2) == "number" and a2 > 0))
-            -- A paused bar holds still: no pulse frozen half-faded.
-            if a.paused and a.row then a.row:SetAlpha(1) end
+        local K = Plain(a1) and type(a1) == "string" and KIND_OF[a1]
+        local a = K and K.active
+        if a and a.timer == a1 and Plain(a2) then
+            a.paused = IsPaused(a2)
+            local cfg = Cfg(K.id)
+            if cfg then PaintLive(K, cfg) end
             Restart()
         end
     elseif event == "MIRROR_TIMER_STOP" then
-        if Plain(a1) and S.active[a1] then
-            S.active[a1] = nil
-            Layout(cfg)
-            UpdateVisibility()
-            Restart()
-        end
+        StopTimer(a1)
     else -- PLAYER_ENTERING_WORLD
-        Resync(cfg)
+        Resync()
+        C_Timer.After(0, ApplyBlizzard)
     end
 end)
 
-local function RegisterEvents()
-    if S.events then return end
-    S.events = true
-    shell:RegisterEvent("MIRROR_TIMER_START")
-    shell:RegisterEvent("MIRROR_TIMER_PAUSE")
-    shell:RegisterEvent("MIRROR_TIMER_STOP")
-    shell:RegisterEvent("PLAYER_ENTERING_WORLD")
-end
+-------------------------------------------------------------------------------
+--  Apply
+-------------------------------------------------------------------------------
 
--- Blizzard's bars: alpha only, never a reparent or an unregister, so turning
--- the option off (or the whole bar) hands them straight back.
-local function ApplyBlizzard(cfg)
-    local blizz = _G.MirrorTimerContainer
-    if not blizz then return end
-    local hide = cfg and cfg.enabled and cfg.hideBlizzard ~= false
-    if hide then
-        blizz:SetAlpha(0)
-        S.blizzHidden = true
-    elseif S.blizzHidden then
-        blizz:SetAlpha(1)
-        S.blizzHidden = nil
+local function ApplyKind(K)
+    local cfg = Cfg(K.id)
+    if not (cfg and cfg.enabled) then
+        K.active = nil
+        if K.built then EllesmereUI.SetElementVisibility(K.frame, false) end
+        return false
     end
-end
-
--------------------------------------------------------------------------------
---  Build / apply
--------------------------------------------------------------------------------
-
-local function EnsureBuilt()
-    if S.built then return end
-    S.built = true
-    shell:SetFrameLevel(15)
-    for i = 1, MAX_TIMERS do S.rows[i] = BuildRow() end
+    if not K.built then
+        K.frame:SetFrameLevel(15)
+        BuildBar(K)
+    end
+    K.frame:SetFrameStrata(cfg.frameStrata or "MEDIUM")
+    K.frame:Show()
+    ApplyPosition(K, cfg)
+    ApplyLook(K, cfg)
+    PaintLive(K, cfg)
+    UpdateVisibility(K)
+    return true
 end
 
 function ns.MT_Apply()
-    local cfg = P()
-    ApplyBlizzard(cfg)
-    if not cfg or not cfg.enabled then
-        if S.built then
-            if S.events then shell:UnregisterAllEvents(); S.events = nil end
-            ticker.Stop()
-            for timer in pairs(S.active) do S.active[timer] = nil end
-            EllesmereUI.SetElementVisibility(shell, false)
-        end
-        return
+    local any = false
+    for _, K in ipairs(KINDS) do
+        if ApplyKind(K) then any = true end
     end
-    local first = not S.built
-    EnsureBuilt()
-    shell:SetFrameStrata(cfg.frameStrata or "MEDIUM")
-    shell:Show()
-    if not S.events then
-        RegisterEvents()
-        first = true
+    if any and not S.events then
+        S.events = true
+        eventFrame:RegisterEvent("MIRROR_TIMER_START")
+        eventFrame:RegisterEvent("MIRROR_TIMER_PAUSE")
+        eventFrame:RegisterEvent("MIRROR_TIMER_STOP")
+        eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+        Resync()
+    elseif not any and S.events then
+        S.events = nil
+        eventFrame:UnregisterAllEvents()
+        Restart()
     end
-    if first then
-        Resync(cfg)
-    else
-        Layout(cfg)
-    end
-    ApplyPosition(cfg)
-    UpdateVisibility()
+    ApplyBlizzard()
 end
 
 -------------------------------------------------------------------------------
---  Unlock element
+--  Unlock elements, one per bar
 -------------------------------------------------------------------------------
 
-function ns.MT_MakeUnlockElement(MK, Rebuild)
+function ns.MT_MakeUnlockElements(MK, Rebuild)
     if not MK then return nil end
     local PP = EllesmereUI.PP
 
     if not S.unlockHooked and EllesmereUI.RegisterUnlockModeListener then
         S.unlockHooked = true
-        EllesmereUI:RegisterUnlockModeListener(UNLOCK_KEY, function(active)
-            -- Two sample rows while the movers are up, so there is something to
+        EllesmereUI:RegisterUnlockModeListener("ERB_Mirror", function(active)
+            -- A sample bar while the movers are up, so there is something to
             -- drag out of the water; MT_Apply restores the real state on exit.
-            S.sample = active and true or nil
+            for _, K in ipairs(KINDS) do K.sample = active and true or nil end
             if ns.MT_Apply then ns.MT_Apply() end
         end)
     end
 
-    local function save(_, point, relPoint, x, y)
-        if not point then return end
-        local cfg = P(); if not cfg then return end
-        cfg.unlockPos = { point = point, relPoint = relPoint or point, x = x, y = y }
-        if not EllesmereUI._unlockActive and S.built then
-            shell:ClearAllPoints()
-            shell:SetPoint(point, UIParent, relPoint or point, x, y)
-        end
+    local out = {}
+    for _, K in ipairs(KINDS) do
+        local id, f = K.id, K.frame
+        out[#out + 1] = MK({
+            key = K.unlock, label = K.name, group = "Resource Bars", order = K.order,
+            getFrame = function() return K.built and f or nil end,
+            isHidden = function() local cfg = Cfg(id); return not (cfg and cfg.enabled) end,
+            getSize  = function() local cfg = Cfg(id); return (cfg and cfg.width or 200), (cfg and cfg.height or 20) end,
+            getMatchPad = function() return ns.ERB_EuiBorderPad(Cfg(id)) end,
+            setWidth = function(_, w)
+                local cfg = Cfg(id); if not cfg then return end
+                cfg.width = PP.Snap(math.max(w, 10))
+                Rebuild()
+            end,
+            setHeight = function(_, h)
+                local cfg = Cfg(id); if not cfg then return end
+                cfg.height = PP.Snap(math.max(h, 4))
+                Rebuild()
+            end,
+            savePos = function(_, point, relPoint, x, y)
+                if not point then return end
+                local cfg = Cfg(id); if not cfg then return end
+                cfg.unlockPos = { point = point, relPoint = relPoint or point, x = x, y = y }
+                if not EllesmereUI._unlockActive and K.built then
+                    f:ClearAllPoints()
+                    f:SetPoint(point, UIParent, relPoint or point, x, y)
+                end
+            end,
+            loadPos = function()
+                local cfg = Cfg(id)
+                local pos = cfg and cfg.unlockPos
+                if not pos then return nil end
+                return { point = pos.point, relPoint = pos.relPoint or pos.point, x = pos.x, y = pos.y }
+            end,
+            clearPos = function()
+                local cfg = Cfg(id); if not cfg then return end
+                cfg.unlockPos = nil
+                cfg.anchorX = nil; cfg.anchorY = nil
+            end,
+            applyPos = function()
+                local cfg = Cfg(id)
+                local pos = cfg and cfg.unlockPos
+                if not (pos and K.built) then return end
+                local sx, sy = ns.SnapXY(pos.x, pos.y, f, pos)
+                f:ClearAllPoints()
+                f:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, sx, sy)
+            end,
+        })
     end
-    local function load()
-        local cfg = P()
-        local pos = cfg and cfg.unlockPos
-        if not pos then return nil end
-        return { point = pos.point, relPoint = pos.relPoint or pos.point, x = pos.x, y = pos.y }
-    end
-    local function clear()
-        local cfg = P(); if not cfg then return end
-        cfg.unlockPos = nil
-        cfg.anchorX = 0; cfg.anchorY = 300
-    end
-    local function apply()
-        local cfg = P()
-        local pos = cfg and cfg.unlockPos
-        if not (pos and S.built) then return end
-        local sx, sy = ns.SnapXY(pos.x, pos.y, shell, pos)
-        shell:ClearAllPoints()
-        shell:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, sx, sy)
-    end
-
-    return MK({
-        key = UNLOCK_KEY, label = "Mirror Timers", group = "Resource Bars", order = 509,
-        getFrame = function() return S.built and shell or nil end,
-        isHidden = function() local cfg = P(); return not (cfg and cfg.enabled) end,
-        getSize  = function() return Size(P()) end,
-        setWidth = function(_, w)
-            local cfg = P(); if not cfg then return end
-            cfg.width = PP.Snap(math.max(w, 10))
-            Rebuild()
-        end,
-        -- The mover resizes the whole stack; the per-row height is what is stored.
-        setHeight = function(_, h)
-            local cfg = P(); if not cfg then return end
-            local n = math.max(ActiveCount(), 1)
-            local sp = cfg.rowSpacing or 2
-            cfg.height = PP.Snap(math.max((h - (n - 1) * sp) / n, 4))
-            Rebuild()
-        end,
-        savePos = save, loadPos = load, clearPos = clear, applyPos = apply,
-    })
+    return out
 end
