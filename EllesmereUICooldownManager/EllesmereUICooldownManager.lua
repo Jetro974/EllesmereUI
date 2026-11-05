@@ -7,7 +7,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  Does NOT parse secret values works around restricted APIs.
 -------------------------------------------------------------------------------
 local _, ns = ...
-if not (EllesmereUI and EllesmereUI._ModuleNS and EllesmereUI.NewInternals and EllesmereUI.NewCombatQueue and EllesmereUI.SetFramePlacer and EllesmereUI._Pool and EllesmereUI.NewFrameData) then EUI_CLIENT_BLOCKED = true; return end -- stale-parent guard: a partially updated install (old parent, new child) goes dormant via the line-1 failsafe instead of erroring (the loot roll placement uses the parent's frame placer, the hooks file its frame-data constructor)
+if not (EllesmereUI and EllesmereUI._ModuleNS and EllesmereUI.NewInternals and EllesmereUI.NewCombatQueue and EllesmereUI.SetFramePlacer and EllesmereUI._Pool and EllesmereUI.NewFrameData and EllesmereUI.PadTaintStandDown) then EUI_CLIENT_BLOCKED = true; return end -- stale-parent guard: a partially updated install (old parent, new child) goes dormant via the line-1 failsafe instead of erroring (the loot roll placement uses the parent's frame placer, the hooks file its frame-data constructor)
 EllesmereUI._ModuleNS["EllesmereUICooldownManager"] = ns  -- LOD options files read this module ns via the registry
 
 -- CPU-attribution shell pool: the engine bills a handler's call tree to the addon
@@ -596,6 +596,10 @@ if EllesmereUI.IS_FOREVER then
         end
     end
 end
+
+-- Pandemic Glow is the Anti-Clip Glow (EUI_CDM_ForeverAntiClip.lua) where auras
+-- carry no time over on a refresh: WoW Forever. The one gate every reader asks.
+ns.CDM_ANTI_CLIP = EllesmereUI.IS_FOREVER == true
 
 -- Built after the WoW Forever drop, so they describe the presets this client offers.
 do

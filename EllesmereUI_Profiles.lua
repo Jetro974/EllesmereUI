@@ -2094,7 +2094,7 @@ do
         "accentReskinElements",
     })
     -- Shared border-editor key sets (tooltip / popup menu / popup menu button)
-    for _, prefix in ipairs({ "tooltip", "popupMenu", "popupMenuButton" }) do
+    for _, prefix in ipairs({ "tooltip", "popupMenu", "popupMenuButton", "lootWindow", "lootIcon" }) do
         for _, suffix in ipairs({
             "BorderTexture", "BorderThickness", "BorderThicknessPx", "BorderColor",
             "BorderColorMode", "BorderOpacity", "BorderOffsetX",
@@ -2110,7 +2110,7 @@ do
         "reskinPlayerSpells", "reskinAdventureGuide", "reskinProfessionsBook",
         "reskinProfessions", "reskinWorldMap", "reskinGuild", "reskinCalendar",
         "reskinAchievements", "reskinMail", "reskinCatalyst", "reskinSocket",
-        "reskinItemUpgrade", "reskinLoot", "reskinLootToast", "lootToastQualityStrip",
+        "reskinItemUpgrade", "reskinLoot", "lootIconBorder", "lootWindowBorderQualityColor", "reskinLootToast", "lootToastQualityStrip",
         "lootToastQualityStripMoney", "lootToastScale",
         "reskinBNetToast",
         "reskinLootRoll", "reskinLootHistory", "reskinGroupInvite",
@@ -2421,6 +2421,8 @@ end
 --                         character's birthday
 --    cdmCachedBarSizes    Cooldown Manager bar sizes cached per character
 --    bagCurrencyByChar    Bags' tracked currencies per character
+--    mageArmorByChar      AuraBuff Reminders (WoW Forever): the mage armor
+--                         each character last had up
 --  (The upgrade-calc and gold blobs are what PRIVATE_ADDON_KEYS strips from
 --  normal strings, at their current top-level homes. The three legacy gold
 --  keys stay listed: until Bags or DataBars loads and absorbs them they are
@@ -2447,11 +2449,13 @@ local FULL_EXPORT_EXCLUDED = {
     groupFinderApps       = true,
     questWatchChars       = true,
     cdmRepopulatePending  = true,
+    cdmRepopulateDone     = true,
     mailAltRoster         = true,
     mailAltHidden         = true,
     raidHoroscope         = true,
     cdmCachedBarSizes     = true,
     bagCurrencyByChar     = true,
+    mageArmorByChar       = true,
 }
 
 -- Root stores keyed by profile name (or character) describe the recipient's

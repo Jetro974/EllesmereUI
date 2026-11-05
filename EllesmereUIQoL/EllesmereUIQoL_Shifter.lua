@@ -140,6 +140,7 @@ local DOCKING_COMPANIONS = {
     ProfessionsBookFrame = true,
     WorldMapFrame = true,
     HousingDashboardFrame = true,
+    EncounterJournal = true,
 }
 
 -- Unprotected windows that take the protected path all the same (Secured):
@@ -148,6 +149,10 @@ local DOCKING_COMPANIONS = {
 -- and the Guild & Communities list hands secret club data to a call allowed
 -- only untainted (C_Club.SetAvatarTexture, in Mythic+ and raids).
 local SECURE_PATH = { CommunitiesFrame = true }
+
+-- Windows whose strata is never changed when lifted over a moved CharacterFrame
+-- (Raise only): a strata change leaves the Adventure Guide's boss loot list blank.
+local NO_STRATA_LIFT = { EncounterJournal = true }
 
 -- Whether a hooked window takes the protected path: secure positioning and
 -- scaling, the cursor-delta drag, position-only docking, never moved in combat.
@@ -246,6 +251,21 @@ local function PointFrac(p)
     local x = p:find("LEFT") and 0 or (p:find("RIGHT") and 1 or 0.5)
     local y = p:find("TOP") and 1 or (p:find("BOTTOM") and 0 or 0.5)
     return x, y
+end
+
+-- Whether a window placed at its saved position would overlap CharacterFrame
+-- (screen-absolute units, so Shifter scaling on either frame is accounted for).
+local function SavedPosOverlaps(frame, pos, cf)
+    local es, cs = frame:GetEffectiveScale() or 1, cf:GetEffectiveScale() or 1
+    local ues = UIParent:GetEffectiveScale() or 1
+    local cl, cr, cb, ct = cf:GetLeft(), cf:GetRight(), cf:GetBottom(), cf:GetTop()
+    if not (cl and cr and cb and ct and pos.point) then return false end
+    local w, h = (frame:GetWidth() or 0) * es, (frame:GetHeight() or 0) * es
+    local rx, ry = PointFrac(pos.relPoint or pos.point)
+    local px, py = PointFrac(pos.point)
+    local left = rx * UIParent:GetWidth() * ues + (pos.x or 0) * es - px * w
+    local bottom = ry * UIParent:GetHeight() * ues + (pos.y or 0) * es - py * h
+    return left < cr * cs and left + w > cl * cs and bottom < ct * cs and bottom + h > cb * cs
 end
 
 -- Offset from one point of a w x h box to another: a mover saves where one
@@ -577,7 +597,7 @@ local function RedockCompanions()
     for i = 1, #dockedCompanions do
         local c = dockedCompanions[i]
         if c.frame:IsShown() and c.shouldDock() then
-            if not Secured(c.frame) then c.frame:SetFrameStrata("DIALOG") end
+            if c.liftStrata and not Secured(c.frame) then c.frame:SetFrameStrata("DIALOG") end
             c.dock()
             if not Secured(c.frame) then c.frame:Raise() end
         end
@@ -594,6 +614,8 @@ local function HookFrame(frame, name)
     hookedFrames[#hookedFrames + 1] = { frame = frame, name = name }
 
     if SECURE_PATH[name] then ffd._shSecure = true end
+    -- Lifted over a moved CharacterFrame by strata and Raise, or by Raise alone (NO_STRATA_LIFT).
+    local liftStrata = not NO_STRATA_LIFT[name]
 
     -- Wheel arming rides panel visibility (WheelArm.Note): registry frames
     -- are all top-level closable panels, so OnShow/OnHide track exactly the
@@ -701,9 +723,9 @@ local function HookFrame(frame, name)
     -- to "HIGH" strata while these default to "MEDIUM", it then renders buried
     -- underneath. Docks left by default (matching Blizzard's normal layout), falling
     -- back to whichever side actually has room -- otherwise SetClampedToScreen just
-    -- snaps it back onto CharacterFrame regardless of which side we pick. Only kicks
-    -- in when the companion has no pin of its own; an explicit Shift+drag on the
-    -- companion wins over auto-docking.
+    -- snaps it back onto CharacterFrame regardless of which side we pick. A companion
+    -- with its own pin keeps it unless that spot would overlap the moved CharacterFrame
+    -- (whichever window moved last); then it docks beside it instead.
     local ShouldDock, DockToCharacterFrame
     if DOCKING_COMPANIONS[name] then
         local defaultStrata = frame:GetFrameStrata()
@@ -712,9 +734,10 @@ local function HookFrame(frame, name)
             -- through the SecureSetPoint branch below; their strata/Raise
             -- touches are skipped in the OnShow/OnHide hooks (insecure writes
             -- taint a protected tree -- the PVEFrame SetMovable incident).
-            if tempPos[frame] or GetSavedPos(name) then return false end
             local cf = _G.CharacterFrame
-            return cf ~= nil and cf:IsShown() and (tempPos[cf] or GetSavedPos("CharacterFrame")) ~= nil
+            if not (cf and cf:IsShown() and (tempPos[cf] or GetSavedPos("CharacterFrame"))) then return false end
+            local own = tempPos[frame] or GetSavedPos(name)
+            return not own or SavedPosOverlaps(frame, own, cf)
         end
         DockToCharacterFrame = function()
             local cf = _G.CharacterFrame
@@ -767,7 +790,7 @@ local function HookFrame(frame, name)
             -- Strata writes are INSECURE: on a protected frame (PVEFrame)
             -- they taint its whole tree, exactly like the SetMovable call
             -- that caused the original secret-value incident. Skip them.
-            if not Secured(frame) then frame:SetFrameStrata(defaultStrata) end
+            if liftStrata and not Secured(frame) then frame:SetFrameStrata(defaultStrata) end
         end)
         frame:HookScript("OnShow", function()
             if not IsEnabled() then return end
@@ -776,12 +799,13 @@ local function HookFrame(frame, name)
                 -- CharacterFrame -- a docked frame no longer does. Protected
                 -- frames therefore get position-only docking; strata and
                 -- Raise are insecure writes that would taint their tree.
-                if not Secured(frame) then frame:SetFrameStrata("DIALOG") end
+                if liftStrata and not Secured(frame) then frame:SetFrameStrata("DIALOG") end
                 DockToCharacterFrame()
                 if not Secured(frame) then frame:Raise() end
             end
         end)
-        dockedCompanions[#dockedCompanions + 1] = { frame = frame, shouldDock = ShouldDock, dock = DockToCharacterFrame }
+        dockedCompanions[#dockedCompanions + 1] = { frame = frame, shouldDock = ShouldDock,
+            dock = DockToCharacterFrame, liftStrata = liftStrata }
     elseif name == "CharacterFrame" then
         -- CharacterFrame itself isn't a companion, but every companion's dock
         -- is relative to IT -- so a scale or position change here is exactly
@@ -804,14 +828,14 @@ local function HookFrame(frame, name)
         -- Blizzard strata, possibly buried but never tainted.
         local defaultStrata = frame:GetFrameStrata()
         frame:HookScript("OnHide", function()
-            if not Secured(frame) then frame:SetFrameStrata(defaultStrata) end
+            if liftStrata and not Secured(frame) then frame:SetFrameStrata(defaultStrata) end
         end)
         frame:HookScript("OnShow", function()
             if not IsEnabled() then return end
             if Secured(frame) then return end
             local cf = _G.CharacterFrame
             if cf and cf:IsShown() and (tempPos[cf] or GetSavedPos("CharacterFrame")) then
-                frame:SetFrameStrata("DIALOG")
+                if liftStrata then frame:SetFrameStrata("DIALOG") end
                 frame:Raise()
             end
         end)
@@ -857,6 +881,30 @@ local function TryHook(name)
     if EllesmereUI.PadGamepadUI() then return end
     local frame = _G[name]
     if frame and frame.HookScript then HookFrame(frame, name) end
+end
+
+-- Windows of our own modules that are built after login (Forever Essentials'
+-- classic spellbook and talent window): each module hands its window over by
+-- name as it builds it, and an enable later in the session hooks the ones
+-- already handed over. Placed at once, since such a window can first open in
+-- combat, when a protected one cannot be moved.
+local adopted = {}
+
+local function HookAdopted(name)
+    if EllesmereUI.PadGamepadUI() then return end
+    local frame = _G[name]
+    if not (frame and frame.HookScript) then return end
+    HookFrame(frame, name)
+    if not InCombatLockdown() then
+        ApplyScale(frame, name)
+        ApplyPosition(frame, name)
+    end
+end
+
+function EllesmereUI._ShifterAdopt(name)
+    if adopted[name] then return end
+    adopted[name] = true
+    if IsEnabled() then HookAdopted(name) end
 end
 
 -------------------------------------------------------------------------------
@@ -1442,6 +1490,7 @@ local function InitShifter()
     if next(pendingAddons) then
         eventFrame:RegisterEvent("ADDON_LOADED")
     end
+    for name in pairs(adopted) do HookAdopted(name) end
     -- Scroll-wheel scaling: the modifier listener is owned by WheelArm.Sync
     -- and registered ONLY while a registered panel is open -- with everything
     -- closed a modifier press never enters Lua. Called here (not just on

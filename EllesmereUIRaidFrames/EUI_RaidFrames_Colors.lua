@@ -473,9 +473,13 @@ end
 -- The Name Format (Text Display, nameFormat): the character name shaped by
 -- EllesmereUI.ShortName; unset or "full" shows it whole. Nicknames are never
 -- shortened. fmt (a tag's own modifier, [name:abbr]) takes the setting's place.
-function ns.RF_FormatName(display, s, fmt)
+-- unit: whose name it is; the setting asks EllesmereUI.UnitNameFormat (WoW
+-- Forever: First / Last Name leave a non-player's name whole, a mob a member
+-- targets included). A tag's modifier shapes any name.
+function ns.RF_FormatName(display, s, fmt, unit)
     local mode = fmt or (s and s.nameFormat)
     if not mode or mode == "full" then return display end
+    if not fmt then mode = EllesmereUI.UnitNameFormat(mode, unit) end
     return EllesmereUI.ShortName(display, mode)
 end
 
@@ -512,7 +516,7 @@ local function ResolveDisplayName(unit, applyCap, s, fmt)
                and not (issecretvalue and issecretvalue(dn)) and dn ~= "" then
                 display = dn
             else
-                display = ns.RF_FormatName(EllesmereUI.WithSurname(name, surname), s, fmt)
+                display = ns.RF_FormatName(EllesmereUI.WithSurname(name, surname), s, fmt, unit)
             end
         end
     end
@@ -567,7 +571,7 @@ local function ResolveDisplayName(unit, applyCap, s, fmt)
     end
     if not display then
         if Ambiguate then name = Ambiguate(name, "short") end
-        display = ns.RF_FormatName(EllesmereUI.WithSurname(name, surname), s, fmt)
+        display = ns.RF_FormatName(EllesmereUI.WithSurname(name, surname), s, fmt, unit)
     end
     -- Cap only the in-frame name (applyCap), not the top name bar banner.
     if applyCap then display = ns.CapName(display, s) end
@@ -812,6 +816,7 @@ do
     local UnitPowerPercent, UnitGetTotalAbsorbs = UnitPowerPercent, UnitGetTotalAbsorbs
     local UnitInRaid, GetRaidRosterInfo, IsInRaid = UnitInRaid, GetRaidRosterInfo, IsInRaid
     local SCHEMA = TextTags.UNIT.keys
+    local IsZeroValue = EllesmereUI.IsZeroValue
 
     -- OFFLINE / DEAD, nil while alive and connected (clean booleans for group units).
     local function Status(unit, pv)
@@ -878,13 +883,16 @@ do
         return SCHEMA["pp:pct"].sample
     end
 
-    -- Full amounts blank at zero, abbreviated ones read 0, as in the Unit Frames.
+    -- Full and abbreviated amounts blank at zero, as the Unit Frames' Absorb Short.
     local function Absorb(key, get)
         local abr, sample = sfind(key, ":abr", 1, true) ~= nil, SCHEMA[key].sample
         return function(unit)
             if not unit then return sample end
             local v = get(unit) or 0
-            if abr then return AbbreviateValue(v, "absorb") end
+            if abr then
+                if IsZeroValue(v) then return "" end
+                return AbbreviateValue(v, "absorb")
+            end
             return C_StringUtil.TruncateWhenZero(v)
         end
     end
