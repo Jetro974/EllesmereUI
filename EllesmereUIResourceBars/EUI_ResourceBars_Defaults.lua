@@ -483,6 +483,8 @@ local DEFAULTS = {
             showLabel     = true,    -- the game's own name for the timer
             showTime      = true,    -- seconds left
             hideBlizzard  = true,    -- Blizzard's bars go invisible while this one is on
+            lowWarn       = false,   -- slide to red under lowWarnAt, pulse in its last half
+            lowWarnAt     = 30,      -- percent of the bar left where the warning starts
             borderSize    = 1,
             borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
             bgR           = 0, bgG = 0, bgB = 0, bgA = 0.7,
