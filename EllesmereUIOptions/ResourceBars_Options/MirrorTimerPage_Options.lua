@@ -81,6 +81,60 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
             end }
     end
 
+    -- Apply to All / Apply to Multiple (EllesmereUI_Widgets_ApplyToAll.lua),
+    -- as the action bars do: a setting's keys copied from this bar to the
+    -- other mirror bars, all of them or the ones ticked in the list.
+    local SYNC_IDS, SYNC_LABELS = {}, {}
+    for _, k in ipairs(ns.MT_KINDS or {}) do
+        SYNC_IDS[#SYNC_IDS + 1] = k.id
+        SYNC_LABELS[k.id] = ns.MT_Name(k)
+    end
+    local function Bar(bid) local p = DB(); return p and p.mirrorTimer and p.mirrorTimer[bid] end
+    local function Sync(region, tooltip, keys)
+        if EllesmereUI._prebuilding or not EllesmereUI.BuildSyncIcon then return end
+        local function CopyTo(ids)
+            local src = C()
+            for _, bid in ipairs(ids) do
+                local dst = Bar(bid)
+                if src and dst and dst ~= src then
+                    for _, k in ipairs(keys) do dst[k] = src[k] end
+                end
+            end
+            for _, k in ipairs(ns.MT_KINDS or {}) do
+                if EllesmereUI.NotifyElementResized then EllesmereUI.NotifyElementResized(k.unlock) end
+            end
+            Refresh(); EllesmereUI:RefreshPage()
+        end
+        EllesmereUI.BuildSyncIcon({
+            region = region, tooltip = tooltip,
+            onClick = function() CopyTo(SYNC_IDS) end,
+            isSynced = function()
+                local src = C(); if not src then return true end
+                for _, bid in ipairs(SYNC_IDS) do
+                    local dst = Bar(bid)
+                    if dst then
+                        for _, k in ipairs(keys) do
+                            if dst[k] ~= src[k] then return false end
+                        end
+                    end
+                end
+                return true
+            end,
+            flashTargets = function() return { region } end,
+            multiApply = {
+                elementKeys = SYNC_IDS, elementLabels = SYNC_LABELS,
+                getCurrentKey = function() return id end,
+                onApply = CopyTo,
+            },
+        })
+    end
+    local function Keys(prefix, list)
+        local out = {}
+        for _, k in ipairs(list) do out[#out + 1] = prefix .. k end
+        return out
+    end
+    local RGBA = { "R", "G", "B", "A" }
+
     ---------------------------------------------------------------------------
     --  LAYOUT
     ---------------------------------------------------------------------------
@@ -121,6 +175,7 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
                 Refresh()
             end
         end
+        Sync(enableRow._rightRegion, "Apply Frame Strata to all Bars", { "frameStrata" })
         EllesmereUI.BuildInlineCog(enableRow._leftRegion, { icon = EllesmereUI.DIRECTIONS_ICON,
             disabled = off, disabledTooltip = TIP,
             title = K.name .. " Bar Position",
@@ -144,9 +199,12 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
           disabled = wDis, disabledTooltip = wTip, rawTooltip = wRaw,
           getValue = Get("width", 200), setValue = Set("width") }
     );  y = y - h
+    Sync(sizeRow._leftRegion, "Apply Height to all Bars", { "height" })
+    Sync(sizeRow._rightRegion, "Apply Width to all Bars", { "width" })
 
     -- Row: Show Spark | Hide Blizzard Bar
-    _, h = W:DualRow(parent, y,
+    local sparkRow
+    sparkRow, h = W:DualRow(parent, y,
         { type = "toggle", text = "Show Spark",
           disabled = off, disabledTooltip = TIP,
           getValue = function() local c = C(); return c and c.showSpark end,
@@ -157,6 +215,8 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
           getValue = function() local c = C(); return c and c.hideBlizzard ~= false end,
           setValue = Set("hideBlizzard") }
     );  y = y - h
+    Sync(sparkRow._leftRegion, "Apply Show Spark to all Bars", { "showSpark" })
+    Sync(sparkRow._rightRegion, "Apply Hide Blizzard Bar to all Bars", { "hideBlizzard" })
 
     _, h = W:Spacer(parent, y, 16);  y = y - h
 
@@ -267,6 +327,11 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
             EllesmereUI.RegisterWidgetRefresh(UpdateCogVis)
             UpdateCogVis()
         end
+        Sync(bsRow._leftRegion, "Apply Border Style to all Bars", { "borderTexture", "borderTextureOffset",
+            "borderTextureOffsetY", "borderTextureShiftX", "borderTextureShiftY", "borderBehind" })
+        local sizeKeys = Keys("border", RGBA)
+        for _, k in ipairs({ "borderSize", "borderSizePx", "cornerRadius", "cornerMask" }) do sizeKeys[#sizeKeys + 1] = k end
+        Sync(bsRow._rightRegion, "Apply Border Size and Color to all Bars", sizeKeys)
     end
 
     -- Row: Fill Color (gradient end + fill, gradient cog) | Background (+ colour)
@@ -304,6 +369,14 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
               getValue = function() local c = C(); return (c and c.bgR or 0), (c and c.bgG or 0), (c and c.bgB or 0) end,
               setValue = function(r, g, b) local c = C(); if not c then return end; c.bgR, c.bgG, c.bgB = r, g, b; Refresh() end },
         }, { size = 20, disabled = off, disabledTooltip = TIP })
+    end
+    do
+        local fillKeys = Keys("fill", RGBA)
+        for _, k in ipairs(Keys("gradient", RGBA)) do fillKeys[#fillKeys + 1] = k end
+        fillKeys[#fillKeys + 1] = "gradientEnabled"
+        fillKeys[#fillKeys + 1] = "gradientDir"
+        Sync(colorRow._leftRegion, "Apply Fill Color to all Bars", fillKeys)
+        Sync(colorRow._rightRegion, "Apply Background Settings to all Bars", Keys("bg", RGBA))
     end
 
     -- A text row's dropdown (None / Left / Right / Center), with its colour
@@ -348,6 +421,9 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
         TextCfg("Label Text", "label", "left")
     );  y = y - h
     TextExtras(textRow._rightRegion, "Label Text", "label", "left")
+    local TEXT_KEYS = { "Side", "Size", "X", "Y", "R", "G", "B", "A" }
+    Sync(textRow._leftRegion, "Apply Bar Texture to all Bars", { "texture" })
+    Sync(textRow._rightRegion, "Apply Label Text to all Bars", Keys("label", TEXT_KEYS))
 
     -- Row: Duration Text | Low Warning (+ Warning Starts At cog)
     local timeRow
@@ -360,6 +436,8 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
           setValue = function(v) local c = C(); if not c then return end; c.lowWarn = v; Refresh(); EllesmereUI:RefreshPage() end }
     );  y = y - h
     TextExtras(timeRow._leftRegion, "Duration Text", "time", "right")
+    Sync(timeRow._leftRegion, "Apply Duration Text to all Bars", Keys("time", TEXT_KEYS))
+    Sync(timeRow._rightRegion, "Apply Low Warning to all Bars", { "lowWarn", "lowWarnAt" })
     if not EllesmereUI._prebuilding then
         EllesmereUI.BuildInlineCog(timeRow._rightRegion, {
             disabled = function() local c = C(); return not (c and c.enabled and c.lowWarn) end,
