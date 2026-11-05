@@ -59,6 +59,15 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
     local function Get(key, default)
         return function() local c = C(); if not c then return default end; local v = c[key]; if v == nil then return default end; return v end
     end
+    -- The cast bar's style dresses these bars too (ns.MT_StockStyle): under a
+    -- stock style its frame art replaces the border, and Blizzard Style (WoW
+    -- Forever included) also brings its own background and fill art.
+    local function stock() return EllesmereUI.BlizzStyle.Get("castbar") end
+    local function Gate(cfg) return EllesmereUI.BlizzStyle.Gate("castbar", cfg) end
+    local function GateKit(cfg)
+        if EllesmereUI.BlizzStyle.Active("castbar") ~= "blizzard" then return cfg end
+        return Gate(cfg)
+    end
     local function Swatch(prefix, tip, disabled, disabledTooltip)
         return { tooltip = tip, hasAlpha = true, disabled = disabled, disabledTooltip = disabledTooltip,
             getValue = function()
@@ -162,7 +171,7 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
         local btValues, btOrder = EllesmereUI.GetBorderTextureDropdown()
         local bsRow
         bsRow, h = W:DualRow(parent, y,
-            { type = "dropdown", text = "Border Style",
+            Gate({ type = "dropdown", text = "Border Style",
               disabled = off, disabledTooltip = TIP,
               values = btValues, order = btOrder,
               getValue = Get("borderTexture", "solid"),
@@ -176,8 +185,8 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
                   if defSz then g.borderSize = defSz end
                   if g.borderSizePx then g.borderSizePx = false end
                   Refresh(); EllesmereUI:RefreshPage(true)
-              end },
-            EllesmereUI.BorderPxSliderCfg({ text = "Border Size",
+              end }),
+            Gate(EllesmereUI.BorderPxSliderCfg({ text = "Border Size",
               disabled = off, disabledTooltip = TIP,
               getStep = function() local c = C(); return c and (c.borderSize or 0) or 0 end,
               setStep = function(v) local c = C(); if c then c.borderSize = v end end,
@@ -185,12 +194,12 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
               getPx = function() local c = C(); return c and c.borderSizePx end,
               setPx = function(v) local c = C(); if c then c.borderSizePx = v end end,
               apply = function() Refresh(); EllesmereUI:RefreshPage() end,
-            }));  y = y - h
+            })));  y = y - h
         -- Width Offset | Height Offset: own row while a textured style is selected.
         do
             local c = C()
             local tex = c and c.borderTexture or "solid"
-            if tex ~= "solid" and tex ~= "" then
+            if tex ~= "solid" and tex ~= "" and not stock() then
                 local function step() local c2 = C(); return c2 and (c2.borderSize or 0) or 0 end
                 local ocfgL, ocfgR = EllesmereUI.BorderOffsetRowCfgs({
                     addonKey = "resourcebars",
@@ -221,10 +230,11 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
             EllesmereUI.BuildInlineCog(bsRow._rightRegion, {
                 title = "Corner Radius", tip = "Corner Radius",
                 disabled = function()
-                    if off() then return true end
+                    if off() or stock() then return true end
                     local c = C(); return not EllesmereUI.RoundedStyleOK(c and c.borderTexture)
                 end,
                 disabledTooltip = function()
+                    if stock() then return EllesmereUI.BlizzStyle.Label("castbar") end
                     if off() then return TIP end
                     return "This option requires the Solid, Glow or Shadow border style."
                 end,
@@ -270,10 +280,10 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
                   function() if off() then return TIP end; return "Gradient" end),
               Swatch("fill", "Fill Color"),
           } },
-        { type = "slider", text = "Background", min = 0, max = 100, step = 1,
+        GateKit({ type = "slider", text = "Background", min = 0, max = 100, step = 1,
           disabled = off, disabledTooltip = TIP,
           getValue = function() local c = C(); return math.floor(((c and c.bgA or 0.7) * 100) + 0.5) end,
-          setValue = function(v) local c = C(); if not c then return end; c.bgA = v / 100; Refresh() end }
+          setValue = function(v) local c = C(); if not c then return end; c.bgA = v / 100; Refresh() end })
     );  y = y - h
     if not EllesmereUI._prebuilding then
         EllesmereUI.BuildInlineCog(colorRow._leftRegion, {
@@ -331,10 +341,10 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
     -- Row: Bar Texture | Label Text
     local textRow
     textRow, h = W:DualRow(parent, y,
-        { type = "dropdown", text = "Bar Texture",
+        GateKit({ type = "dropdown", text = "Bar Texture",
           disabled = off, disabledTooltip = TIP,
           values = texValues, order = texOrder,
-          getValue = Get("texture", "none"), setValue = Set("texture") },
+          getValue = Get("texture", "none"), setValue = Set("texture") }),
         TextCfg("Label Text", "label", "left")
     );  y = y - h
     TextExtras(textRow._rightRegion, "Label Text", "label", "left")
