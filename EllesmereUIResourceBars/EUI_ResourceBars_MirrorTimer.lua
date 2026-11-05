@@ -203,6 +203,19 @@ local function ApplyLook(obj, cfg, onePx)
         cfg.labelR or 1, cfg.labelG or 1, cfg.labelB or 1, cfg.labelA or 1)
     PlaceText(obj.time, f, cfg.timeSide or "right", cfg.timeSize or 11, cfg.timeX or 0, cfg.timeY or 0,
         cfg.timeR or 1, cfg.timeG or 1, cfg.timeB or 1, cfg.timeA or 1)
+
+    -- Rounded corners (EllesmereUI_RoundedCorners.lua; nothing at radius 0).
+    -- The body is the clip (fill + spark) and the background.
+    local radius = cfg.cornerRadius or 0
+    if radius > 0 and EllesmereUI.RoundCorners then
+        EllesmereUI.RoundCorners(f, radius, {
+            roots = { clip }, textures = { obj.bg },
+            border = bdr, clip = clip,
+            style = cfg.borderTexture or "solid", corners = cfg.cornerMask,
+        })
+    elseif EllesmereUI.RoundCorners then
+        EllesmereUI.RoundCorners(f, 0)
+    end
 end
 ns.MT_ApplyLook = ApplyLook
 

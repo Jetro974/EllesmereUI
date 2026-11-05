@@ -216,6 +216,25 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
                         return "This option requires a Border Size above 0."
                     end),
             }, { size = 20 })
+            -- Corner Radius (EllesmereUI_RoundedCorners.lua): an inline cog on the
+            -- border size control, as on the swing timer.
+            EllesmereUI.BuildInlineCog(bsRow._rightRegion, {
+                title = "Corner Radius", tip = "Corner Radius",
+                disabled = function()
+                    if off() then return true end
+                    local c = C(); return not EllesmereUI.RoundedStyleOK(c and c.borderTexture)
+                end,
+                disabledTooltip = function()
+                    if off() then return TIP end
+                    return "This option requires the Solid, Glow or Shadow border style."
+                end,
+                rows = EllesmereUI.RoundedCornerRows({
+                    { type = "slider", label = "Corner Radius", min = 0, max = EllesmereUI.ROUNDED_MAX_RADIUS, step = 1,
+                      get = function() local c = C(); return c and c.cornerRadius or 0 end,
+                      set = function(v) local c = C(); if not c then return end; c.cornerRadius = v; Refresh() end },
+                }, function() local c = C(); return c and c.cornerMask end,
+                   function(v) local c = C(); if not c then return end; c.cornerMask = v; Refresh() end),
+            })
             local cogBtn = EllesmereUI.BuildInlineCog(bsRow._leftRegion, { icon = EllesmereUI.DIRECTIONS_ICON,
                 title = "Border Options",
                 rows = {

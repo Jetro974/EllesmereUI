@@ -492,6 +492,7 @@ local DEFAULTS = {
                 borderSize    = 1,
                 borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
                 borderTexture = "solid",
+                cornerRadius  = 0,       -- rounded corners (EllesmereUI_RoundedCorners.lua)
                 bgR           = 0, bgG = 0, bgB = 0, bgA = 0.7,
                 frameStrata   = "MEDIUM",
                 unlockPos     = nil,
@@ -518,6 +519,7 @@ local DEFAULTS = {
                 borderSize    = 1,
                 borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
                 borderTexture = "solid",
+                cornerRadius  = 0,       -- rounded corners (EllesmereUI_RoundedCorners.lua)
                 bgR           = 0, bgG = 0, bgB = 0, bgA = 0.7,
                 frameStrata   = "MEDIUM",
                 unlockPos     = nil,
@@ -544,6 +546,7 @@ local DEFAULTS = {
                 borderSize    = 1,
                 borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
                 borderTexture = "solid",
+                cornerRadius  = 0,       -- rounded corners (EllesmereUI_RoundedCorners.lua)
                 bgR           = 0, bgG = 0, bgB = 0, bgA = 0.7,
                 frameStrata   = "MEDIUM",
                 unlockPos     = nil,
