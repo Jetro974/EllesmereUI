@@ -750,7 +750,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
           disabled = function() return not LU.Get("enabled") end, disabledTooltip = "Level Up Toast",
           onClick = function() LU.Preview() end }
     );  y = y - h
-    do
+    if not EllesmereUI._prebuilding then
         local function partRow(label, tooltip, key)
             return { type = "toggle", label = label, tooltip = tooltip,
                 get = function() return LU.Get(key) end,

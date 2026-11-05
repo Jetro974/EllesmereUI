@@ -37,6 +37,7 @@ local STATS = {
     { 7, "SPELL_STAT2_NAME" },  -- agility
     { 8, "SPELL_STAT3_NAME" },  -- stamina
     { 9, "SPELL_STAT4_NAME" },  -- intellect
+    { 10, "SPELL_STAT5_NAME" }, -- spirit
 }
 
 local anchor, toast, events
@@ -217,8 +218,8 @@ local function Show(level, timeLevel, timeSecs, health, power, talents, ...)
         local _, token = UnitPowerType("player")
         if power > 0 then stats[#stats + 1] = { _G[token] or token, power } end
         for i = 1, #STATS do
-            local d = deltas[STATS[i][1] - 5]
-            if d and d > 0 then stats[#stats + 1] = { _G[STATS[i][2]], d } end
+            local d, name = deltas[STATS[i][1] - 5], _G[STATS[i][2]]
+            if d and d > 0 and name then stats[#stats + 1] = { name, d } end
         end
     else
         talents = 0
@@ -348,13 +349,15 @@ local function OnEvent(_, event, ...)
     if event == "PLAYER_LEVEL_UP" then
         local level = ...
         local secs = LevelSeconds(level - 1)
+        -- Two levels at once (a quest turn-in): the second one took no time.
+        if secs and secs < 1 then secs = nil end
         local t = Record(true)
         t.level, t.seconds, t.full = level, 0, true
         sessionStart = GetTime()
         local p = { level, level - 1, secs, select(2, ...) }
         p.n = select("#", ...) + 2
         pending = p
-        if not hooked then
+        if not hooked and EventToastManagerFrame then
             hooked = true
             hooksecurefunc(EventToastManagerFrame, "DisplayToast", OnGameToast)
         end
@@ -399,7 +402,7 @@ EllesmereUI._LevelUpToast = {
     -- A sample: the last level, with typical gains.
     Preview = function()
         local max = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or 60
-        Show(max, max - 1, 8040, 52, 38, 1, 1, 0, 2, 1)
+        Show(max, max - 1, 8040, 52, 38, 1, 1, 0, 2, 1, 1)
     end,
 }
 

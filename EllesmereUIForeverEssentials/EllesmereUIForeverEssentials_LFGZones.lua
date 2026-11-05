@@ -14,7 +14,7 @@ local _, module = ...
 local F = module.Feature("lfgZones", { enabled = false })
 
 local hooked = false
--- Result row or tooltip leader frame -> our zone FontString.
+-- Result row or tooltip leader frame -> our frame holding the zone FontString.
 local zoneText = setmetatable({}, { __mode = "k" })
 
 -- The zone of a solo listing's player, or nil (a group, none sent, or secret).
@@ -29,14 +29,18 @@ local function Zone(resultID)
     return area
 end
 
+-- Our own frame over the row (or tooltip leader), holding the zone text.
 local function ZoneString(frame)
-    local fs = zoneText[frame]
-    if not fs then
-        fs = frame:CreateFontString(nil, "ARTWORK", "GameFontDisableSmallLeft")
-        fs:SetWordWrap(false)
-        zoneText[frame] = fs
+    local holder = zoneText[frame]
+    if not holder then
+        holder = CreateFrame("Frame", nil, frame)
+        holder:SetAllPoints()
+        holder.text = holder:CreateFontString(nil, "ARTWORK", "GameFontDisableSmallLeft")
+        holder.text:SetWordWrap(false)
+        zoneText[frame] = holder
     end
-    return fs
+    holder:Show()
+    return holder.text
 end
 
 -- The parts after the player's name on a result row, left to right.
@@ -76,8 +80,7 @@ local function UpdateRow(row)
     fs:Show()
 end
 
--- Tooltip: after the player's role icons. The tooltip sizes itself to its
--- rows, so it is widened when the zone runs past it.
+-- Tooltip: after the player's role icons, cut to the tooltip's width.
 local function UpdateTooltip(tip, resultID)
     local leader = tip.Leader
     local zone = leader:IsShown() and Zone(resultID)
@@ -93,11 +96,12 @@ local function UpdateTooltip(tip, resultID)
     fs:ClearAllPoints()
     fs:SetPoint("LEFT", after, "RIGHT", 4, 0)
     fs:SetText(zone)
-    fs:Show()
-    local left, right = tip:GetLeft(), fs:GetRight()
-    if left and right and right - left + 11 > tip:GetWidth() then
-        tip:SetWidth(right - left + 11)
+    fs:SetWidth(0)
+    local start, edge = after:GetRight(), tip:GetRight()
+    if start and edge and fs:GetWidth() > edge - start - 15 then
+        fs:SetWidth(math.max(edge - start - 15, 1))
     end
+    fs:Show()
 end
 
 local function Hook()
@@ -106,8 +110,13 @@ local function Hook()
 end
 
 -- hooksecurefunc cannot be undone: hooked once, the hooks follow the setting.
+-- Turning it off hides the zones already drawn.
 local function Apply()
-    if hooked or not F.Enabled() then return end
+    if not F.Enabled() then
+        for _, holder in pairs(zoneText) do holder:Hide() end
+        return
+    end
+    if hooked then return end
     hooked = true
     EventUtil.ContinueOnAddOnLoaded("Blizzard_GroupFinder_VanillaStyle", Hook)
 end
