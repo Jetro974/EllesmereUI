@@ -15,6 +15,11 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -- in a clip frame and two FontStrings (the game's own label on the left, the
 -- seconds left on the right).
 --
+-- Low Warning (optional): below Warning Starts At, a draining bar slides from
+-- its own colour to red as it empties, and pulses over the last half of that
+-- range. A bar that is refilling (breath at the surface) never warns. Both
+-- ride the 20 Hz read the fill already pays for.
+--
 -- Blizzard's bars are only made invisible (alpha 0) while this one is on and
 -- Hide Blizzard Bars is set; they keep running untouched, and get their alpha
 -- back the moment either is turned off. Off by default: nothing is built,
@@ -170,11 +175,38 @@ local function ApplyRowLook(row, cfg)
     if cfg.showTime ~= false then row._time:Show() else row._time:Hide() end
 end
 
+local WARN_R, WARN_G, WARN_B = 1, 0.1, 0.1
+local PULSE_PERIOD = 0.6   -- seconds per blink
+
+-- The low-warning look for a row at fill fraction `frac`: its colour slid
+-- toward red under the threshold, and a pulsing alpha in the last half of it.
+-- `rising` (refilling) and Low Warning off both give the plain look.
+local function PaintWarning(row, cfg, frac, rising)
+    local r, g, b, a = TimerColor(cfg, row._timer)
+    local start = (cfg.lowWarnAt or 30) / 100
+    local alpha = 1
+    if cfg.lowWarn and not rising and start > 0 and frac < start then
+        local t = 1 - math.max(frac, 0) / start   -- 0 at the threshold, 1 empty
+        r = r + (WARN_R - r) * t
+        g = g + (WARN_G - g) * t
+        b = b + (WARN_B - b) * t
+        if frac < start / 2 then
+            local s = math.sin(GetTime() * math.pi * 2 / PULSE_PERIOD)
+            alpha = 0.35 + 0.65 * math.abs(s)
+        end
+    end
+    row._bar:SetStatusBarColor(r, g, b, a)
+    row:SetAlpha(alpha)
+end
+
 -- Paints one row's fill and seconds from a value in milliseconds.
-local function PaintValue(row, ms)
+local function PaintValue(row, ms, cfg, maxMs, rising)
     if not (Plain(ms) and type(ms) == "number") then return end
     row._bar:SetValue(ms / 1000)
     row._time:SetText(string.format("%d", math.max(0, math.floor(ms / 1000 + 0.5))))
+    if cfg and row._timer and maxMs and maxMs > 0 then
+        PaintWarning(row, cfg, ms / maxMs, rising)
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -215,12 +247,17 @@ local function Layout(cfg)
         if S.sample then
             row._bar:SetMinMaxValues(0, 60)
             row._label:SetText(timer == "BREATH" and (BREATH_LABEL or "Breath") or (EXHAUSTION_LABEL or "Fatigue"))
-            PaintValue(row, timer == "BREATH" and 60000 or 36000)
+            -- The fatigue sample sits in the warning range, so Low Warning
+            -- shows while the movers are up.
+            PaintValue(row, timer == "BREATH" and 60000 or 9000, cfg, 60000, false)
+            -- Nothing ticks a sample row: hold it opaque rather than freeze a
+            -- pulse half-faded.
+            row:SetAlpha(1)
         elseif a then
             a.row = row
             row._bar:SetMinMaxValues(0, math.max(a.max / 1000, 0.001))
             row._label:SetText(a.label or "")
-            PaintValue(row, a.value)
+            PaintValue(row, a.value, cfg, a.max, a.rising)
         end
     end
     local n = math.max(math.min(#list, MAX_TIMERS), 1)
@@ -274,13 +311,16 @@ end
 
 local ticker = EllesmereUI.Tick.NewAnimTicker(tickFrame, function()
     local running = false
+    local cfg = P()
     for timer, a in pairs(S.active) do
         if not a.paused then
             running = true
             local ms = GetMirrorTimerProgress(timer)
             if Plain(ms) and type(ms) == "number" then
+                -- Refilling: the value went up since the last read.
+                if a.value and ms ~= a.value then a.rising = ms > a.value end
                 a.value = ms
-                if a.row and not S.sample then PaintValue(a.row, ms) end
+                if a.row and not S.sample then PaintValue(a.row, ms, cfg, a.max, a.rising) end
             end
         end
     end
@@ -295,7 +335,7 @@ local function StartTimer(cfg, timer, value, maxValue, paused, label)
     if not (Plain(timer) and Plain(value) and Plain(maxValue) and Plain(paused) and Plain(label)) then return end
     if type(timer) ~= "string" or timer == "UNKNOWN" or type(maxValue) ~= "number" then return end
     S.active[timer] = {
-        value = value, max = maxValue, label = label,
+        value = value, max = maxValue, label = label, rising = false,
         paused = (paused == true or (type(paused) == "number" and paused > 0)),
     }
     Layout(cfg)
@@ -327,6 +367,8 @@ shell:SetScript("OnEvent", function(_, event, a1, a2, a3, a4, a5, a6)
         local a = Plain(a1) and S.active[a1]
         if a and Plain(a2) then
             a.paused = (a2 == true or (type(a2) == "number" and a2 > 0))
+            -- A paused bar holds still: no pulse frozen half-faded.
+            if a.paused and a.row then a.row:SetAlpha(1) end
             Restart()
         end
     elseif event == "MIRROR_TIMER_STOP" then

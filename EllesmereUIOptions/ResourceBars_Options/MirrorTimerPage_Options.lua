@@ -197,5 +197,20 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset)
           swatches = { Swatch("border", "Border Color") } }
     );  y = y - h
 
+    -- Row: Low Warning | Warning Starts At
+    local warnOff = function() local c = C(); return not (c and c.enabled and c.lowWarn) end
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Low Warning",
+          tooltip = "As a bar runs low it turns red, then blinks just before it runs out.",
+          disabled = mtOff, disabledTooltip = MT_TIP,
+          getValue = function() local c = C(); return c and c.lowWarn == true end,
+          setValue = function(v) local c = C(); if not c then return end; c.lowWarn = v; RefreshMT(); EllesmereUI:RefreshPage() end },
+        { type = "slider", text = "Warning Starts At", min = 10, max = 90, step = 5,
+          tooltip = "How much of the bar is left when it starts turning red, in percent. It blinks over the last half of that.",
+          disabled = warnOff, disabledTooltip = "Low Warning",
+          getValue = function() local c = C(); return c and c.lowWarnAt or 30 end,
+          setValue = Set("lowWarnAt") }
+    );  y = y - h
+
     return math.abs(y)
 end
