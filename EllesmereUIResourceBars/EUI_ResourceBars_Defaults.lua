@@ -464,32 +464,90 @@ local DEFAULTS = {
             visHideNoEnemy = false,
             unlockPos     = nil,
         },
-        -- Mirror Timers (EUI_ResourceBars_MirrorTimer.lua): breath, fatigue and
-        -- feign death, one row per running timer. Flat colour keys per module
+        -- Mirror Timers (EUI_ResourceBars_MirrorTimer.lua): the Breath, Fatigue
+        -- and Feign Death bars, each with its own settings and mover, set from
+        -- the Cast Bar page's bar selector. Flat colour keys per module
         -- convention; OFF by default, and nothing is built, registered or hidden
-        -- until it is turned on.
+        -- until a bar is turned on.
         mirrorTimer = {
-            enabled       = false,
-            width         = 220,
-            height        = 16,      -- per row
-            rowSpacing    = 2,
-            anchorX       = 0,
-            anchorY       = 300,
-            breathR  = 0,    breathG  = 0.5,  breathB  = 1,  breathA  = 1,   -- Breath
-            fatigueR = 1,    fatigueG = 0.9,  fatigueB = 0,  fatigueA = 1,   -- Fatigue
-            feignR   = 1,    feignG   = 0.7,  feignB   = 0,  feignA   = 1,   -- Feign Death
-            texture       = "none",
-            textSize      = 11,
-            showLabel     = true,    -- the game's own name for the timer
-            showTime      = true,    -- seconds left
-            hideBlizzard  = true,    -- Blizzard's bars go invisible while this one is on
-            lowWarn       = false,   -- slide to red under lowWarnAt, pulse in its last half
-            lowWarnAt     = 30,      -- percent of the bar left where the warning starts
-            borderSize    = 1,
-            borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
-            bgR           = 0, bgG = 0, bgB = 0, bgA = 0.7,
-            frameStrata   = "MEDIUM",
-            unlockPos     = nil,
+            breath = {
+                enabled       = false,
+                width         = 200,
+                height        = 20,
+                anchorX       = 0,
+                anchorY       = 300,
+                fillR = 0, fillG = 0.5, fillB = 1, fillA = 1,
+                gradientEnabled = false,
+                gradientR     = 0.20, gradientG = 0.20, gradientB = 0.80, gradientA = 1,
+                gradientDir   = "HORIZONTAL",
+                texture       = "none",
+                showSpark     = false,
+                labelSide     = "left",  labelSize = 11, labelX = 0, labelY = 0,
+                labelR = 1, labelG = 1, labelB = 1, labelA = 1,
+                timeSide      = "right", timeSize  = 11, timeX  = 0, timeY  = 0,
+                timeR  = 1, timeG  = 1, timeB  = 1, timeA  = 1,
+                lowWarn       = false,   -- slide to red under lowWarnAt, pulse in its last half
+                lowWarnAt     = 30,      -- percent of the bar left where the warning starts
+                hideBlizzard  = true,    -- Blizzard's bar for this timer goes invisible while this one is on
+                borderSize    = 1,
+                borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
+                borderTexture = "solid",
+                bgR           = 0, bgG = 0, bgB = 0, bgA = 0.7,
+                frameStrata   = "MEDIUM",
+                unlockPos     = nil,
+            },
+            fatigue = {
+                enabled       = false,
+                width         = 200,
+                height        = 20,
+                anchorX       = 0,
+                anchorY       = 270,
+                fillR = 1, fillG = 0.9, fillB = 0, fillA = 1,
+                gradientEnabled = false,
+                gradientR     = 0.20, gradientG = 0.20, gradientB = 0.80, gradientA = 1,
+                gradientDir   = "HORIZONTAL",
+                texture       = "none",
+                showSpark     = false,
+                labelSide     = "left",  labelSize = 11, labelX = 0, labelY = 0,
+                labelR = 1, labelG = 1, labelB = 1, labelA = 1,
+                timeSide      = "right", timeSize  = 11, timeX  = 0, timeY  = 0,
+                timeR  = 1, timeG  = 1, timeB  = 1, timeA  = 1,
+                lowWarn       = false,   -- slide to red under lowWarnAt, pulse in its last half
+                lowWarnAt     = 30,      -- percent of the bar left where the warning starts
+                hideBlizzard  = true,    -- Blizzard's bar for this timer goes invisible while this one is on
+                borderSize    = 1,
+                borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
+                borderTexture = "solid",
+                bgR           = 0, bgG = 0, bgB = 0, bgA = 0.7,
+                frameStrata   = "MEDIUM",
+                unlockPos     = nil,
+            },
+            feign = {
+                enabled       = false,
+                width         = 200,
+                height        = 20,
+                anchorX       = 0,
+                anchorY       = 240,
+                fillR = 1, fillG = 0.7, fillB = 0, fillA = 1,
+                gradientEnabled = false,
+                gradientR     = 0.20, gradientG = 0.20, gradientB = 0.80, gradientA = 1,
+                gradientDir   = "HORIZONTAL",
+                texture       = "none",
+                showSpark     = false,
+                labelSide     = "left",  labelSize = 11, labelX = 0, labelY = 0,
+                labelR = 1, labelG = 1, labelB = 1, labelA = 1,
+                timeSide      = "right", timeSize  = 11, timeX  = 0, timeY  = 0,
+                timeR  = 1, timeG  = 1, timeB  = 1, timeA  = 1,
+                lowWarn       = false,   -- slide to red under lowWarnAt, pulse in its last half
+                lowWarnAt     = 30,      -- percent of the bar left where the warning starts
+                hideBlizzard  = true,    -- Blizzard's bar for this timer goes invisible while this one is on
+                borderSize    = 1,
+                borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
+                borderTexture = "solid",
+                bgR           = 0, bgG = 0, bgB = 0, bgA = 0.7,
+                frameStrata   = "MEDIUM",
+                unlockPos     = nil,
+            },
         },
         -- Sunfury Arcane Mage Arcane Soul callout (EUI_ResourceBars_ArcaneSoul.lua).
         -- Flat colour keys per module convention; OFF by default, and nothing at

@@ -1,21 +1,29 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  ResourceBars_Options\MirrorTimerPage_Options.lua
---  Resource Bars options: Mirror Timers page (breath, fatigue, feign death).
+--  Resource Bars options: one Mirror Timers bar (Breath, Fatigue or Feign
+--  Death), shown on the Cast Bar page when its bar selector picks that bar.
 --  Definitions only; the shared helpers come from ns._ERB_OptEnv (filled by
---  EUI_ResourceBars_Options.lua). Same widget set as the Swing Timer page.
+--  EUI_ResourceBars_Options.lua). The Cast Bar page's rows, where they apply.
 -------------------------------------------------------------------------------
 local ns = EllesmereUI._ModuleNS["EllesmereUIResourceBars"]
 if not ns then return end  -- module disabled: no options page
 
-function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset)
+-- id: breath, fatigue or feign (profile.mirrorTimer[id], ns.MT_KIND_BY_ID[id]).
+function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
     local env = ns._ERB_OptEnv
-    local DB = env.DB
+    local DB, _clickMappings = env.DB, env._clickMappings
+    local K = ns.MT_KIND_BY_ID and ns.MT_KIND_BY_ID[id]
+    if not K then return 0 end
     local W = EllesmereUI.Widgets
     local y = yOffset
     local _, h
 
     parent._showRowDivider = true
+    EllesmereUI:SetContentHeader(env.CastHeaderBuilder())
+    if not EllesmereUI._prebuilding then
+        _clickMappings.mirrorBar, _clickMappings.mirrorLabel, _clickMappings.mirrorTime = nil, nil, nil
+    end
 
     EllesmereUI.AppendSharedMediaTextures(
         _G._ERB_BarTextureNames or {},
@@ -35,182 +43,312 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset)
         texValues._menuOpts = { itemHeight = 28, background = function(key) return texLookup[key] end }
     end
 
-    local MT_TIP = "Mirror Timers"
-    local function C() local p = DB(); return p and p.mirrorTimer end
-    local mtOff = function() local c = C(); return c and not c.enabled end
+    local UNLOCK = K.unlock
+    local TIP = K.name
+    local function C() local p = DB(); return p and p.mirrorTimer and p.mirrorTimer[id] end
+    local off = function() local c = C(); return not (c and c.enabled) end
 
-    local function RefreshMT()
+    local function Refresh()
         if _G._ERB_Apply then _G._ERB_Apply() end
-        if EllesmereUI.NotifyElementResized then
-            EllesmereUI.NotifyElementResized("ERB_MirrorTimer")
-        end
+        if EllesmereUI.NotifyElementResized then EllesmereUI.NotifyElementResized(UNLOCK) end
+        if env.UpdateMirrorPreview then env.UpdateMirrorPreview() end
     end
-
     local function Set(key)
-        return function(v) local c = C(); if not c then return end; c[key] = v; RefreshMT() end
+        return function(v) local c = C(); if not c then return end; c[key] = v; Refresh() end
+    end
+    local function Get(key, default)
+        return function() local c = C(); if not c then return default end; local v = c[key]; if v == nil then return default end; return v end
+    end
+    local function Swatch(prefix, tip, disabled, disabledTooltip)
+        return { tooltip = tip, hasAlpha = true, disabled = disabled, disabledTooltip = disabledTooltip,
+            getValue = function()
+                local c = C(); if not c then return 1, 1, 1, 1 end
+                return c[prefix .. "R"] or 1, c[prefix .. "G"] or 1, c[prefix .. "B"] or 1, c[prefix .. "A"] or 1
+            end,
+            setValue = function(r, g, b, a)
+                local c = C(); if not c then return end
+                c[prefix .. "R"], c[prefix .. "G"], c[prefix .. "B"], c[prefix .. "A"] = r, g, b, a
+                Refresh(); EllesmereUI:RefreshPage()
+            end }
     end
 
-    _, h = W:SectionHeader(parent, "LAYOUT", y);  y = y - h
+    ---------------------------------------------------------------------------
+    --  LAYOUT
+    ---------------------------------------------------------------------------
+    local layoutSection
+    layoutSection, h = W:SectionHeader(parent, "LAYOUT", y);  y = y - h
 
-    -- Row: Enable Mirror Timers (+ position cog) | Frame Strata
+    -- Row: Enable (+ position cog) | Frame Strata
     local enableRow
     enableRow, h = W:DualRow(parent, y,
-        { type = "toggle", text = "Enable Mirror Timers",
-          tooltip = "Your own bars for breath, fatigue and feign death, one per running timer.",
+        { type = "toggle", text = "Enable " .. K.name .. " Bar",
+          tooltip = "Your own bar for this timer, in place of Blizzard's.",
           getValue = function() local c = C(); return c and c.enabled end,
           setValue = function(v)
               local c = C(); if not c then return end
-              c.enabled = v; RefreshMT(); EllesmereUI:RefreshPage()
+              c.enabled = v; Refresh(); EllesmereUI:RefreshPage()
           end },
         { type = "dropdown", text = "Frame Strata",
           tooltip = "Controls the order that overlapping elements display in. Set higher to show above other elements.",
-          disabled = mtOff, disabledTooltip = MT_TIP,
+          disabled = off, disabledTooltip = TIP,
           values = EllesmereUI.FRAME_STRATA_LABELS, order = EllesmereUI.FRAME_STRATA_ORDER_BASE,
-          getValue = function() local c = C(); return c and c.frameStrata or "MEDIUM" end,
-          setValue = Set("frameStrata") }
+          getValue = Get("frameStrata", "MEDIUM"), setValue = Set("frameStrata") }
     );  y = y - h
     if not EllesmereUI._prebuilding then
-        local function PosGet(axis, default)
+        local function PosGet(axis)
             return function()
                 local c = C(); if not c then return 0 end
                 if c.unlockPos and c.unlockPos.point then return c.unlockPos[axis] or 0 end
-                local v = c[axis == "x" and "anchorX" or "anchorY"]
-                if v == nil then return default end
-                return v
+                if axis == "x" then return c.anchorX or 0 end
+                return c.anchorY or 300
             end
         end
         local function PosSet(axis)
             return function(v)
                 local c = C(); if not c then return end
                 if c.unlockPos and c.unlockPos.point then c.unlockPos[axis] = v
-                else c[axis == "x" and "anchorX" or "anchorY"] = v end
-                RefreshMT()
+                elseif axis == "x" then c.anchorX = v
+                else c.anchorY = v end
+                Refresh()
             end
         end
         EllesmereUI.BuildInlineCog(enableRow._leftRegion, { icon = EllesmereUI.DIRECTIONS_ICON,
-            disabled = mtOff, disabledTooltip = MT_TIP,
-            title = "Mirror Timers Position",
+            disabled = off, disabledTooltip = TIP,
+            title = K.name .. " Bar Position",
             rows = {
-                { type = "slider", label = "X Offset", min = -600, max = 600, step = 1,
-                  get = PosGet("x", 0), set = PosSet("x") },
-                { type = "slider", label = "Y Offset", min = -600, max = 600, step = 1,
-                  get = PosGet("y", 300), set = PosSet("y") },
+                { type = "slider", label = "X Offset", min = -600, max = 600, step = 1, get = PosGet("x"), set = PosSet("x") },
+                { type = "slider", label = "Y Offset", min = -600, max = 600, step = 1, get = PosGet("y"), set = PosSet("y") },
             },
-            footer = { unlockKey = "ERB_MirrorTimer" },
+            footer = { unlockKey = UNLOCK },
         })
     end
 
-    -- Row: Row Height | Width. Height is per row; the mover reports the whole stack.
-    local shDis, shTip, shRaw = EllesmereUI.MatchGuard("ERB_MirrorTimer", "Height", mtOff, MT_TIP)
-    local swDis, swTip, swRaw = EllesmereUI.MatchGuard("ERB_MirrorTimer", "Width", mtOff, MT_TIP)
-    _, h = W:DualRow(parent, y,
-        { type = "slider", text = "Row Height", min = 4, max = 60, step = 1,
-          tooltip = "Height of each timer bar.",
-          disabled = shDis, disabledTooltip = shTip, rawTooltip = shRaw,
-          getValue = function() local c = C(); return c and c.height or 16 end,
-          setValue = Set("height") },
+    -- Row: Height | Width
+    local hDis, hTip, hRaw = EllesmereUI.MatchGuard(UNLOCK, "Height", off, TIP)
+    local wDis, wTip, wRaw = EllesmereUI.MatchGuard(UNLOCK, "Width", off, TIP)
+    local sizeRow
+    sizeRow, h = W:DualRow(parent, y,
+        { type = "slider", text = "Height", min = 4, max = 60, step = 1,
+          disabled = hDis, disabledTooltip = hTip, rawTooltip = hRaw,
+          getValue = Get("height", 20), setValue = Set("height") },
         { type = "slider", text = "Width", min = 50, max = 800, step = 1,
-          disabled = swDis, disabledTooltip = swTip, rawTooltip = swRaw,
-          getValue = function() local c = C(); return c and c.width or 220 end,
-          setValue = Set("width") }
+          disabled = wDis, disabledTooltip = wTip, rawTooltip = wRaw,
+          getValue = Get("width", 200), setValue = Set("width") }
     );  y = y - h
 
-    -- Row: Row Spacing | Text Size
+    -- Row: Show Spark | Hide Blizzard Bar
     _, h = W:DualRow(parent, y,
-        { type = "slider", pixel = true, text = "Row Spacing", min = 0, max = 20, step = 1,
-          tooltip = "Gap between the timer bars when more than one runs.",
-          disabled = mtOff, disabledTooltip = MT_TIP,
-          getValue = function() local c = C(); return c and c.rowSpacing or 2 end,
-          setValue = Set("rowSpacing") },
-        { type = "slider", text = "Text Size", min = 6, max = 24, step = 1,
-          disabled = mtOff, disabledTooltip = MT_TIP,
-          getValue = function() local c = C(); return c and c.textSize or 11 end,
-          setValue = Set("textSize") }
+        { type = "toggle", text = "Show Spark",
+          disabled = off, disabledTooltip = TIP,
+          getValue = function() local c = C(); return c and c.showSpark end,
+          setValue = Set("showSpark") },
+        { type = "toggle", text = "Hide Blizzard Bar",
+          tooltip = "Makes Blizzard's own bar for this timer invisible while this one is on.",
+          disabled = off, disabledTooltip = TIP,
+          getValue = function() local c = C(); return c and c.hideBlizzard ~= false end,
+          setValue = Set("hideBlizzard") }
     );  y = y - h
 
-    _, h = W:SectionHeader(parent, "DISPLAY", y);  y = y - h
+    _, h = W:Spacer(parent, y, 16);  y = y - h
 
-    local function Swatch(prefix, tip)
-        return { tooltip = tip, hasAlpha = true,
-            getValue = function()
-                local c = C(); if not c then return 1, 1, 1, 1 end
-                return c[prefix .. "R"], c[prefix .. "G"], c[prefix .. "B"], c[prefix .. "A"]
-            end,
-            setValue = function(r, g, b, a)
-                local c = C(); if not c then return end
-                c[prefix .. "R"], c[prefix .. "G"], c[prefix .. "B"], c[prefix .. "A"] = r, g, b, a
-                RefreshMT()
-            end }
+    ---------------------------------------------------------------------------
+    --  DISPLAY
+    ---------------------------------------------------------------------------
+    local displaySection
+    displaySection, h = W:SectionHeader(parent, "DISPLAY", y);  y = y - h
+
+    -- Row: Border Style (+ border options cog) | Border Size (+ border colour)
+    do
+        local btValues, btOrder = EllesmereUI.GetBorderTextureDropdown()
+        local bsRow
+        bsRow, h = W:DualRow(parent, y,
+            { type = "dropdown", text = "Border Style",
+              disabled = off, disabledTooltip = TIP,
+              values = btValues, order = btOrder,
+              getValue = Get("borderTexture", "solid"),
+              setValue = function(v)
+                  local g = C(); if not g then return end
+                  g.borderTexture = v; g.borderTextureOffset = nil; g.borderTextureOffsetY = nil; g.borderTextureShiftX = nil; g.borderTextureShiftY = nil
+                  local bcol, bbehind = EllesmereUI.GetBorderStyleSelectDefaults(v)
+                  g.borderR = bcol.r; g.borderG = bcol.g; g.borderB = bcol.b; g.borderA = 1
+                  g.borderBehind = bbehind
+                  local defSz = EllesmereUI.GetBorderDefaultSize("resourcebars", v)
+                  if defSz then g.borderSize = defSz end
+                  if g.borderSizePx then g.borderSizePx = false end
+                  Refresh(); EllesmereUI:RefreshPage(true)
+              end },
+            EllesmereUI.BorderPxSliderCfg({ text = "Border Size",
+              disabled = off, disabledTooltip = TIP,
+              getStep = function() local c = C(); return c and (c.borderSize or 0) or 0 end,
+              setStep = function(v) local c = C(); if c then c.borderSize = v end end,
+              getTex = function() local c = C(); return c and (c.borderTexture or "solid") or "solid" end,
+              getPx = function() local c = C(); return c and c.borderSizePx end,
+              setPx = function(v) local c = C(); if c then c.borderSizePx = v end end,
+              apply = function() Refresh(); EllesmereUI:RefreshPage() end,
+            }));  y = y - h
+        -- Width Offset | Height Offset: own row while a textured style is selected.
+        do
+            local c = C()
+            local tex = c and c.borderTexture or "solid"
+            if tex ~= "solid" and tex ~= "" then
+                local function step() local c2 = C(); return c2 and (c2.borderSize or 0) or 0 end
+                local ocfgL, ocfgR = EllesmereUI.BorderOffsetRowCfgs({
+                    addonKey = "resourcebars",
+                    disabled = off, disabledTooltip = TIP,
+                    getTex = function() local c2 = C(); return c2 and (c2.borderTexture or "solid") or "solid" end,
+                    getStep = step, getSizeKey = step,
+                    getPx = function() local c2 = C(); return c2 and c2.borderSizePx end,
+                    getX = function() local c2 = C(); return c2 and c2.borderTextureOffset end,
+                    setX = function(v) local c2 = C(); if c2 then c2.borderTextureOffset = v end end,
+                    getY = function() local c2 = C(); return c2 and c2.borderTextureOffsetY end,
+                    setY = function(v) local c2 = C(); if c2 then c2.borderTextureOffsetY = v end end,
+                    apply = function() Refresh(); EllesmereUI:RefreshPage() end,
+                })
+                _, h = W:DualRow(parent, y, ocfgL, ocfgR);  y = y - h
+            end
+        end
+        if not EllesmereUI._prebuilding then
+            EllesmereUI.BuildInlineSwatches(bsRow._rightRegion, {
+                Swatch("border", "Border Color",
+                    function() local c = C(); return not (c and c.enabled and (c.borderSize or 0) > 0) end,
+                    function()
+                        if off() then return TIP end
+                        return "This option requires a Border Size above 0."
+                    end),
+            }, { size = 20 })
+            local cogBtn = EllesmereUI.BuildInlineCog(bsRow._leftRegion, { icon = EllesmereUI.DIRECTIONS_ICON,
+                title = "Border Options",
+                rows = {
+                    { type = "slider", label = "Shift X", min = -10, max = 10, step = 1,
+                      get = function() local c = C(); if not c then return 0 end; local v = c.borderTextureShiftX; if v then return v end; local _, _, dsx = EllesmereUI.GetBorderDefaults("resourcebars", c.borderTexture or "solid", c.borderSize or 0); return dsx end,
+                      set = function(v) local c = C(); if not c then return end; c.borderTextureShiftX = v == 0 and nil or v; Refresh(); EllesmereUI:RefreshPage() end },
+                    { type = "slider", label = "Shift Y", min = -10, max = 10, step = 1,
+                      get = function() local c = C(); if not c then return 0 end; local v = c.borderTextureShiftY; if v then return v end; local _, _, _, dsy = EllesmereUI.GetBorderDefaults("resourcebars", c.borderTexture or "solid", c.borderSize or 0); return dsy end,
+                      set = function(v) local c = C(); if not c then return end; c.borderTextureShiftY = v == 0 and nil or v; Refresh(); EllesmereUI:RefreshPage() end },
+                    { type = "toggle", label = "Show Behind",
+                      get = function() local c = C(); return c and c.borderBehind or false end,
+                      set = function(v) local c = C(); if not c then return end; c.borderBehind = v == false and nil or v; Refresh(); EllesmereUI:RefreshPage() end },
+                },
+            })
+            local function UpdateCogVis()
+                local c = C()
+                local tex = c and c.borderTexture or "solid"
+                if tex == "solid" then cogBtn:Hide() else cogBtn:Show() end
+            end
+            EllesmereUI.RegisterWidgetRefresh(UpdateCogVis)
+            UpdateCogVis()
+        end
     end
 
-    -- Row: Color (breath / fatigue / feign death) | Background
-    _, h = W:DualRow(parent, y,
-        { type = "multiSwatch", text = "Color",
-          disabled = mtOff, disabledTooltip = MT_TIP,
+    -- Row: Fill Color (gradient end + fill, gradient cog) | Background (+ colour)
+    local colorRow
+    colorRow, h = W:DualRow(parent, y,
+        { type = "multiSwatch", text = "Fill Color",
+          disabled = off, disabledTooltip = TIP,
           swatches = {
-              Swatch("breath",  "Breath Color"),
-              Swatch("fatigue", "Fatigue Color"),
-              Swatch("feign",   "Feign Death Color"),
+              Swatch("gradient", "Gradient End Color",
+                  function() local c = C(); return not (c and c.gradientEnabled) end,
+                  function() if off() then return TIP end; return "Gradient" end),
+              Swatch("fill", "Fill Color"),
           } },
         { type = "slider", text = "Background", min = 0, max = 100, step = 1,
-          disabled = mtOff, disabledTooltip = MT_TIP,
+          disabled = off, disabledTooltip = TIP,
           getValue = function() local c = C(); return math.floor(((c and c.bgA or 0.7) * 100) + 0.5) end,
-          setValue = function(v) local c = C(); if not c then return end; c.bgA = v / 100; RefreshMT() end }
+          setValue = function(v) local c = C(); if not c then return end; c.bgA = v / 100; Refresh() end }
     );  y = y - h
+    if not EllesmereUI._prebuilding then
+        EllesmereUI.BuildInlineCog(colorRow._leftRegion, {
+            disabled = off, disabledTooltip = TIP,
+            title = "Gradient Settings",
+            rows = {
+                { type = "toggle", label = "Enable Gradient",
+                  get = function() local c = C(); return c and c.gradientEnabled end,
+                  set = function(v) local c = C(); if not c then return end; c.gradientEnabled = v; Refresh(); EllesmereUI:RefreshPage() end },
+                { type = "dropdown", label = "Gradient Direction",
+                  values = { HORIZONTAL = "Horizontal", VERTICAL = "Vertical" }, order = { "HORIZONTAL", "VERTICAL" },
+                  get = function() local c = C(); return c and c.gradientDir or "HORIZONTAL" end,
+                  set = function(v) local c = C(); if not c then return end; c.gradientDir = v; Refresh() end },
+            },
+        })
+        EllesmereUI.BuildInlineSwatches(colorRow._rightRegion, {
+            { tooltip = "Background Color",
+              getValue = function() local c = C(); return (c and c.bgR or 0), (c and c.bgG or 0), (c and c.bgB or 0) end,
+              setValue = function(r, g, b) local c = C(); if not c then return end; c.bgR, c.bgG, c.bgB = r, g, b; Refresh() end },
+        }, { size = 20, disabled = off, disabledTooltip = TIP })
+    end
 
-    -- Row: Bar Texture | Border Size
-    _, h = W:DualRow(parent, y,
+    -- A text row's dropdown (None / Left / Right / Center), with its colour
+    -- swatch and a cog for size and offsets, as the Cast Bar's Spell Text.
+    local SIDES = { none = "None", left = "Left", right = "Right", center = "Center" }
+    local SIDE_ORDER = { "none", "left", "right", "center" }
+    local function TextCfg(text, prefix, default)
+        return { type = "dropdown", text = text,
+          disabled = off, disabledTooltip = TIP,
+          values = SIDES, order = SIDE_ORDER,
+          getValue = Get(prefix .. "Side", default),
+          setValue = function(v) local c = C(); if not c then return end; c[prefix .. "Side"] = v; Refresh(); EllesmereUI:RefreshPage() end }
+    end
+    local function TextExtras(region, text, prefix, default)
+        if EllesmereUI._prebuilding then return end
+        local textOff = function() local c = C(); return not (c and c.enabled and (c[prefix .. "Side"] or default) ~= "none") end
+        local textTip = function() return off() and TIP or text end
+        EllesmereUI.BuildInlineSwatches(region, {
+            Swatch(prefix, text .. " Color", textOff, textTip),
+        }, { size = 20 })
+        EllesmereUI.BuildInlineCog(region, { icon = EllesmereUI.DIRECTIONS_ICON,
+            disabled = textOff, disabledTooltip = textTip,
+            title = text .. " Settings",
+            rows = {
+                { type = "slider", label = "Text Size", min = 8, max = 24, step = 1,
+                  get = Get(prefix .. "Size", 11), set = Set(prefix .. "Size") },
+                { type = "slider", label = "X Offset", min = -100, max = 100, step = 1,
+                  get = Get(prefix .. "X", 0), set = Set(prefix .. "X") },
+                { type = "slider", label = "Y Offset", min = -100, max = 100, step = 1,
+                  get = Get(prefix .. "Y", 0), set = Set(prefix .. "Y") },
+            },
+        })
+    end
+
+    -- Row: Bar Texture | Label Text
+    local textRow
+    textRow, h = W:DualRow(parent, y,
         { type = "dropdown", text = "Bar Texture",
-          disabled = mtOff, disabledTooltip = MT_TIP,
+          disabled = off, disabledTooltip = TIP,
           values = texValues, order = texOrder,
-          getValue = function() local c = C(); return c and c.texture or "none" end,
-          setValue = Set("texture") },
-        { type = "slider", pixel = true, text = "Border Size", min = 0, max = 4, step = 1,
-          disabled = mtOff, disabledTooltip = MT_TIP,
-          getValue = function() local c = C(); return c and c.borderSize or 1 end,
-          setValue = Set("borderSize") }
+          getValue = Get("texture", "none"), setValue = Set("texture") },
+        TextCfg("Label Text", "label", "left")
     );  y = y - h
+    TextExtras(textRow._rightRegion, "Label Text", "label", "left")
 
-    -- Row: Show Label | Show Time
-    _, h = W:DualRow(parent, y,
-        { type = "toggle", text = "Show Label",
-          tooltip = "The game's own name for the timer, on the left of the bar.",
-          disabled = mtOff, disabledTooltip = MT_TIP,
-          getValue = function() local c = C(); return c and c.showLabel ~= false end,
-          setValue = Set("showLabel") },
-        { type = "toggle", text = "Show Time",
-          tooltip = "The seconds left, on the right of the bar.",
-          disabled = mtOff, disabledTooltip = MT_TIP,
-          getValue = function() local c = C(); return c and c.showTime ~= false end,
-          setValue = Set("showTime") }
-    );  y = y - h
-
-    -- Row: Hide Blizzard Bars | Border Color
-    _, h = W:DualRow(parent, y,
-        { type = "toggle", text = "Hide Blizzard Bars",
-          tooltip = "Makes Blizzard's own breath and fatigue bars invisible while these are on.",
-          disabled = mtOff, disabledTooltip = MT_TIP,
-          getValue = function() local c = C(); return c and c.hideBlizzard ~= false end,
-          setValue = Set("hideBlizzard") },
-        { type = "multiSwatch", text = "Border Color",
-          disabled = mtOff, disabledTooltip = MT_TIP,
-          swatches = { Swatch("border", "Border Color") } }
-    );  y = y - h
-
-    -- Row: Low Warning | Warning Starts At
-    local warnOff = function() local c = C(); return not (c and c.enabled and c.lowWarn) end
-    _, h = W:DualRow(parent, y,
+    -- Row: Duration Text | Low Warning (+ Warning Starts At cog)
+    local timeRow
+    timeRow, h = W:DualRow(parent, y,
+        TextCfg("Duration Text", "time", "right"),
         { type = "toggle", text = "Low Warning",
-          tooltip = "As a bar runs low it turns red, then blinks just before it runs out.",
-          disabled = mtOff, disabledTooltip = MT_TIP,
+          tooltip = "As the bar runs low it turns red, then blinks just before it runs out.",
+          disabled = off, disabledTooltip = TIP,
           getValue = function() local c = C(); return c and c.lowWarn == true end,
-          setValue = function(v) local c = C(); if not c then return end; c.lowWarn = v; RefreshMT(); EllesmereUI:RefreshPage() end },
-        { type = "slider", text = "Warning Starts At", min = 10, max = 90, step = 5,
-          tooltip = "How much of the bar is left when it starts turning red, in percent. It blinks over the last half of that.",
-          disabled = warnOff, disabledTooltip = "Low Warning",
-          getValue = function() local c = C(); return c and c.lowWarnAt or 30 end,
-          setValue = Set("lowWarnAt") }
+          setValue = function(v) local c = C(); if not c then return end; c.lowWarn = v; Refresh(); EllesmereUI:RefreshPage() end }
     );  y = y - h
+    TextExtras(timeRow._leftRegion, "Duration Text", "time", "right")
+    if not EllesmereUI._prebuilding then
+        EllesmereUI.BuildInlineCog(timeRow._rightRegion, {
+            disabled = function() local c = C(); return not (c and c.enabled and c.lowWarn) end,
+            disabledTooltip = function() return off() and TIP or "Low Warning" end,
+            title = "Low Warning",
+            rows = {
+                { type = "slider", label = "Warning Starts At", min = 10, max = 90, step = 5,
+                  tooltip = "How much of the bar is left when it starts turning red, in percent. It blinks over the last half of that.",
+                  get = Get("lowWarnAt", 30), set = Set("lowWarnAt") },
+            },
+        })
+    end
+
+    if not EllesmereUI._prebuilding then
+        _clickMappings.mirrorBar   = { section = layoutSection, target = sizeRow }
+        _clickMappings.mirrorLabel = { section = displaySection, target = textRow, slotSide = "right" }
+        _clickMappings.mirrorTime  = { section = displaySection, target = timeRow, slotSide = "left" }
+    end
 
     return math.abs(y)
 end
