@@ -124,9 +124,24 @@ local function BuildBar(obj, mk)
     spark:SetBlendMode("ADD")
     obj.spark = spark
 
+    -- Stock-style chrome (the cast bar's look, see StockStyle below): its own
+    -- host above the fill, under the texts. Two handles: the Blizzard Style
+    -- frame art, and the Classic WoW UI frame (its pieces ride the host).
+    local art = CreateFrame("Frame", nil, f)
+    art:SetAllPoints(f)
+    art:EnableMouse(false)
+    obj.art = art
+    local frameTex = art:CreateTexture(nil, "OVERLAY", nil, 2)
+    if frameTex.SetSnapToPixelGrid then frameTex:SetSnapToPixelGrid(false); frameTex:SetTexelSnappingBias(0) end
+    frameTex:Hide()
+    obj.frameTex = frameTex
+    obj.classicTex = art:CreateTexture(nil, "OVERLAY", nil, 1)
+    obj.classicTex:Hide()
+
     local textFrame = CreateFrame("Frame", nil, f)
     textFrame:SetAllPoints(f)
     textFrame:SetFrameLevel(bar:GetFrameLevel() + 3)
+    obj.textFrame = textFrame
     -- Font before any SetText (a FontString with no font errors on SetText).
     local label = textFrame:CreateFontString(nil, "OVERLAY")
     ns.SetRBFont(label, ns.GetRBFont(), 11)
@@ -175,11 +190,24 @@ local function PlaceText(fs, f, side, size, x, y, r, g, b, a)
     fs:Show()
 end
 
+-- The cast bar's style drives these bars too (Global Settings > Style, the
+-- Player Cast Bar entry): "eui", "blizzard" (WoW Forever included: the
+-- client's own frame art) or "classic". Latched per session like the cast
+-- bar, so a switch takes a reload.
+local function StockStyle()
+    return (ns.ERB_CastStyle and ns.ERB_CastStyle()) or "eui"
+end
+ns.MT_StockStyle = StockStyle
+
 -- Size, border, texture, background, spark and texts from cfg.
 local function ApplyLook(obj, cfg, onePx)
     local f = obj.frame
     local PP = EllesmereUI.PP
-    local bs = cfg.borderSize or 0
+    local style = StockStyle()
+    local stock = style ~= "eui"
+    local blizzKit = style == "blizzard"
+    -- No EUI border under a stock style: its frame art is the border.
+    local bs = (not stock and cfg.borderSize) or 0
     local bdr = obj.border
     local pl = f:GetFrameLevel()
     bdr:SetFrameLevel(cfg.borderBehind and math.max(0, pl - 1) or (pl + 5))
@@ -199,17 +227,83 @@ local function ApplyLook(obj, cfg, onePx)
     clip:SetFrameLevel(pl + 1)
     bar:ClearAllPoints()
     bar:SetAllPoints(clip)
-    bar:SetStatusBarTexture(EllesmereUI.ResolveTexturePath(_G._ERB_BarTextures, cfg.texture, "Interface\\Buttons\\WHITE8x8"))
+    local fillAtlas = blizzKit and ns.ERB_BlizzAtlas and ns.ERB_BlizzAtlas("cast")
+    if fillAtlas then
+        -- Blizzard Style: the stock fill art, greyed so the bar's own colour
+        -- tints it (Paint) and Breath stays blue.
+        bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8x8")
+        bar:GetStatusBarTexture():SetAtlas(fillAtlas)
+        bar:GetStatusBarTexture():SetDesaturated(true)
+    else
+        bar:SetStatusBarTexture(EllesmereUI.ResolveTexturePath(_G._ERB_BarTextures, cfg.texture, "Interface\\Buttons\\WHITE8x8"))
+        bar:GetStatusBarTexture():SetDesaturated(false)
+    end
     bar:SetOrientation("HORIZONTAL")
     bar:SetReverseFill(false)
-    obj.bg:SetTexture(nil)
-    obj.bg:SetColorTexture(cfg.bgR or 0, cfg.bgG or 0, cfg.bgB or 0, cfg.bgA or 0.7)
+    local bgAtlas = blizzKit and ns.ERB_BlizzAtlas and ns.ERB_BlizzAtlas("bg")
+    obj.bg:ClearAllPoints()
+    if bgAtlas then
+        -- The retail background under WoW Forever too, as the cast bar.
+        EllesmereUI.StockAtlas(obj.bg, bgAtlas)
+        obj.bg:SetVertexColor(1, 1, 1, 1)
+        obj.bg:SetPoint("TOPLEFT", f, "TOPLEFT", -1, 1)
+        obj.bg:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 1, -1)
+    else
+        obj.bg:SetTexture(nil)
+        obj.bg:SetColorTexture(cfg.bgR or 0, cfg.bgG or 0, cfg.bgB or 0, cfg.bgA or 0.7)
+        obj.bg:SetAllPoints(f)
+    end
+
+    -- Frame art: above the fill and spark, under the texts.
+    local h = cfg.height or 20
+    local art = obj.art
+    art:SetFrameLevel(pl + 6)
+    obj.textFrame:SetFrameLevel(pl + 8)
+    local frameAtlas = blizzKit and ns.ERB_BlizzAtlas and ns.ERB_BlizzAtlas("frame")
+    if frameAtlas then
+        ns.ERB_StockAtlas(obj.frameTex, frameAtlas)
+        obj.frameTex:ClearAllPoints()
+        obj.frameTex:SetPoint("TOPLEFT", f, "TOPLEFT", -2, 2)
+        obj.frameTex:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 2, -2)
+        obj.frameTex:Show()
+    else
+        obj.frameTex:Hide()
+    end
+    if style == "classic" and ns.ERB_SeatClassicChrome then
+        ns.ERB_SeatClassicChrome(obj.classicTex, f, h, false, ns.ERB_ClassicFrameK(cfg))
+    end
 
     local spark = obj.spark
+    local sparkY = 0
+    if blizzKit and not obj.blizzSpark then
+        local pip = ns.ERB_BlizzAtlas and ns.ERB_BlizzAtlas("spark")
+        if pip then
+            obj.blizzSpark = true
+            spark:SetAtlas(pip)
+            spark:SetBlendMode("BLEND")
+        end
+    elseif style == "classic" and not obj.classicSpark then
+        -- The vanilla spark stands taller than the bar and over the frame
+        -- art: its host leaves the clip for the bar frame.
+        obj.classicSpark = true
+        spark:SetTexture(ns.ERB_CLASSIC.spark)
+        local sf = spark:GetParent()
+        sf:SetParent(f)
+        sf:ClearAllPoints()
+        sf:SetAllPoints(bar)
+    end
+    if style == "classic" then spark:GetParent():SetFrameLevel(pl + 7) end
     if cfg.showSpark then
         spark:ClearAllPoints()
-        spark:SetSize(8, cfg.height or 20)
-        spark:SetPoint("CENTER", bar:GetStatusBarTexture(), "RIGHT", 0, 0)
+        if style == "classic" then
+            local C = ns.ERB_CLASSIC
+            local ss = C.sparkSize * h / C.barH
+            spark:SetSize(ss, ss)
+            sparkY = C.sparkY * h / C.barH
+        else
+            spark:SetSize(8, h)
+        end
+        spark:SetPoint("CENTER", bar:GetStatusBarTexture(), "RIGHT", 0, sparkY)
         spark:Show()
     else
         spark:Hide()
@@ -241,7 +335,7 @@ local function ApplyLook(obj, cfg, onePx)
 
     -- Rounded corners (EllesmereUI_RoundedCorners.lua; nothing at radius 0).
     -- The body is the clip (fill + spark) and the background.
-    local radius = cfg.cornerRadius or 0
+    local radius = (not stock and cfg.cornerRadius) or 0
     if radius > 0 and EllesmereUI.RoundCorners then
         EllesmereUI.RoundCorners(f, radius, {
             roots = { clip }, textures = { obj.bg },
