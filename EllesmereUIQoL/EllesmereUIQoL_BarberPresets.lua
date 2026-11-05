@@ -85,10 +85,11 @@ local function SavePreset(name)
         if entry.current then choices[#choices + 1] = { o = optionID, c = entry.current } end
     end
     for _, p in ipairs(list) do
-        if p.name == name then p.choices = choices; return end
+        if p.name == name then p.choices = choices; return true end
     end
-    if #list >= MAX_PRESETS then return end
+    if #list >= MAX_PRESETS then return false end
     list[#list + 1] = { name = name, choices = choices }
+    return true
 end
 
 -- A choice can force a dependent option to change (style -> colour), so the
@@ -183,7 +184,8 @@ end
 local function TrySave()
     local name = strtrim(nameBox:GetText() or "")
     if name == "" then nameBox:SetFocus(); return end
-    SavePreset(name)
+    -- A full list keeps the typed name (Enter skips the disabled button).
+    if not SavePreset(name) then return end
     nameBox:SetText("")
     nameBox:ClearFocus()
     Refresh()
@@ -196,7 +198,7 @@ Refresh = function()
     for i, preset in ipairs(list) do
         local row = GetRow(i)
         row._preset = preset
-        row._label:SetText(preset.name)
+        row._label:SetText((preset.name:gsub("|", "||")))
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD, -y)
         row:Show()
@@ -284,6 +286,10 @@ local function BuildPanel()
     saveBtn:SetPoint("LEFT", input, "RIGHT", ROW_GAP, 0)
     saveBtn._label:SetJustifyH("CENTER")
     saveBtn._label:SetText(EllesmereUI.L("Save"))
+    -- The button fits its label in every language ("Enregistrer").
+    local saveW = math.max(SAVE_W, math.ceil(saveBtn._label:GetUnboundedStringWidth()) + 18)
+    saveBtn:SetWidth(saveW)
+    input:SetWidth(PANEL_W - PAD * 2 - saveW - ROW_GAP)
     saveBtn:SetScript("OnClick", TrySave)
 
     emptyFS = MakeLabel(panel, 10, 0.6, 0.6, 0.6, 1)
