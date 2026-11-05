@@ -76,14 +76,19 @@ local function Remember(s)
     return c
 end
 
--- A title without colour codes and textures, trimmed.
+-- A title without colour codes and textures, trimmed: for sorting and search
+-- only. What is shown is the addon's own title, as its author wrote it.
 local function Plain(text)
     text = (text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", "")
     return (text:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
--- Every addon the game lists, by title: { index, name, title, notes, lod, group,
--- category, on = enabled for this character, loaded, loadable, reason, locked }.
+-- Every addon the game lists, by title: { index, name, title, shown, icon,
+-- notes, lod, group, category, categoryShown, on = enabled for this character,
+-- loaded, loadable, reason, locked }. title is plain (sort, search); shown is
+-- the title with its author's colours and textures; icon is the .toc's
+-- IconTexture or IconAtlas as text markup, else the game's question mark,
+-- as in the game's own addon list.
 -- reason is why the game will not load it (a key of the game's ADDON_<reason>
 -- strings). group is the addon a
 -- sub-addon is listed under (its own name when it stands alone); category is
@@ -95,15 +100,26 @@ function AM.List()
         local name, title, notes = C_AddOns.GetAddOnInfo(i)
         if name then
             local category = C_AddOns.GetAddOnMetadata(i, "Category")
+            local declared = category
             local put = s and s.catOf[name]
-            if put ~= nil then category = put or nil end
+            if put ~= nil then category = put or nil; declared = nil end
+            local iconTexture = C_AddOns.GetAddOnMetadata(i, "IconTexture")
+            local iconAtlas = C_AddOns.GetAddOnMetadata(i, "IconAtlas")
+            local icon
+            if iconAtlas and not iconTexture then
+                icon = CreateAtlasMarkup(iconAtlas, 16, 16)
+            else
+                icon = CreateSimpleTextureMarkup(iconTexture or [[Interface\ICONS\INV_Misc_QuestionMark]], 16, 16)
+            end
             local loadable, reason = C_AddOns.IsAddOnLoadable(i, UnitName("player"))
             out[#out + 1] = {
                 index = i, name = name, notes = notes,
                 title = Plain(title ~= "" and title or name),
+                shown = (title ~= "" and title or name), icon = icon,
                 lod = C_AddOns.IsAddOnLoadOnDemand(i),
                 group = C_AddOns.GetAddOnMetadata(i, "Group") or name,
                 category = (category and category ~= "") and Plain(category) or nil,
+                categoryShown = (declared and declared ~= "") and declared or nil,
                 on = C_AddOns.GetAddOnEnableState(i, guid) > NONE,
                 loaded = C_AddOns.IsAddOnLoaded(i),
                 loadable = loadable, reason = reason,
@@ -252,7 +268,7 @@ function AM.Tree(list, folded, query)
             roots[#roots + 1] = a
         end
     end
-    local cats, order, loose = {}, {}, {}
+    local cats, order, loose, shownAs = {}, {}, {}, {}
     for _, a in ipairs(roots) do
         local c = a.category
         if c then
@@ -260,6 +276,8 @@ function AM.Tree(list, folded, query)
                 cats[c] = {}
                 order[#order + 1] = c
             end
+            -- The heading as its addons' .toc writes it (colours kept).
+            shownAs[c] = shownAs[c] or a.categoryShown
             table.insert(cats[c], a)
         else
             loose[#loose + 1] = a
@@ -302,7 +320,7 @@ function AM.Tree(list, folded, query)
             for _, a in ipairs(members) do Add(a, 1) end
         end
     end
-    for _, c in ipairs(order) do Category(c, c, cats[c], made[c]) end
+    for _, c in ipairs(order) do Category(c, shownAs[c] or c, cats[c], made[c]) end
     if #loose > 0 then Category("", EllesmereUI.L("Uncategorized"), loose) end
     return out
 end
