@@ -30,10 +30,9 @@ EllesmereUIForeverEssentials_MapTravelData.lua
 EllesmereUIForeverEssentials_MapTravel.lua
 EllesmereUIForeverEssentials_QuestRewards.lua
 
-# Travel (flight timer) and the Minimap's Teleport Menu
+# Travel (flight timer)
 EllesmereUIForeverEssentials_FlightTimerData.lua
 EllesmereUIForeverEssentials_FlightTimer.lua
-EllesmereUIForeverEssentials_TeleportMenu.lua
 
 # World map zone levels
 EllesmereUIForeverEssentials_ZoneLevels.lua

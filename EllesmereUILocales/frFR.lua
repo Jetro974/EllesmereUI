@@ -6021,10 +6021,6 @@ L["Planned for level %s"] = "Prévu au niveau %s"
 L["Left-click: plan its next rank. Right-click: take its last planned rank back."] = "Clic gauche : prévoir son rang suivant. Clic droit : retirer son dernier rang prévu."
 L["Talents learned: %s"] = "Talents appris : %s"
 L["Talent Planner: %1$s (planned for level %2$d) cannot be learned yet; check your plan."] = "Planificateur de talents : %1$s (prévu au niveau %2$d) ne peut pas encore être appris ; vérifiez votre plan."
--- Teleport menu (EllesmereUIForeverEssentials_TeleportMenu.lua)
-L["Teleport Menu"] = "Menu de téléportation"
-L["Teleport Menu Scale"] = "Échelle du menu de téléportation"
-L["Scales the Teleport Menu the button opens."] = "Met à l'échelle le menu de téléportation ouvert par le bouton."
 -- Unspent Legacy Points alert (EllesmereUIQoL_Alerts.lua, WoW Forever)
 L["Unspent Legacy points"] = "Points Legacy non dépensés"
 L["Unspent Legacy Points Alert"] = "Alerte de points Legacy non dépensés"

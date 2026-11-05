@@ -401,9 +401,7 @@ I.portalFlyoutSetters[#I.portalFlyoutSetters + 1] = function(v) _portalFlyout = 
 local function ToggleMinimapPortalFlyout(anchorBtn)
     if InCombatLockdown() then return end
     if not _portalFlyout then
-        -- WoW Forever: the Teleport Menu (Forever Essentials) instead of the M+ portals.
-        local Create = EllesmereUI.IS_FOREVER and EllesmereUI._ForeverTeleport.Create or EllesmereUI.CreatePortalFlyout
-        SetPortalFlyout(Create({
+        SetPortalFlyout(EllesmereUI.CreatePortalFlyout({
             name = "EUIMinimap", bg = { 0.04, 0.04, 0.06 }, clamp = true, unitEvents = true,
             labelFont = (EllesmereUI.GetFontPath("minimap")) or "Fonts\\FRIZQT__.TTF",
             labelFlags = "OUTLINE",
@@ -469,7 +467,7 @@ local function CreatePortalBtn(parent)
     btn._bg = bg
 
     local icon = btn:CreateTexture(nil, "ARTWORK")
-    icon:SetTexture(EllesmereUI.IS_FOREVER and 134414 or "Interface\\Icons\\Spell_Arcane_PortalDalaran")
+    icon:SetTexture("Interface\\Icons\\Spell_Arcane_PortalDalaran")
     icon:SetTexCoord(6/64, 58/64, 6/64, 58/64)
     btn._icon = icon
 
@@ -478,7 +476,7 @@ local function CreatePortalBtn(parent)
     btn:SetScript("OnEnter", function(self)
         self._icon:SetVertexColor(1, 1, 1, 1)
         if _portalFlyout and _portalFlyout:IsShown() then return end
-        EllesmereUI.ShowWidgetTooltip(self, EllesmereUI.IS_FOREVER and "Teleport Menu" or "M+ Portals", { anchor = EBS._Grow.TT(), scale = GetCustomTooltipScale() })
+        EllesmereUI.ShowWidgetTooltip(self, "M+ Portals", { anchor = EBS._Grow.TT(), scale = GetCustomTooltipScale() })
     end)
     btn:SetScript("OnLeave", function(self)
         self._icon:SetVertexColor(0.85, 0.85, 0.85, 1)
