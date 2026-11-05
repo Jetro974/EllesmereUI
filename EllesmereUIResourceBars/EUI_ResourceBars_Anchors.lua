@@ -528,6 +528,10 @@ local function RegisterUnlockElements()
     if ns.ST_MakeUnlockElement then
         elements[#elements + 1] = ns.ST_MakeUnlockElement(MK, Rebuild)
     end
+    -- Mirror Timers (breath, fatigue, feign death).
+    if ns.MT_MakeUnlockElement then
+        elements[#elements + 1] = ns.MT_MakeUnlockElement(MK, Rebuild)
+    end
     -- Call Totem Bar (WoW Forever): nil elsewhere.
     if ns.CT_MakeUnlockElement then
         elements[#elements + 1] = ns.CT_MakeUnlockElement(MK)
