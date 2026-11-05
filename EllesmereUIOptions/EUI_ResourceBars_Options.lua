@@ -4889,7 +4889,7 @@ initFrame:SetScript("OnEvent", function(self)
             container:ClearAllPoints(); container:SetPoint("CENTER", hdr, "CENTER", 0, 0)
 
             ns.MT_ApplyLook(mpf.obj, cfg, onePx)
-            mpf.obj.label:SetText(EllesmereUI.L(K.name))
+            mpf.obj.label:SetText(ns.MT_Name(K))
             local frac = K.sampleFrac
             if cfg.lowWarn then frac = math.min(frac, (cfg.lowWarnAt or 30) / 100 * 0.6) end
             ns.MT_Paint(mpf.obj, cfg, frac, 60 * frac, false, true)
@@ -5196,7 +5196,8 @@ initFrame:SetScript("OnEvent", function(self)
     do
         local env = ns._ERB_OptEnv
         local SEL_H = 54
-        local SEL_VALUES = { cast = "Player Cast Bar", breath = "Breath", fatigue = "Fatigue", feign = "Feign Death" }
+        local SEL_VALUES = { cast = "Player Cast Bar" }
+        for _, K in ipairs(ns.MT_KINDS or {}) do SEL_VALUES[K.id] = ns.MT_Name(K) end
         local SEL_ORDER = { "cast", "breath", "fatigue", "feign" }
         local sel = "cast"
 
