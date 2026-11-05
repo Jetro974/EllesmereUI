@@ -6504,14 +6504,14 @@ L["A class spell you learn for the first time goes on the first empty slot of yo
 L["Placed %1$s on action slot %2$d."] = "%1$s placé sur l'emplacement d'action %2$d."
 
 -- Mirror Timers (EUI_ResourceBars_MirrorTimer.lua): Breath, Fatigue, Feign Death
-L["Breath"] = "Respiration"
+L["Breath"] = "Souffle"
 L["Fatigue"] = "Fatigue"
 L["Feign Death"] = "Feindre la mort"
-L["Enable Breath Bar"] = "Activer la barre de respiration"
+L["Enable Breath Bar"] = "Activer la barre de souffle"
 L["Enable Fatigue Bar"] = "Activer la barre de fatigue"
 L["Enable Feign Death Bar"] = "Activer la barre de Feindre la mort"
 L["Your own bar for this timer, in place of Blizzard's."] = "Votre propre barre pour ce minuteur, à la place de celle de Blizzard."
-L["Breath Bar Position"] = "Position de la barre de respiration"
+L["Breath Bar Position"] = "Position de la barre de souffle"
 L["Fatigue Bar Position"] = "Position de la barre de fatigue"
 L["Feign Death Bar Position"] = "Position de la barre de Feindre la mort"
 L["Hide Blizzard Bar"] = "Masquer la barre Blizzard"

@@ -40,12 +40,26 @@ if not (GetMirrorTimerProgress and GetMirrorTimerInfo) then return end
 -- the fill the Unlock Mode and options previews show.
 local KINDS = {
     { id = "breath",  unlock = "ERB_MirrorBreath",  name = "Breath",      sampleFrac = 0.7,  order = 509,
-      timers = { BREATH = true } },
+      timers = { BREATH = true }, clientLabel = "BREATH_LABEL" },
     { id = "fatigue", unlock = "ERB_MirrorFatigue", name = "Fatigue",     sampleFrac = 0.45, order = 510,
-      timers = { EXHAUSTION = true } },
+      timers = { EXHAUSTION = true }, clientLabel = "EXHAUSTION_LABEL" },
     { id = "feign",   unlock = "ERB_MirrorFeign",   name = "Feign Death", sampleFrac = 0.6,  order = 511,
-      timers = { FEIGNDEATH = true, DEATH = true } },
+      timers = { FEIGNDEATH = true, DEATH = true }, spell = 5384 },
 }
+-- The name the client itself gives the timer (its bar label: BREATH_LABEL,
+-- EXHAUSTION_LABEL; Feign Death has none, so the spell's name), so the
+-- options, previews and movers say what the live bar says. Falls back to
+-- the English name through the locale table.
+local function KindName(K)
+    local s = K.clientLabel and _G[K.clientLabel]
+    if type(s) == "string" and s ~= "" then return s end
+    if K.spell then
+        local n = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(K.spell)
+        if type(n) == "string" and n ~= "" then return n end
+    end
+    return EllesmereUI.L(K.name)
+end
+ns.MT_Name = KindName
 local KIND_OF = {}     -- client timer name -> kind
 local KIND_BY_ID = {}
 for _, K in ipairs(KINDS) do
@@ -410,7 +424,7 @@ ns.MT_Paint = Paint
 
 local function PaintLive(K, cfg)
     if K.sample then
-        K.label:SetText(EllesmereUI.L(K.name))
+        K.label:SetText(KindName(K))
         Paint(K, cfg, K.sampleFrac, 60 * K.sampleFrac, false, true)
         return
     end
@@ -629,7 +643,7 @@ function ns.MT_MakeUnlockElements(MK, Rebuild)
     for _, K in ipairs(KINDS) do
         local id, f = K.id, K.frame
         out[#out + 1] = MK({
-            key = K.unlock, label = K.name, group = "Resource Bars", order = K.order,
+            key = K.unlock, label = KindName(K), group = "Resource Bars", order = K.order,
             getFrame = function() return K.built and f or nil end,
             isHidden = function() local cfg = Cfg(id); return not (cfg and cfg.enabled) end,
             getSize  = function() local cfg = Cfg(id); return (cfg and cfg.width or 200), (cfg and cfg.height or 20) end,
