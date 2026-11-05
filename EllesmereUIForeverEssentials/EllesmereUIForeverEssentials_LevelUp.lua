@@ -5,33 +5,30 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  Level Up Toast: on level up, a toast in the loot feed's EUI look (accent
 --  bar on a fading dark plate) that completes the game's own level-up toast
 --  rather than repeating it: the level in large accent digits, the health,
---  power and stats gained ("Health: +52"), new talent points, what the
---  class trainer teaches at the new level as icons (TrainerData.lua) and,
---  last, the time the last level took. It sits under the game's toast by
+--  power and stats gained ("Health: +52"), new talent points and, last, the
+--  time the last level took. It sits under the game's toast by
 --  default and shows with it: a read-only hook on the game's toast display
 --  releases it as the game's fades in, with a one-shot fallback should the
 --  game's never come.
 --  It slides in with an accent sheen, fades out after a while, and hovering
 --  holds it. Unlock mode places and sizes it. Show in Chat also writes it
---  to the chat, the abilities as spell links. Everything moves through
+--  to the chat. Everything moves through
 --  animation groups on frames of our own.
 -------------------------------------------------------------------------------
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.levelUpToast; unset keys read these.
--- gains, abilities, time: which parts the toast (and the chat) shows.
-local F = module.Feature("levelUpToast", { enabled = false, chat = false, width = 340, duration = 6,
-    gains = true, abilities = true, time = true },
+-- gains, time: which parts the toast (and the chat) shows.
+local F = module.Feature("levelUpToast", { enabled = false, chat = false, width = 340, duration = 4,
+    gains = true, time = true },
     { point = "TOP", relPoint = "TOP", x = 0, y = -340 })
 local Get, Enabled = F.Get, F.Enabled
 
 local BAR = 3          -- the accent bar on the left edge
 local NUMBER_W = 58    -- the level digits' column
 local PAD = 12
-local ICON = 26        -- an ability's icon
 local ROW_H = 17       -- a stat line
 local BASE_H = 64      -- the plate's height before its lines
-local TALENT = { 0.78, 0.55, 1 }  -- the talents' color, as in the Training Book
 local FADE_IN, FADE_OUT, SLIDE = 0.35, 0.8, 10
 
 -- PLAYER_LEVEL_UP payload: the stat deltas' positions and their names.
@@ -62,7 +59,7 @@ local function Text(parent, size)
     return fs
 end
 
--- The mouse is on the toast or one of its icons, not just over its area
+-- The mouse is on the toast, not just over its area
 -- (a window above it, the options panel, holds no hover).
 local function Hovered()
     local focus = GetMouseFoci()[1]
@@ -75,36 +72,6 @@ local function ArmFade()
     toast.fade:Stop()
     toast:SetAlpha(1)
     if not Hovered() then toast.fade:Play() end
-end
-
--- An ability's tooltip: the spell's own.
-local function AbilityEnter(b)
-    toast.fade:Stop()
-    toast:SetAlpha(1)
-    GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
-    GameTooltip:SetSpellByID(b.spellID)
-    GameTooltip:Show()
-end
-
-local function AbilityLeave(b)
-    if GameTooltip:IsOwned(b) then GameTooltip:Hide() end
-    ArmFade()
-end
-
-local function AbilityIcon(i)
-    local b = toast.icons[i]
-    if b then return b end
-    b = CreateFrame("Frame", nil, toast)
-    b:SetSize(ICON, ICON)
-    b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetAllPoints()
-    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    EllesmereUI.PP.CreateBorder(b, 0, 0, 0, 1, 1, "OVERLAY", 1)
-    b:EnableMouseMotion(true)
-    b:SetScript("OnEnter", AbilityEnter)
-    b:SetScript("OnLeave", AbilityLeave)
-    toast.icons[i] = b
-    return b
 end
 
 -- A stat line of the two-column list.
@@ -185,12 +152,8 @@ local function Build()
     toast.number:SetJustifyH("CENTER")
     toast.number:SetPoint("TOP", toast.levelLabel, "BOTTOM", 0, -1)
     toast.number:SetWidth(NUMBER_W)
-    toast.cells, toast.icons = {}, {}
+    toast.cells = {}
     toast.talents = Text(toast, 12)
-    toast.learn = Text(toast, 12)
-    toast.learn:SetTextColor(1, 1, 1)
-    toast.talentList = Text(toast, 12)
-    toast.talentList:SetTextColor(TALENT[1], TALENT[2], TALENT[3])
     toast.time = Text(toast, 11)
     toast.time:SetTextColor(0.7, 0.7, 0.7)
 
@@ -223,35 +186,8 @@ local function Build()
     ApplyStyle()
 end
 
--- What the class trainer teaches up to level and the player does not know
--- yet, the new level's first, from the trainer data (TrainerData.lua):
--- neither the game's level-up display nor Forever's spellbook lists it. A
--- talent's own spell comes with the talent and a higher rank is taught only to
--- a player who has the talent: those the player lacks are the second list,
--- the new level's alone. only: that level's alone (the sample).
-local function LevelAbilities(level, only)
-    local out, talents = {}, {}
-    local _, class = UnitClass("player")
-    local data = module.TrainerSpells(class)
-    for l = level, only and level or 1, -1 do
-        local spells = data[l] or {}
-        for i = 1, #spells do
-            local id = spells[i]
-            if not IsPlayerSpell(id) then
-                local entry = { icon = C_Spell.GetSpellTexture(id), spellID = id }
-                if not module.SpellIsTalent(class, id) or module.TalentRankOpen(class, id) then
-                    out[#out + 1] = entry
-                elseif l == level then
-                    talents[#talents + 1] = entry
-                end
-            end
-        end
-    end
-    return out, talents
-end
-
 -- The toast's lines in the chat.
-local function ToChat(level, timeLevel, timeSecs, stats, talents, abilities, talentSpells, hex)
+local function ToChat(level, timeLevel, timeSecs, stats, talents, hex)
     local brand = EllesmereUI.COLOR_CODES.BRAND .. "EllesmereUI:|r "
     local parts = {}
     for i = 1, #stats do
@@ -261,31 +197,14 @@ local function ToChat(level, timeLevel, timeSecs, stats, talents, abilities, tal
         parts[#parts + 1] = EllesmereUI.Lf("%1$s: %2$s", EllesmereUI.L("Talent points"), ("%s+%d|r"):format(hex, talents))
     end
     EllesmereUI.Print(brand .. hex .. EllesmereUI.Lf("Level %d", level) .. "|r  " .. table.concat(parts, ", "))
-    if #abilities > 0 then
-        local links = {}
-        for i = 1, #abilities do
-            links[#links + 1] = C_Spell.GetSpellLink(abilities[i].spellID) or ""
-        end
-        EllesmereUI.Print(brand .. EllesmereUI.Lf("To learn now (%d):", #abilities) .. " " .. table.concat(links, " "))
-    end
-    if #talentSpells > 0 then
-        local links = {}
-        for i = 1, #talentSpells do
-            links[#links + 1] = C_Spell.GetSpellLink(talentSpells[i].spellID) or ""
-        end
-        EllesmereUI.Print(brand .. EllesmereUI.Lf("Talents (%d):", #talentSpells) .. " " .. table.concat(links, " "))
-    end
     if timeSecs and SecondsToTime then
         EllesmereUI.Print(brand .. EllesmereUI.Lf("Time at level %d: %s", timeLevel, SecondsToTime(math.floor(timeSecs), true)))
     end
 end
 
 -- What the level brought, top to bottom: health, power and stats on two
--- columns ("Health: +52"); talent points; what can be trained now as icons
--- (two rows at most, the count in the label); the time the last level took
--- (timeLevel, timeSecs; nil: not known). sampleOnly: the sample's level alone.
-local sampleOnly = false
-local MAX_ICON_ROWS = 2
+-- columns ("Health: +52"); talent points; the time the last level took
+-- (timeLevel, timeSecs; nil: not known).
 
 local function Show(level, timeLevel, timeSecs, health, power, talents, ...)
     Build()
@@ -330,51 +249,6 @@ local function Show(level, timeLevel, timeSecs, health, power, talents, ...)
         y = y + ROW_H
     end
 
-    local abilities, talentSpells = {}, {}
-    if Get("abilities") then abilities, talentSpells = LevelAbilities(level, sampleOnly) end
-    local perRow = math.max(1, math.floor((Get("width") - left - PAD + 4) / (ICON + 4)))
-    local shown = 0
-    toast.learn:SetShown(#abilities > 0)
-    if #abilities > 0 then
-        y = y + 4
-        toast.learn:SetText(EllesmereUI.Lf("To learn now (%d):", #abilities))
-        toast.learn:ClearAllPoints()
-        toast.learn:SetPoint("TOPLEFT", left, -y)
-        y = y + ROW_H + 2
-        shown = math.min(#abilities, perRow * MAX_ICON_ROWS)
-        for i = 1, shown do
-            local a, b = abilities[i], AbilityIcon(i)
-            b.icon:SetTexture(a.icon)
-            b.spellID = a.spellID
-            b:ClearAllPoints()
-            b:SetPoint("TOPLEFT", left + ((i - 1) % perRow) * (ICON + 4), -(y + math.floor((i - 1) / perRow) * (ICON + 4)))
-            b:Show()
-        end
-        y = y + math.ceil(shown / perRow) * (ICON + 4)
-    end
-
-    -- The talents of the new level the player does not have, one row at most.
-    local shownTalents = 0
-    toast.talentList:SetShown(#talentSpells > 0)
-    if #talentSpells > 0 then
-        y = y + 4
-        toast.talentList:SetText(EllesmereUI.Lf("Talents (%d):", #talentSpells))
-        toast.talentList:ClearAllPoints()
-        toast.talentList:SetPoint("TOPLEFT", left, -y)
-        y = y + ROW_H + 2
-        shownTalents = math.min(#talentSpells, perRow)
-        for i = 1, shownTalents do
-            local a, b = talentSpells[i], AbilityIcon(shown + i)
-            b.icon:SetTexture(a.icon)
-            b.spellID = a.spellID
-            b:ClearAllPoints()
-            b:SetPoint("TOPLEFT", left + (i - 1) * (ICON + 4), -y)
-            b:Show()
-        end
-        y = y + ICON + 4
-    end
-    for i = shown + shownTalents + 1, #toast.icons do toast.icons[i]:Hide() end
-
     local showTime = timeSecs and SecondsToTime
     toast.time:SetShown(showTime and true or false)
     if showTime then
@@ -385,7 +259,7 @@ local function Show(level, timeLevel, timeSecs, health, power, talents, ...)
         y = y + ROW_H
     end
     toast:SetHeight(math.max(BASE_H, y + PAD))
-    if Get("chat") then ToChat(level, timeLevel, timeSecs, stats, talents, abilities, talentSpells, hex) end
+    if Get("chat") then ToChat(level, timeLevel, timeSecs, stats, talents, hex) end
 
     toast.fade.alpha:SetStartDelay(Get("duration"))
     toast.fade:Stop()
@@ -522,13 +396,10 @@ EllesmereUI._LevelUpToast = {
     Get = Get,
     Cfg = F.Cfg,
     Apply = Apply,
-    -- A sample: the last level, with what that level teaches and typical
-    -- gains.
+    -- A sample: the last level, with typical gains.
     Preview = function()
         local max = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or 60
-        sampleOnly = true
         Show(max, max - 1, 8040, 52, 38, 1, 1, 0, 2, 1)
-        sampleOnly = false
     end,
 }
 

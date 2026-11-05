@@ -723,7 +723,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
     local luRow
     luRow, h = W:DualRow(parent, y,
         { type = "toggle", text = "Level Up Toast",
-          tooltip = "Shows a toast when you level up: your new level, the health, power and stats you gained, new talent points, the time the last level took and what you can train now. Place it in unlock mode.",
+          tooltip = "Shows a toast when you level up: your new level, the health, power and stats you gained, new talent points and the time the last level took. Place it in unlock mode.",
           getValue = function() return LU.Get("enabled") end,
           setValue = function(v)
               LU.Cfg().enabled = v
@@ -745,7 +745,6 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
             title = "Level Up Toast",
             rows = {
                 partRow("Stat Gains", "The health, power, stats and talent points the level brought.", "gains"),
-                partRow("Abilities to Learn", "What you can train now, as icons.", "abilities"),
                 partRow("Time at Level", "How long the last level took.", "time"),
             },
             disabled = function() return not LU.Get("enabled") end,
@@ -755,7 +754,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
 
     _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Show in Chat",
-          tooltip = "Also writes the toast to the chat, the abilities to learn as spell links.",
+          tooltip = "Also writes the toast to the chat.",
           disabled = function() return not LU.Get("enabled") end, disabledTooltip = "Level Up Toast",
           getValue = function() return LU.Get("chat") end,
           setValue = function(v) LU.Cfg().chat = v or nil end },
