@@ -6235,3 +6235,12 @@ L["Countdown to Soul"] = "Compte à rebours avant Âme des arcanes"
 L["Inside Soul"] = "Pendant Âme des arcanes"
 L["Last Barrage"] = "Dernier Barrage"
 L["This option requires Countdown Format to count GCDs inside Arcane Soul."] = "Cette option nécessite que le format du compte à rebours compte les GCD pendant Âme des arcanes."
+
+-- Auto Uprank Spells on Bars, Place New Spells (EllesmereUIForeverEssentials_Uprank.lua)
+L["Auto Uprank Spells on Bars"] = "Rangs supérieurs automatiques dans les barres"
+L["Swaps new spell ranks onto your action bars."] = "Remplace les sorts de vos barres d'action par leur nouveau rang."
+L["Upranked %s on 1 action slot."] = "%s mis au rang supérieur sur 1 emplacement d'action."
+L["Upranked %1$s on %2$d action slots."] = "%1$s mis au rang supérieur sur %2$d emplacements d'action."
+L["Place New Spells"] = "Placer les nouveaux sorts"
+L["A class spell you learn for the first time goes on the first empty slot of your main action bar: WoW Forever never places learned spells itself. Passives and higher ranks are left alone."] = "Un sort de classe appris pour la première fois va dans le premier emplacement vide de votre barre d'action principale : WoW Forever ne place jamais lui-même les sorts appris. Les sorts passifs et les rangs supérieurs ne sont pas concernés."
+L["Placed %1$s on action slot %2$d."] = "%1$s placé sur l'emplacement d'action %2$d."

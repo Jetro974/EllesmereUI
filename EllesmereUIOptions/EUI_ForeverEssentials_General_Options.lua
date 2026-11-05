@@ -233,6 +233,20 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
           tooltip = "Choose which windows open in their classic version." }
     );  y = y - h
     if not EllesmereUI._prebuilding then
+        EllesmereUI.BuildInlineCog(generalRow._leftRegion, {
+            title = "Auto Uprank Spells on Bars",
+            rows = {
+                { type = "toggle", label = "Place New Spells",
+                  tooltip = "A class spell you learn for the first time goes on the first empty slot of your main action bar: WoW Forever never places learned spells itself. Passives and higher ranks are left alone.",
+                  get = function() return SU.Get("placeNew") end,
+                  set = function(v)
+                      SU.Cfg().placeNew = v
+                      SU.Apply()
+                  end },
+            },
+            disabled = function() return not SU.Get("enabled") end,
+            disabledTooltip = "Auto Uprank Spells on Bars",
+        })
         local rgn = generalRow._rightRegion
         local byKey = {}
         for i = 1, #cwItems do byKey[cwItems[i].key] = cwItems[i] end
