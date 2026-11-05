@@ -14,6 +14,7 @@ local PAGE_CASTBAR   = "Cast Bar"
 local PAGE_GCD       = "GCD Bar"
 local PAGE_SWING     = "Swing Timer"   -- WoW Forever only (C_SwingTimer)
 local PAGE_TOTEM     = "Totem Bar"
+local PAGE_MIRROR    = "Mirror Timers"
 local PAGE_UNLOCK    = "Unlock Mode"
 
 -- WoW Forever shows the first tab as "Main Resources" and the totem tab as
@@ -5097,8 +5098,8 @@ initFrame:SetScript("OnEvent", function(self)
         title       = "Resource Bars",
         description = "Custom class resource, health, and mana bar display.",
         pages       = C_SwingTimer
-            and { PAGE_DISPLAY, PAGE_CASTBAR, PAGE_GCD, PAGE_SWING, PAGE_TOTEM }
-            or  { PAGE_DISPLAY, PAGE_CASTBAR, PAGE_GCD, PAGE_TOTEM },
+            and { PAGE_DISPLAY, PAGE_CASTBAR, PAGE_GCD, PAGE_SWING, PAGE_MIRROR, PAGE_TOTEM }
+            or  { PAGE_DISPLAY, PAGE_CASTBAR, PAGE_GCD, PAGE_MIRROR, PAGE_TOTEM },
         buildPage   = function(pageName, parent, yOffset)
             if pageName == PAGE_DISPLAY then
                 return ns.ERB_BuildBarDisplayPage(pageName, parent, yOffset)
@@ -5108,6 +5109,8 @@ initFrame:SetScript("OnEvent", function(self)
                 return ns.ERB_BuildGCDBarPage(pageName, parent, yOffset)
             elseif pageName == PAGE_SWING then
                 return ns.ERB_BuildSwingTimerPage(pageName, parent, yOffset)
+            elseif pageName == PAGE_MIRROR then
+                return ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset)
             elseif pageName == PAGE_TOTEM then
                 return ns.ERB_BuildTotemBarPage(pageName, parent, yOffset)
             end
