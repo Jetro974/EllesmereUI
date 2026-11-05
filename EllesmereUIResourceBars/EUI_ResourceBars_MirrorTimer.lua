@@ -91,6 +91,8 @@ end
 -- Builds the children of obj.frame. obj is a KINDS entry, or a preview table
 -- the options page makes ({ frame = <its container> }); mk is its frame maker
 -- (the options page pool's CreateFrame there, so a rebuilt page reuses them).
+local MAX_DIGITS = 4
+
 local function BuildBar(obj, mk)
     local CreateFrame = mk or CreateFrame
     local f = obj.frame
@@ -136,6 +138,20 @@ local function BuildBar(obj, mk)
     time:SetWordWrap(false)
     time:SetText("")
     obj.time = time
+    -- The seconds are drawn one digit per fixed cell (the widest digit's
+    -- width), so a narrow 1 does not shift the others as they count down.
+    -- obj.time stays as the invisible box that places them (and that the
+    -- options' click overlay follows).
+    obj.digits = {}
+    for i = 1, MAX_DIGITS do
+        local d = textFrame:CreateFontString(nil, "OVERLAY")
+        ns.SetRBFont(d, ns.GetRBFont(), 11)
+        d:SetWordWrap(false)
+        d:SetJustifyH("CENTER")
+        d:SetText("")
+        d:Hide()
+        obj.digits[i] = d
+    end
     obj.built = true
 end
 ns.MT_BuildBar = BuildBar
@@ -203,6 +219,25 @@ local function ApplyLook(obj, cfg, onePx)
         cfg.labelR or 1, cfg.labelG or 1, cfg.labelB or 1, cfg.labelA or 1)
     PlaceText(obj.time, f, cfg.timeSide or "right", cfg.timeSize or 11, cfg.timeX or 0, cfg.timeY or 0,
         cfg.timeR or 1, cfg.timeG or 1, cfg.timeB or 1, cfg.timeA or 1)
+    -- Digit cells: same font and colour; the box itself is never seen.
+    local time = obj.time
+    time:SetAlpha(0)
+    obj.timeShown = (cfg.timeSide or "right") ~= "none"
+    for i = 1, MAX_DIGITS do
+        local d = obj.digits[i]
+        ns.SetRBFont(d, ns.GetRBFont(), cfg.timeSize or 11)
+        d:SetTextColor(cfg.timeR or 1, cfg.timeG or 1, cfg.timeB or 1, cfg.timeA or 1)
+        if not obj.timeShown then d:Hide() end
+    end
+    local wide, wideW = "0", -1
+    for n = 0, 9 do
+        time:SetText(tostring(n))
+        local w = time:GetStringWidth() or 0
+        if w > wideW then wide, wideW = tostring(n), w end
+    end
+    obj.wideDigit = wide
+    obj.lastTime = nil
+    time:SetText("")
 
     -- Rounded corners (EllesmereUI_RoundedCorners.lua; nothing at radius 0).
     -- The body is the clip (fill + spark) and the background.
@@ -229,7 +264,26 @@ local function Paint(obj, cfg, frac, seconds, rising, still)
     frac = math.max(0, math.min(frac or 0, 1))
     obj.bar:SetMinMaxValues(0, 1)
     obj.bar:SetValue(frac)
-    obj.time:SetText(string.format("%d", math.max(0, math.floor((seconds or 0) + 0.5))))
+    local txt = string.format("%d", math.max(0, math.floor((seconds or 0) + 0.5)))
+    if txt ~= obj.lastTime then
+        obj.lastTime = txt
+        local n = math.min(#txt, MAX_DIGITS)
+        txt = txt:sub(-n)
+        local time = obj.time
+        time:SetText(string.rep(obj.wideDigit or "0", n))
+        local cw = (time:GetStringWidth() or 0) / n
+        for i = 1, MAX_DIGITS do
+            local d = obj.digits[i]
+            if i <= n and obj.timeShown then
+                d:ClearAllPoints()
+                d:SetPoint("CENTER", time, "LEFT", (i - 0.5) * cw, 0)
+                d:SetText(txt:sub(i, i))
+                d:Show()
+            else
+                d:Hide()
+            end
+        end
+    end
 
     local r, g, b, a = cfg.fillR or 1, cfg.fillG or 1, cfg.fillB or 1, cfg.fillA or 1
     local alpha = 1
