@@ -489,8 +489,11 @@ local function BuildList(page, host)
         local status, sr, sg, sb, sa = StatusOf(a)
         row.status:SetText(status or "")
         if status then row.status:SetTextColor(sr, sg, sb, sa) end
-        row.title:SetText(a.title .. mark)
-        row.title:SetTextColor(1, 1, 1, shown and 0.95 or 0.4)
+        -- The addon's own icon and title, colours included; an addon that
+        -- will be off is dimmed as a whole (its colour codes ignore the text colour).
+        row.title:SetText(a.icon .. " " .. a.shown .. mark)
+        row.title:SetTextColor(1, 1, 1, 1)
+        row.title:SetAlpha(shown and 1 or 0.45)
         SetBox(row.box, a.locked or (d == nil and a.on) or d == true, d == nil and not a.locked, a.locked)
         SetPill(row.pill, o, a.locked)
     end
