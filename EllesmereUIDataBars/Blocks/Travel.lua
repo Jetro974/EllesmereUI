@@ -368,6 +368,77 @@ local function TravelGetPrimaryCooldown()
     return TravelGetRemainingCooldown(travelPrimaryHearthId, false)
 end
 
+-- Show Other Characters (block setting altHearths, off by default): every
+-- character's hearthstone, account-wide in EllesmereUIDB.travelHearths
+-- ["Name-RealmGroup"] = { name, class, bind, readyAt }. readyAt is a time()
+-- stamp (0 = ready): item cooldowns keep running while logged out, so an alt's
+-- row counts down from what it last saved. A character saves itself on each
+-- block refresh while the setting is on; a secret (combat) read saves nothing.
+local function TravelHearthStore()
+    local db = _G.EllesmereUIDB
+    if type(db) ~= "table" then return nil end
+    local store = db.travelHearths
+    if type(store) ~= "table" then
+        store = {}
+        db.travelHearths = store
+    end
+    return store
+end
+
+local function TravelSaveMyHearth()
+    local store = TravelHearthStore()
+    local key = store and EllesmereUI.CharKey and EllesmereUI.CharKey("-", store)
+    if not key then return end
+    local cd, known = TravelGetPrimaryCooldown()
+    if not known then return end
+    local e = store[key]
+    if type(e) ~= "table" then
+        e = {}
+        store[key] = e
+    end
+    local _, class = UnitClass("player")
+    e.name = UnitName("player")
+    e.class = class
+    e.bind = GetBindLocation()
+    e.readyAt = (cd > 0) and (time() + cd) or 0
+end
+
+-- The other characters' rows, sorted by name (reused buffer: the open tooltip
+-- refreshes every second).
+local _altBuf = {}
+local function TravelAltSort(a, z) return (a.name or "") < (z.name or "") end
+local function TravelAddAltRows(ar, ag, ab)
+    local store = TravelHearthStore()
+    if not store then return end
+    local mine = EllesmereUI.CharKey and EllesmereUI.CharKey("-")
+    local n = 0
+    for key, e in pairs(store) do
+        if key ~= mine and type(e) == "table" and e.name then
+            n = n + 1
+            _altBuf[n] = e
+        end
+    end
+    for i = n + 1, #_altBuf do _altBuf[i] = nil end
+    if n == 0 then return end
+    table.sort(_altBuf, TravelAltSort)
+    ns.Tip_AddLine(" ")
+    ns.Tip_AddLine(L["OTHER_CHARACTERS"], ar, ag, ab)
+    local now = time()
+    for i = 1, n do
+        local e = _altBuf[i]
+        local cc = e.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[e.class]
+        local cr, cg, cb = 1, 1, 1
+        if cc then cr, cg, cb = cc.r, cc.g, cc.b end
+        local rem = (e.readyAt or 0) - now
+        local cdStr, rr, rg, rb = L["READY"], 0, 1, 0
+        if rem > 0 then
+            cdStr = ns.FormatCooldown(rem) or L["READY"]
+            rr, rg, rb = 0.5, 0.5, 0.5
+        end
+        ns.Tip_AddDouble(e.name .. " (" .. (e.bind or "?") .. ")", cdStr, cr, cg, cb, rr, rg, rb)
+    end
+end
+
 -- "smart": the cooldown while cooling, else the destination.
 local TEXT_KEYS = { "textLeft", "textRight", "textMiddle" }
 local function TravelClickTextMode(dt, btn)
@@ -682,6 +753,8 @@ ns.BlockFactories.travel = function(blockCfg, slot, content, barCtx)
             end
         end
 
+        if dt.altHearths == true then TravelAddAltRows(ar, ag, ab) end
+
         -- Show M+ Portals: nil reads as shown (no migration needed). OFF skips the section and its spell-resolution work entirely.
         -- WoW Forever has no Mythic+ teleports: the section never builds there.
         _mythicLineCount = 0
@@ -871,6 +944,7 @@ ns.BlockFactories.travel = function(blockCfg, slot, content, barCtx)
 
     function inst:Refresh()
         SyncHouseWatch()
+        if D().altHearths == true then TravelSaveMyHearth() end
         if not built then return end
         K.SetBlockIcon(hearthIcon, blockCfg)
         local barCfg = BC()

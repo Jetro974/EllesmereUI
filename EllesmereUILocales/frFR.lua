@@ -6532,3 +6532,7 @@ L["Apply Fill Color to all Bars"] = "Appliquer la couleur de remplissage à tout
 L["Apply Bar Texture to all Bars"] = "Appliquer la texture de barre à toutes les barres"
 L["Apply Label Text to all Bars"] = "Appliquer le texte du nom à toutes les barres"
 L["Apply Low Warning to all Bars"] = "Appliquer l'alerte niveau bas à toutes les barres"
+-- DataBars Travel: Show Other Characters (alt hearthstones)
+L["Other Characters"] = "Autres personnages"
+L["Show Other Characters"] = "Afficher les autres personnages"
+L["Lists your other characters' hearthstones in the tooltip: where each is bound and when it is ready. A character appears once it has logged in with this on."] = "Liste dans l'infobulle les pierres de foyer de vos autres personnages : où chacune est liée et quand elle est prête. Un personnage apparaît après s'être connecté avec cette option active."
