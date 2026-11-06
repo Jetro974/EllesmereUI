@@ -96,7 +96,17 @@ end
 local HINT_SIZE = 36
 local hint = CreateFrame("Button", "EUIQuickdrawContextHint", UIParent)
 hint:SetSize(HINT_SIZE, HINT_SIZE)
-hint:SetPoint("CENTER", UIParent, "CENTER", 0, -170)
+-- Its place: below the middle of the screen until moved in Unlock Mode
+-- (profile.contextHintPos, CENTER offsets).
+local HINT_X, HINT_Y = 0, -170
+local function PlaceHint()
+    local p = P()
+    local pos = p and p.contextHintPos
+    hint:ClearAllPoints()
+    hint:SetPoint("CENTER", UIParent, "CENTER",
+        (pos and pos.x) or HINT_X, (pos and pos.y) or HINT_Y)
+end
+PlaceHint()
 hint:SetFrameStrata("MEDIUM")
 hint:RegisterForClicks("LeftButtonUp")
 hint:Hide()
@@ -284,6 +294,7 @@ end
 
 -- Reached from ns.Refresh and OnEnable.
 function ns.ContextRefresh()
+    PlaceHint() -- a profile switch brings its own spot
     local on = Wanted()
     if on ~= eventsOn then
         eventsOn = on
@@ -302,5 +313,49 @@ function ns.ContextRefresh()
     end
     if on then Evaluate() else UpdateHint() end
 end
+
+-------------------------------------------------------------------------------
+--  Unlock Mode: the hint has a mover of its own, shown while some menu
+--  names a context. Only its spot is stored; it has no size to change.
+-------------------------------------------------------------------------------
+local unlockFrame = CreateFrame("Frame")
+unlockFrame:RegisterEvent("PLAYER_LOGIN")
+unlockFrame:SetScript("OnEvent", function(self)
+    self:UnregisterAllEvents()
+    PlaceHint()
+    if not (EllesmereUI.RegisterUnlockElements and EllesmereUI.MakeUnlockElement) then return end
+    local MK = EllesmereUI.MakeUnlockElement
+    EllesmereUI:RegisterUnlockElements({
+        MK({
+            key = "EQD_ContextHint",
+            label = "Quickdraw Context",
+            group = "Quickdraw",
+            order = 900,
+            noResize = true,
+            noAnchorTarget = true,
+            noAnchorTo = true,
+            noSizeMatchTarget = true,
+            isHidden = function() return not Wanted() end,
+            getFrame = function() return hint end,
+            getSize = function() return HINT_SIZE, HINT_SIZE end,
+            savePos = function(_, _point, _relPoint, x, y)
+                local p = P()
+                if p then p.contextHintPos = { x = x, y = y } end
+            end,
+            loadPos = function()
+                local p = P()
+                local pos = p and p.contextHintPos
+                return { point = "CENTER", relPoint = "CENTER",
+                         x = (pos and pos.x) or HINT_X, y = (pos and pos.y) or HINT_Y }
+            end,
+            clearPos = function()
+                local p = P()
+                if p then p.contextHintPos = nil end
+                PlaceHint()
+            end,
+            applyPos = PlaceHint,
+        }),
+    })
+end)
 
 I.broken = false
