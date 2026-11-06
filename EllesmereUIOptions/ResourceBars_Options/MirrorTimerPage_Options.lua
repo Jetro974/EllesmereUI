@@ -430,7 +430,7 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
     timeRow, h = W:DualRow(parent, y,
         TextCfg("Duration Text", "time", "right"),
         { type = "toggle", text = "Low Warning",
-          tooltip = "As the bar runs low it turns red, then blinks just before it runs out.",
+          tooltip = "The bar turns red and blinks once it runs down to the level set in the cog.",
           disabled = off, disabledTooltip = TIP,
           getValue = function() local c = C(); return c and c.lowWarn == true end,
           setValue = function(v) local c = C(); if not c then return end; c.lowWarn = v; Refresh(); EllesmereUI:RefreshPage() end }
@@ -445,7 +445,7 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
             title = "Low Warning",
             rows = {
                 { type = "slider", label = "Warn When Left", min = 10, max = 90, step = 5,
-                  tooltip = "The warning starts when this much of the bar is left, in percent: the bar turns half red at once, fully red as it empties, and blinks once half of that is left.",
+                  tooltip = "When this much of the bar is left, in percent, the bar turns red and blinks.",
                   get = Get("lowWarnAt", 30), set = Set("lowWarnAt") },
             },
         })

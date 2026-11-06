@@ -19,9 +19,9 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -- optional spark and two texts (the game's label, the seconds left), each
 -- placed left, right or center with its own size, offsets and colour.
 --
--- Low Warning (optional, per bar): below Warning Starts At a draining bar
--- slides from its colour to red as it empties, and pulses over the last half
--- of that range. A refilling bar never warns. Both ride the 20 Hz read.
+-- Low Warning (optional, per bar): once a draining bar is down to Warn When
+-- Left, it turns red and blinks. A refilling bar never warns. Both ride the
+-- 20 Hz read.
 --
 -- Blizzard's own bar for a timer is made invisible (alpha 0, never a reparent
 -- or an unregister) while ours for that timer is on with Hide Blizzard Bar;
@@ -413,14 +413,11 @@ local function Paint(obj, cfg, frac, seconds, rising, still)
     local r, g, b, a = cfg.fillR or 1, cfg.fillG or 1, cfg.fillB or 1, cfg.fillA or 1
     local alpha = 1
     local start = (cfg.lowWarnAt or 30) / 100
-    if cfg.lowWarn and not rising and start > 0 and frac < start then
-        -- Half way to red the moment the threshold is crossed (a slow slide
-        -- from the bar's colour went unseen), fully red when empty.
-        local t = 0.5 + 0.5 * (1 - frac / start)
-        r = r + (WARN_R - r) * t
-        g = g + (WARN_G - g) * t
-        b = b + (WARN_B - b) * t
-        if frac < start / 2 and not still then
+    if cfg.lowWarn and not rising and start > 0 and frac <= start then
+        -- The warning fires at the threshold: red and blinking until the bar
+        -- refills or ends.
+        r, g, b = WARN_R, WARN_G, WARN_B
+        if not still then
             local s = math.sin(GetTime() * math.pi * 2 / PULSE_PERIOD)
             alpha = 0.35 + 0.65 * math.abs(s)
         end
