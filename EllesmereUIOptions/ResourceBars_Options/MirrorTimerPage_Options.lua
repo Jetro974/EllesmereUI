@@ -88,7 +88,7 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
     end
 
     -- Apply to All / Apply to Multiple (EllesmereUI_Widgets_ApplyToAll.lua),
-    -- as the action bars do: a setting's keys copied from this bar to the
+    -- as the action bars do: a setting's keys written from this bar onto the
     -- other mirror bars, all of them or the ones ticked in the list.
     local SYNC_IDS, SYNC_LABELS = {}, {}
     for _, k in ipairs(ns.MT_KINDS or {}) do
@@ -143,7 +143,7 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
 
     ---------------------------------------------------------------------------
     --  Apply All Settings From (as the Unit Frames pages have it): another
-    --  bar's settings copied onto this one after a confirm. Another of these
+    --  bar's settings written onto this one after a confirm. Another of these
     --  bars key for key; the Player Cast Bar through the keys that mean the
     --  same thing here (its Spell Text is this bar's name text, its Duration
     --  Text the time). This bar's position and enable switch stay its own.
