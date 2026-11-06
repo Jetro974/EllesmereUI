@@ -253,7 +253,7 @@ local CAMPSITE_ITEMS = {
     279973, 279976, 279978, 279979, 279982, 279985, 279987, 279988, 279989,
     279990,
 }
-local CAMPSITE_ICON_ITEM = 279978 -- Camp Tent
+local CAMPSITE_ICON = 135805 -- the game's campfire (Basic Campfire's icon)
 ns.CAMPSITE_ITEMS = CAMPSITE_ITEMS
 
 local function CampsiteOwned()
@@ -713,8 +713,7 @@ local function SlotDisplay(slot)
         if info then return info.iconID or QUESTION_MARK, info.name end
 
     elseif k == "campsite" then
-        local icon = C_Item.GetItemIconByID(CAMPSITE_ICON_ITEM)
-        return icon or QUESTION_MARK, EllesmereUI.L("Campsite Items")
+        return CAMPSITE_ICON, EllesmereUI.L("Campsite Items")
 
     elseif k == "item" then
         if type(slot.id) ~= "number" then return QUESTION_MARK, slot.name end
