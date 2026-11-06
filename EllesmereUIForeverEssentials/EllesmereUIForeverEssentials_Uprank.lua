@@ -47,8 +47,14 @@ end
 -- The main bar's shown buttons and the slots they show right now: a stance,
 -- form or stealth pages the bar (a warrior never shows slots 1-12), so the
 -- slot is read off the button (EUI's bars, then Blizzard's), up to the last
--- button shown (a bar can show fewer than 12). In a vehicle, or with another
--- bar addon: slots 1-12 and no button.
+-- button the bar holds (EUI's can hold fewer than 12). An empty button is
+-- hidden unless empty buttons are shown, so it counts while its bar is shown.
+-- In a vehicle, or with another bar addon: slots 1-12 and no button.
+local function OnShownBar(btn)
+    local bar = btn and btn:GetParent()
+    return bar ~= nil and bar:IsVisible()
+end
+
 local function MainBar()
     local list = {}
     local vehicle = (HasVehicleActionBar and HasVehicleActionBar())
@@ -56,11 +62,12 @@ local function MainBar()
     if not vehicle then
         for i = 1, MAIN_BAR_SLOTS do
             local btn, slot = _G["EABButton" .. i], nil
-            if btn and btn:IsVisible() then
+            -- eab-withincutoff 0: past the number of buttons the bar shows.
+            if OnShownBar(btn) and btn:GetAttribute("eab-withincutoff") ~= 0 then
                 slot = Plain(btn:GetAttribute("action"))
             else
                 btn = _G["ActionButton" .. i]
-                if btn and btn:IsVisible() then slot = Plain(btn.action) end
+                if OnShownBar(btn) then slot = Plain(btn.action) end
             end
             if not slot then break end
             list[i] = { index = i, slot = slot, button = btn }
@@ -79,8 +86,9 @@ end
 local FLY_SIZE = 44
 local flyers, flights = {}, 0
 
-local function Center(frame)
-    if not (frame and frame:IsVisible()) then return end
+-- anyShown: the frame may be hidden (a button just filled shows a frame later).
+local function Center(frame, anyShown)
+    if not (frame and (anyShown or frame:IsVisible())) then return end
     local x, y = frame:GetCenter()
     if not x then return end
     local s = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
@@ -135,22 +143,23 @@ local function NewFlyer()
 end
 
 local function Fly(spellID, button)
-    local tx, ty, tw = Center(button)
-    if not tx then return end
     local sx, sy = Center(ClassTrainerTrainButton)
     if not sx then sx, sy = Center(ClassTrainerFrame) end
     if not sx then sx, sy = Center(PlayerSpellsFrame or SpellBookFrame) end
     if not sx then sx, sy = UIParent:GetWidth() / 2, UIParent:GetHeight() / 2 end
-    local f = table.remove(flyers) or NewFlyer()
-    f.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
-    f:ClearAllPoints()
-    f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", sx, sy)
-    f:SetSize(tw, tw)
-    f.move:SetOffset(tx - sx, ty - sy)
-    local r = FLY_SIZE / tw
-    f.shrink:SetScaleFrom(r, r); f.shrink:SetScaleTo(1, 1)
     flights = flights + 1
     C_Timer.After((flights - 1) * 0.2, function()
+        -- Read when it flies: the button it lands on may only now be laid out.
+        local tx, ty, tw = Center(button, true)
+        if not tx or tw <= 0 then return end
+        local f = table.remove(flyers) or NewFlyer()
+        f.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
+        f:ClearAllPoints()
+        f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", sx, sy)
+        f:SetSize(tw, tw)
+        f.move:SetOffset(tx - sx, ty - sy)
+        local r = FLY_SIZE / tw
+        f.shrink:SetScaleFrom(r, r); f.shrink:SetScaleTo(1, 1)
         f:Show()
         f.path:Play()
         f.look:Play()
