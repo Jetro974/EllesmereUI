@@ -6227,8 +6227,7 @@ L["All pets"] = "Tous les familiers"
 L["%d pet families"] = "%d familles de familiers"
 L["Pet trainer"] = "Maître des familiers"
 L["Grimoire"] = "Grimoire"
--- == Global Settings and major sections (9.7.4) ====================================
-L["Absorb Shields"] = "Absorptions"
+-- == Global Settings and major sections (9.7.4) =============================L["Absorb Shields"] = "Absorptions"
 L["Accent Colored Settings Elements"] = "Éléments de réglages colorés par accent"
 L["Cast Actions on Key Down Lag Tolerance"] = "Tolérance de latence pour les actions d'incantation à l'appui de la touche"
 L["Celebrating the donors and team behind EllesmereUI."] = "Célébration des donateurs et de l'équipe derrière EllesmereUI."
@@ -6536,3 +6535,6 @@ L["Apply Low Warning to all Bars"] = "Appliquer l'alerte niveau bas à toutes le
 L["Other Characters"] = "Autres personnages"
 L["Show Other Characters"] = "Afficher les autres personnages"
 L["Lists your other characters' hearthstones in the tooltip: where each is bound and when it is ready. A character appears once it has logged in with this on."] = "Liste dans l'infobulle les pierres de foyer de vos autres personnages : où chacune est liée et quand elle est prête. Un personnage apparaît après s'être connecté avec cette option active."
+=======
+L["Your changes only apply after a reload. Apply them and reload now? Otherwise they are discarded."] = "Vos changements ne s'appliquent qu'après un rechargement. Les appliquer et recharger maintenant ? Sinon, ils sont annulés."
+L["Discard Changes"] = "Annuler les changements"
