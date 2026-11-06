@@ -6246,3 +6246,4 @@ L["Leaves this menu out while you already have %s."] = "Retire ce menu tant que 
 L["Unless Under (min)"] = "Sauf sous (min)"
 L["The menu comes back once %s has fewer minutes left than this. 0: hidden for as long as it lasts."] = "Le menu revient quand il reste moins de minutes que ceci sur %s. 0 : masqué tant qu'il dure."
 L["%1$s now shares %2$s with %3$s."] = "%1$s partage maintenant %2$s avec %3$s."
+L["Right-Click to dismiss it until you leave."] = "Clic droit pour le retirer jusqu'à votre départ."
