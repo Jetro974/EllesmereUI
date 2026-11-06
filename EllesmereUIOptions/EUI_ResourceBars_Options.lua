@@ -5193,7 +5193,8 @@ initFrame:SetScript("OnEvent", function(self)
         local SEL_H = 54
         local SEL_VALUES = { cast = "Player Cast Bar" }
         for _, K in ipairs(ns.MT_KINDS or {}) do SEL_VALUES[K.id] = ns.MT_Name(K) end
-        local SEL_ORDER = { "cast", "breath", "fatigue", "feign" }
+        local SEL_ORDER = { "cast" }
+        for _, K in ipairs(ns.MT_KINDS or {}) do SEL_ORDER[#SEL_ORDER + 1] = K.id end
         local sel = "cast"
 
         -- Unlock Mode "Element Options" pre-selects a bar: direct setter plus a

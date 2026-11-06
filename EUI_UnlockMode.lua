@@ -635,6 +635,7 @@ EllesmereUI._ELEMENT_SETTINGS_MAP = {
     ["ERB_MirrorBreath"]  = { module = "EllesmereUIResourceBars",       page = "Cast Bar",                     sectionName = "LAYOUT",               preSelectFn = EllesmereUI._SelectCastBar("breath"),  highlightText = "Height" },
     ["ERB_MirrorFatigue"] = { module = "EllesmereUIResourceBars",       page = "Cast Bar",                     sectionName = "LAYOUT",               preSelectFn = EllesmereUI._SelectCastBar("fatigue"), highlightText = "Height" },
     ["ERB_MirrorFeign"]   = { module = "EllesmereUIResourceBars",       page = "Cast Bar",                     sectionName = "LAYOUT",               preSelectFn = EllesmereUI._SelectCastBar("feign"),   highlightText = "Height" },
+    ["ERB_MirrorPvP"]     = { module = "EllesmereUIResourceBars",       page = "Cast Bar",                     sectionName = "LAYOUT",               preSelectFn = EllesmereUI._SelectCastBar("pvp"),     highlightText = "Height" },
 
     -- Action Bars (all share "Bar Display" page; dropdown pre-selected to correct bar)
     ["MainBar"]   = { module = "EllesmereUIActionBars",          page = "Bar Display",                  sectionName = "LAYOUT",  preSelectFn = SelectActionBar("MainBar"),   highlightText = "Icon Size" },
