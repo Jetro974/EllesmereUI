@@ -773,7 +773,6 @@ Hide in All Items
 Hide in preview
 Hide these instead of showing them
 Hides groups that have declined you this session.
-Hides this bar once the game switches to its big golden numbers (under %d seconds), so they show alone.
 Highlights the items your spells can work on (%s). Click a matching item while this mode is on, or Alt-click it. Out of combat only.
 Highmountain
 Hit
@@ -840,6 +839,7 @@ Its Cooldown Manager spells come from the other game client and will not be impo
 Keep Mine
 Keep Raid & Party Frames
 Keeps a saved signup note you can copy into the Sign Up dialog with the Copy button.
+Keeps this bar on screen once the game switches to its big golden numbers (under %d seconds). Off, they show alone, as in the default UI.
 Keybind
 Keybind: %1$s
 Kezan

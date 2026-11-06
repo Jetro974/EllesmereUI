@@ -6277,5 +6277,5 @@ L["Copy all settings from %1$s to %2$s?"] = "Copier tous les réglages de %1$s v
 L["This overwrites this bar's current settings. Its position and enable state are not changed."] = "Cela remplace les réglages actuels de cette barre. Sa position et son activation ne changent pas."
 L["Copy every setting this bar shares with the bar you choose onto this bar."] = "Copie sur cette barre chaque réglage qu'elle partage avec la barre choisie."
 L["Default Color"] = "Couleur par défaut"
-L["Hide Under the Golden Numbers"] = "Masquer sous les chiffres dorés"
-L["Hides this bar once the game switches to its big golden numbers (under %d seconds), so they show alone."] = "Masque cette barre quand le jeu passe à ses gros chiffres dorés (sous %d secondes) : ils s'affichent seuls."
+L["Show Under the Golden Numbers"] = "Afficher sous les chiffres dorés"
+L["Keeps this bar on screen once the game switches to its big golden numbers (under %d seconds). Off, they show alone, as in the default UI."] = "Garde cette barre à l'écran quand le jeu passe à ses gros chiffres dorés (sous %d secondes). Désactivé, ils s'affichent seuls, comme dans l'interface de base."

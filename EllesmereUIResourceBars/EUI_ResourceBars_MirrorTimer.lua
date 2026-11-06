@@ -65,8 +65,9 @@ if START_TYPES and START_TYPES.PlayerCountdown then
         numbersAt = 31 }
 end
 -- numbersAt: the seconds left where the game swaps its bar for its golden
--- numbers (its TimerTracker's mediumMarker for that type); Hide Under the
--- Golden Numbers (hideUnderNumbers) hides ours there too, so they show alone.
+-- numbers (its TimerTracker's mediumMarker for that type). Ours steps aside
+-- there too, so they show alone, unless Show Under the Golden Numbers
+-- (showUnderNumbers) keeps it up to the end.
 for _, K in ipairs(KINDS) do
     if K.startType then START_KIND[K.startType] = K end
 end
@@ -578,7 +579,7 @@ local ticker = EllesmereUI.Tick.NewAnimTicker(tickFrame, function()
                     K.active = nil
                     UpdateVisibility(K)
                 elseif a.endTime and K.numbersAt and not a.underNumbers
-                       and cfg and cfg.hideUnderNumbers and ms < K.numbersAt * 1000 then
+                       and cfg and not cfg.showUnderNumbers and ms < K.numbersAt * 1000 then
                     a.underNumbers = true
                     UpdateVisibility(K)
                 end

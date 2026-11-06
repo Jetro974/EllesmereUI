@@ -69,7 +69,7 @@ local function MirrorTimerDefaults(anchorY, r, g, b)
         lowWarn       = false,   -- red and blinking once lowWarnAt percent is left
         lowWarnAt     = 30,      -- percent of the bar left where the warning starts
         hideBlizzard  = true,    -- Blizzard's bar for this timer goes invisible while this one is on
-        hideUnderNumbers = false, -- countdowns: gone once the game shows its golden numbers
+        showUnderNumbers = false, -- countdowns: kept on under the game's golden numbers
         borderSize    = 1,
         borderR       = 0, borderG = 0, borderB = 0, borderA = 1,
         borderTexture = "solid",
