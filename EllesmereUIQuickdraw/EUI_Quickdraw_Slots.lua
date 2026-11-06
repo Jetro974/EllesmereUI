@@ -520,6 +520,8 @@ do
     -- entry never pays for the walk.
     local byToken, list
 
+    local ENGLISH = (GetLocale() or ""):sub(1, 2) == "en"
+
     local function Build()
         byToken, list = {}, {}
         -- Indexes have gaps, so the walk runs to the client's own ceiling
@@ -530,7 +532,24 @@ do
             -- Several indexes alias one token; the first is the emote's own.
             if type(token) == "string" and type(cmd) == "string"
                and cmd:sub(1, 1) == "/" and not byToken[token] then
-                local name = cmd:sub(2)
+                -- The name is the client's own word for it. Some locales keep
+                -- the English command first and put their own after it (frFR
+                -- HELLO: /hello, /he...), so outside English the first command
+                -- that is not the token itself names the entry; the command
+                -- fired stays the first.
+                local word = cmd
+                if not ENGLISH then
+                    local lower = token:lower()
+                    for c = 1, 9 do
+                        local alt = _G["EMOTE" .. i .. "_CMD" .. c]
+                        if type(alt) ~= "string" then break end
+                        if alt:sub(1, 1) == "/" and alt:sub(2):lower() ~= lower then
+                            word = alt
+                            break
+                        end
+                    end
+                end
+                local name = word:sub(2)
                 -- Capitalised for display only. A first letter outside ASCII
                 -- (a French emote with an accented first letter) is left as typed:
                 -- upper() would not touch it.
