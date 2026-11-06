@@ -520,8 +520,6 @@ do
     -- entry never pays for the walk.
     local byToken, list
 
-    local ENGLISH = (GetLocale() or ""):sub(1, 2) == "en"
-
     local function Build()
         byToken, list = {}, {}
         -- Indexes have gaps, so the walk runs to the client's own ceiling
@@ -532,29 +530,10 @@ do
             -- Several indexes alias one token; the first is the emote's own.
             if type(token) == "string" and type(cmd) == "string"
                and cmd:sub(1, 1) == "/" and not byToken[token] then
-                -- The name is the client's own word for it. Some locales keep
-                -- the English command first and put their own after it (frFR
-                -- HELLO: /hello, /he...), so outside English the first command
-                -- that is not the token itself names the entry; the command
-                -- fired stays the first.
-                local word = cmd
-                if not ENGLISH then
-                    local lower = token:lower()
-                    for c = 1, 9 do
-                        local alt = _G["EMOTE" .. i .. "_CMD" .. c]
-                        if type(alt) ~= "string" then break end
-                        if alt:sub(1, 1) == "/" and alt:sub(2):lower() ~= lower then
-                            word = alt
-                            break
-                        end
-                    end
-                end
-                local name = word:sub(2)
-                -- Capitalised for display only. A first letter outside ASCII
-                -- (a French emote with an accented first letter) is left as typed:
-                -- upper() would not touch it.
-                name = name:sub(1, 1):upper() .. name:sub(2)
-                local rec = { token = token, command = cmd, name = name }
+                -- The entry is named by the command it fires, as the player
+                -- would type it: the client's own, in its language (some
+                -- locales keep an English one first, frFR HELLO among them).
+                local rec = { token = token, command = cmd, name = cmd }
                 byToken[token] = rec
                 list[#list + 1] = rec
             end
@@ -573,12 +552,12 @@ do
         return rec and rec.command
     end
 
-    -- The name drawn on the entry. A token this client does not know still
-    -- names itself, lowercased the way the game's own commands read.
+    -- The name drawn on the entry: its command. A token this client does not
+    -- know still names itself, as a command the way the game's own read.
     ns.EmoteName = function(slot)
         local rec = Emote(slot)
         if rec then return rec.name end
-        return slot and type(slot.token) == "string" and slot.token:lower() or nil
+        return slot and type(slot.token) == "string" and ("/" .. slot.token:lower()) or nil
     end
 
     -- Candidate slots for the picker, one per emote.
