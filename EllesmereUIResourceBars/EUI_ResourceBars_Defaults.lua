@@ -66,7 +66,7 @@ local function MirrorTimerDefaults(anchorY, r, g, b)
         labelR = 1, labelG = 1, labelB = 1, labelA = 1,
         timeSide      = "right", timeSize  = 11, timeX  = 0, timeY  = 0,
         timeR  = 1, timeG  = 1, timeB  = 1, timeA  = 1,
-        lowWarn       = false,   -- slide to red under lowWarnAt, pulse in its last half
+        lowWarn       = false,   -- red and blinking once lowWarnAt percent is left
         lowWarnAt     = 30,      -- percent of the bar left where the warning starts
         hideBlizzard  = true,    -- Blizzard's bar for this timer goes invisible while this one is on
         borderSize    = 1,
