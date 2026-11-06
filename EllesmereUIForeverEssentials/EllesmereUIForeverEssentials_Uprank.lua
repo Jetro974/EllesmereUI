@@ -3,7 +3,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
 --  EllesmereUIForeverEssentials_Uprank.lua  (WoW Forever only)
 --  When a new spell rank is learned, swaps every lower rank of that spell on
---  the action bars for the new one and reports it in chat.
+--  the action bars for the new one, quietly: the game already prints the
+--  spell learned, and the button shows the new rank.
 --  Place New Spells (its cog): a class spell learned for the first time also
 --  goes on the first empty slot of the main action bar, since the WoW Forever
 --  client never places learned spells itself. Passives, higher ranks and
@@ -225,14 +226,15 @@ local function Uprank(newID, line)
             count = count + 1
         end
     end
+    if count > 0 then return end
+    -- The rank once: on WoW Forever the spell link already carries it.
     local rank = C_Spell.GetSpellSubtext(newID)
-    local spell = (C_Spell.GetSpellLink(newID) or name) .. (rank and rank ~= "" and " (" .. rank .. ")" or "")
-    if count > 0 then
-        Report(count == 1 and EllesmereUI.Lf("Upranked %s on 1 action slot.", spell)
-            or EllesmereUI.Lf("Upranked %1$s on %2$d action slots.", spell, count))
-    else
-        PlaceNew(newID, line, spell)
+    local link = C_Spell.GetSpellLink(newID)
+    local spell = link or name
+    if rank and rank ~= "" and not (link and link:find(rank, 1, true)) then
+        spell = spell .. " (" .. rank .. ")"
     end
+    PlaceNew(newID, line, spell)
 end
 
 -- Placing actions needs no combat and an empty cursor; waits for both.
