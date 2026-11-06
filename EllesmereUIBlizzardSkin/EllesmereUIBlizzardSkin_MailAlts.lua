@@ -1,5 +1,4 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
-if EllesmereUI and EllesmereUI.IS_FOREVER then return end -- retail only: WoW Forever's mail window is its own build (gamepad navigation, surnames); the Mail card's ALT LIST section is not built there
 -------------------------------------------------------------------------------
 --  EllesmereUIBlizzardSkin_MailAlts.lua
 --  The Mail card's Alt List (opt-in, EllesmereUIDB.mailAltList): beside the
@@ -38,6 +37,13 @@ if EllesmereUI and EllesmereUI.IS_FOREVER then return end -- retail only: WoW Fo
 --     suggestions open when the player had started typing (Tab or the arrows
 --     can then pick one; a typed key or Escape refreshes or closes them).
 --
+--  WoW Forever (no realms, surnames): a character is kept with its surname,
+--  UnitName's second return there, and mail addresses it as "Name Surname"
+--  (the first name alone is refused); its "realm" is the ruleset
+--  (EllesmereUI.RealmGroupName), and only characters of the same ruleset and
+--  faction can be mailed, so the others are left out or dimmed. The letter
+--  window's close runs InboxFrame:Update there, not InboxFrame_Update.
+--
 --  The panel's look is latched at login with the mail window's own skin
 --  (which applies at login, its style changes needing a reload): EllesmereUI
 --  and Modern draw the window theme (eui <-> modern repaints live), Blizz
@@ -48,6 +54,7 @@ local WSkin = ns.WSkin
 if not WSkin then return end
 
 local EUI = EllesmereUI
+local FOREVER = EUI.IS_FOREVER
 local Theme = WSkin.Theme
 local IsSecret, PlainString = EUI.IsSecret, EUI.PlainString
 local wipe, sort = wipe, table.sort
@@ -125,13 +132,15 @@ end
 local function RecordPlayer()
     local guid = PlainString(UnitGUID("player"))
     if guid then myGuid = guid end
-    local name = PlainString((UnitName("player")))
-    local realm = PlainString(GetRealmName())
+    local name, surname = UnitName("player")
+    name = PlainString(name)
+    local realm = PlainString(FOREVER and EUI.RealmGroupName() or GetRealmName())
     local _, class = UnitClass("player")
     class = PlainString(class)
     if not (guid and name and realm and class) then return end
-    -- The realm as mail addresses it ("Area52"): the normalized name.
-    local realmKey = PlainString(GetNormalizedRealmName()) or (realm:gsub("[%s%-]", ""))
+    -- The realm as mail addresses it ("Area52"): the normalized name. WoW
+    -- Forever has none: the ruleset groups the characters.
+    local realmKey = FOREVER and realm or PlainString(GetNormalizedRealmName()) or (realm:gsub("[%s%-]", ""))
     local roster = Roster()
     if not roster then return end
     local e = roster[guid]
@@ -140,6 +149,7 @@ local function RecordPlayer()
         roster[guid] = e
     end
     e.name, e.realm, e.realmKey, e.class = name, realm, realmKey, class
+    if FOREVER then e.surname = PlainString(surname) end
     local level = UnitLevel("player")
     if type(level) == "number" and not IsSecret(level) and level > 0 then e.level = level end
     local faction = PlainString((UnitFactionGroup("player")))
@@ -163,12 +173,18 @@ end
 --  Minimum Level. Any mail reaches this realm or a connected one, either
 --  faction; Warbound items reach every character on the account.
 -------------------------------------------------------------------------------
+-- This character's realm key, as RecordPlayer stores it.
+local function OwnRealmKey()
+    if FOREVER then return PlainString(EUI.RealmGroupName()) end
+    return PlainString(GetNormalizedRealmName())
+end
+
 local function ConnectedRealms()
     if connected then return connected end
-    local own = PlainString(GetNormalizedRealmName())
+    local own = OwnRealmKey()
     local set = {}
     if own then set[own] = true end
-    local list = C_AutoComplete.GetAutoCompleteRealms()
+    local list = not FOREVER and C_AutoComplete.GetAutoCompleteRealms()
     if type(list) == "table" then
         for i = 1, #list do
             local r = PlainString(list[i])
@@ -209,8 +225,11 @@ local function Collect()
     local me = myGuid or PlainString(UnitGUID("player"))
     local hidden = Hidden()
     local minLevel = NumberSetting("mailAltListMinLevel", DEFAULT_MIN_LEVEL)
+    -- WoW Forever: another ruleset is out of reach altogether.
+    local own = FOREVER and OwnRealmKey()
     for guid, e in pairs(roster) do
-        if guid ~= me and type(e) == "table" and type(e.name) == "string" and e.realmKey then
+        if guid ~= me and type(e) == "table" and type(e.name) == "string" and e.realmKey
+           and (not own or e.realmKey == own) then
             mailable = mailable + 1
             if not (hidden and hidden[guid]) and (e.level or 0) >= minLevel then
                 shown[#shown + 1] = guid
@@ -237,7 +256,8 @@ local function RowEnter(self)
     if self._foreign then head = head .. " - " .. (e.realm or e.realmKey) end
     local text = EUI.HexColor(c.r, c.g, c.b) .. head .. "|r\n" .. Describe(e)
     if self._limited then
-        text = text .. "\n" .. EllesmereUI.L("Only Warbound items can be mailed to this character.")
+        text = text .. "\n" .. (FOREVER and EllesmereUI.L("Your mail cannot reach the other faction.")
+            or EllesmereUI.L("Only Warbound items can be mailed to this character."))
     end
     EUI.ShowWidgetTooltip(self, text .. "\n" .. EUI.COLOR_CODES.DIM
         .. EllesmereUI.L("Click to mail, right-click for options.") .. "|r",
@@ -398,8 +418,9 @@ Paint = function()
     paintedGen = EUI._dmGen
     Collect()
     local roster = Roster()
-    local own = PlainString(GetNormalizedRealmName())
+    local own = OwnRealmKey()
     local realms = ConnectedRealms()
+    local myFaction = FOREVER and paintedFaction
     local n = #shown
     for i = 1, n do
         local guid = shown[i]
@@ -407,11 +428,22 @@ Paint = function()
         local r = rows[i] or NewRow(i)
         local foreign = e.realmKey ~= own
         -- Any mail reaches this realm or a connected one, either faction;
-        -- another realm takes Warbound items only and shows dimmed.
-        local limited = not realms[e.realmKey]
+        -- another realm takes Warbound items only and shows dimmed. WoW
+        -- Forever: the same ruleset only (Collect), and the same faction.
+        local limited
+        if FOREVER then
+            limited = myFaction ~= nil and e.faction ~= nil and e.faction ~= myFaction
+        else
+            limited = not realms[e.realmKey]
+        end
         r._guid, r._foreign, r._limited = guid, foreign, limited
-        -- Mail addresses another realm's character as "Name-Realm".
-        r._target = foreign and (e.name .. "-" .. e.realmKey) or e.name
+        -- Mail addresses another realm's character as "Name-Realm", and a
+        -- WoW Forever character by its full name, "Name Surname".
+        if FOREVER then
+            r._target = e.surname and (e.name .. " " .. e.surname) or e.name
+        else
+            r._target = foreign and (e.name .. "-" .. e.realmKey) or e.name
+        end
         DressIcon(r._icon, e.class)
         local c = EUI.GetClassColor(e.class)
         r._name:SetText(foreign and (e.name .. FOREIGN_SERVER_LABEL) or e.name)
@@ -569,10 +601,18 @@ local function OnInboxUpdate()
 end
 
 local function HookMail()
-    if hooked or type(_G.MailFrameTab_OnClick) ~= "function" or type(_G.InboxFrame_Update) ~= "function" then return end
+    if hooked or type(_G.MailFrameTab_OnClick) ~= "function" then return end
+    -- WoW Forever's inbox is a mixin: its update is InboxFrame:Update.
+    local inbox = _G.InboxFrame
+    local mixinUpdate = type(_G.InboxFrame_Update) ~= "function" and inbox and type(inbox.Update) == "function"
+    if type(_G.InboxFrame_Update) ~= "function" and not mixinUpdate then return end
     hooked = true
     hooksecurefunc("MailFrameTab_OnClick", OnTab)
-    hooksecurefunc("InboxFrame_Update", OnInboxUpdate)
+    if mixinUpdate then
+        hooksecurefunc(inbox, "Update", OnInboxUpdate)
+    else
+        hooksecurefunc("InboxFrame_Update", OnInboxUpdate)
+    end
 end
 
 local function Install()
@@ -621,7 +661,7 @@ function ns.MailAlts.Entries()
                 class = e.class, level = e.level, faction = e.faction }
         end
     end
-    local own = GetRealmName()
+    local own = FOREVER and EUI.RealmGroupName() or GetRealmName()
     sort(out, function(a, b)
         if a.realm ~= b.realm then
             if a.realm == own then return true end
