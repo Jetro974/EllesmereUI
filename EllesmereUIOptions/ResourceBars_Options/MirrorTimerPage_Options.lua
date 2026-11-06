@@ -136,6 +136,97 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
     local RGBA = { "R", "G", "B", "A" }
 
     ---------------------------------------------------------------------------
+    --  Apply All Settings From (as the Unit Frames pages have it): another
+    --  bar's settings copied onto this one after a confirm. Another of these
+    --  bars key for key; the Player Cast Bar through the keys that mean the
+    --  same thing here (its Spell Text is this bar's name text, its Duration
+    --  Text the time). This bar's position and enable switch stay its own.
+    ---------------------------------------------------------------------------
+    local KEEP = { enabled = true, unlockPos = true, anchorX = true, anchorY = true }
+    local CAST_SAME = { "width", "height", "texture", "showSpark",
+        "fillR", "fillG", "fillB", "fillA",
+        "gradientEnabled", "gradientR", "gradientG", "gradientB", "gradientA", "gradientDir",
+        "borderSize", "borderSizePx", "borderR", "borderG", "borderB", "borderA", "borderTexture",
+        "borderTextureOffset", "borderTextureOffsetY", "borderTextureShiftX", "borderTextureShiftY",
+        "borderBehind", "bgR", "bgG", "bgB", "bgA" }
+    local CAST_TEXT = { { mine = "label", theirs = "spellText", show = "showSpellText", side = "left" },
+                        { mine = "time",  theirs = "timer",     show = "showTimer",     side = "right" } }
+    local function CopyFrom(src)
+        local dst, p = C(), DB()
+        if not (dst and p) then return end
+        if src == "cast" then
+            local cb = p.castBar
+            if not cb then return end
+            for _, k in ipairs(CAST_SAME) do dst[k] = cb[k] end
+            for _, t in ipairs(CAST_TEXT) do
+                dst[t.mine .. "Side"] = (cb[t.show] == false) and "none" or (cb[t.theirs .. "Side"] or t.side)
+                for _, suffix in ipairs({ "Size", "X", "Y", "R", "G", "B", "A" }) do
+                    dst[t.mine .. suffix] = cb[t.theirs .. suffix]
+                end
+            end
+        else
+            local from = Bar(src)
+            if not from then return end
+            local keys = {}
+            for k in pairs(from) do keys[k] = true end
+            for k in pairs(dst) do keys[k] = true end
+            for k in pairs(keys) do
+                if type(k) == "string" and not KEEP[k] and k:sub(1, 1) ~= "_" then
+                    local v = from[k]
+                    dst[k] = (type(v) == "table") and EllesmereUI.Lite.DeepCopy(v) or v
+                end
+            end
+        end
+        for _, k in ipairs(ns.MT_KINDS or {}) do
+            if EllesmereUI.NotifyElementResized then EllesmereUI.NotifyElementResized(k.unlock) end
+        end
+        Refresh(); EllesmereUI:RefreshPage(true)
+    end
+    do
+        local ROW_H = 50
+        if not EllesmereUI._prebuilding then
+            local PP = EllesmereUI.PanelPP
+            local mk = EllesmereUI._Pool and EllesmereUI._Pool.CreateFrame or CreateFrame
+            local contentPad = EllesmereUI.CONTENT_PAD or 45
+            local row = mk("Frame", nil, parent)
+            PP.Size(row, parent:GetWidth() - contentPad * 2, ROW_H)
+            PP.Point(row, "TOPLEFT", parent, "TOPLEFT", contentPad, y)
+            local values, order = { [""] = "Choose Bar..." }, {}
+            values.cast = "Player Cast Bar"; order[1] = "cast"
+            for _, k in ipairs(ns.MT_KINDS or {}) do
+                if k.id ~= id then
+                    values[k.id] = ns.MT_Name(k)
+                    order[#order + 1] = k.id
+                end
+            end
+            local label = EllesmereUI.MakeFont(row, 14, nil, 1, 1, 1)
+            label:SetText(EllesmereUI.L("Apply All Settings From"))
+            label:SetTextColor(1, 1, 1, 0.6)
+            local DD_W, GAP = 180, 12
+            local dd = EllesmereUI.BuildDropdownControl(row, DD_W, row:GetFrameLevel() + 2, values, order,
+                function() return "" end,
+                function(src)
+                    if src == "" then return end
+                    EllesmereUI:ShowConfirmPopup({
+                        title = "Apply All Settings",
+                        message = EllesmereUI.Lf("Copy all settings from %1$s to %2$s?",
+                            EllesmereUI.L(values[src]), ns.MT_Name(K)),
+                        disclaimer = "This overwrites this bar's current settings. Its position and enable state are not changed.",
+                        confirmText = "Apply",
+                        cancelText = "Cancel",
+                        onConfirm = function() CopyFrom(src) end,
+                    })
+                end)
+            dd._ttText = "Copy every setting this bar shares with the bar you choose onto this bar."
+            EllesmereUI.RegisterWidgetRefresh(function() dd._refreshLabel() end)
+            local totalW = label:GetStringWidth() + GAP + DD_W
+            label:SetPoint("LEFT", row, "CENTER", -totalW / 2, 0)
+            dd:SetPoint("LEFT", label, "RIGHT", GAP, 0)
+        end
+        y = y - ROW_H
+    end
+
+    ---------------------------------------------------------------------------
     --  LAYOUT
     ---------------------------------------------------------------------------
     local layoutSection
