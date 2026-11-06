@@ -54,6 +54,10 @@ local CONTEXTS = {
         icon  = 7808147,
         label = "Near a Campfire",
         seed  = {
+            -- Cooking, by position (the menu's Professions entries): every
+            -- recipe the game makes wait for a fire is a cooking one, and a
+            -- character without Cooking simply does not see it.
+            { kind = "dynamicprofession", index = 3 },
             { kind = "emote", token = "SIT" },
             { kind = "emote", token = "HELLO" },
             -- Purple Dust Pouch, the toy that turns a campfire purple. Hidden
