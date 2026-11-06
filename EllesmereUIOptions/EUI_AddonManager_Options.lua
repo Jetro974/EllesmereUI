@@ -703,6 +703,7 @@ local function CreateWindow()
     apply:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -86)
     EllesmereUI.MakeStyledButton(apply, "Apply and Reload", 12, EllesmereUI.RB_COLOURS, function()
         if InCombatLockdown() or #AM.Pending() == 0 then return end
+        f.applying = true
         EllesmereUI.RequestReload(nil, nil, AM.ApplyNative)
     end)
     function f.RefreshApply()
@@ -775,7 +776,27 @@ local function CreateWindow()
     f:SetScript("OnEvent", function(self) self.RefreshApply() end)
     f:SetScript("OnShow", function(self)
         self:Raise()
+        AM.BeginEdit()
         self.Rebuild()
+    end)
+    -- Closing: a change only counts once applied (EllesmereUI_AddonManager.lua,
+    -- "Editing"). Apply and reload, or it goes back to what it was.
+    f:SetScript("OnHide", function(self)
+        if self.applying then return end
+        if not AM.Edited() or #AM.Pending() == 0 then
+            AM.EndEdit(true)
+            return
+        end
+        EllesmereUI:ShowConfirmPopup({
+            title = EllesmereUI.L("Addon Manager"),
+            message = EllesmereUI.L("Your changes only apply after a reload. Apply them and reload now? Otherwise they are discarded."),
+            confirmText = EllesmereUI.L("Apply and Reload"),
+            cancelText = EllesmereUI.L("Discard Changes"),
+            confirmDisabled = InCombatLockdown(),
+            reload = true,
+            onConfirm = AM.ApplyNative,
+            onCancel = function() AM.EndEdit(false) end,
+        })
     end)
     EllesmereUI.RegisterEscapeClose(f)
     return f

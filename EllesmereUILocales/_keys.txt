@@ -1902,3 +1902,5 @@ your house of the Guild: the roster fills itself.
 |cffff4444Delete Macro|r
 |cffff6060[EllesmereUI]|r A profile named \
 |cffff6060[EllesmereUI]|r Cannot rename to \
+Your changes only apply after a reload. Apply them and reload now? Otherwise they are discarded.
+Discard Changes
