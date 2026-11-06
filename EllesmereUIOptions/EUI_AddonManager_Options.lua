@@ -590,6 +590,7 @@ local function CreateWindow()
     local toggle, applyVisual, snapToState
     toggle, applyVisual, snapToState = EllesmereUI.BuildToggleControl(f, lvl + 3, Enabled, function(v)
         AM.SetEnabled(v)
+        AM.BeginEdit() -- switched on here: nothing was kept at opening
         f.Rebuild()
     end)
     toggle:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -48)
