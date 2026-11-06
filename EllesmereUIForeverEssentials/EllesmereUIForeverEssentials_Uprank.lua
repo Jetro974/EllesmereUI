@@ -3,7 +3,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
 --  EllesmereUIForeverEssentials_Uprank.lua  (WoW Forever only)
 --  When a new spell rank is learned, swaps every lower rank of that spell on
---  the action bars for the new one and reports it in chat.
+--  the action bars for the new one, quietly: the game already prints the
+--  spell learned, and the button shows the new rank.
 --  Place New Spells (its cog): a class spell learned for the first time also
 --  goes on the first empty slot of the main action bar, since the WoW Forever
 --  client never places learned spells itself. Passives, higher ranks and
@@ -47,8 +48,14 @@ end
 -- The main bar's shown buttons and the slots they show right now: a stance,
 -- form or stealth pages the bar (a warrior never shows slots 1-12), so the
 -- slot is read off the button (EUI's bars, then Blizzard's), up to the last
--- button shown (a bar can show fewer than 12). In a vehicle, or with another
--- bar addon: slots 1-12 and no button.
+-- button the bar holds (EUI's can hold fewer than 12). An empty button is
+-- hidden unless empty buttons are shown, so it counts while its bar is shown.
+-- In a vehicle, or with another bar addon: slots 1-12 and no button.
+local function OnShownBar(btn)
+    local bar = btn and btn:GetParent()
+    return bar ~= nil and bar:IsVisible()
+end
+
 local function MainBar()
     local list = {}
     local vehicle = (HasVehicleActionBar and HasVehicleActionBar())
@@ -56,11 +63,12 @@ local function MainBar()
     if not vehicle then
         for i = 1, MAIN_BAR_SLOTS do
             local btn, slot = _G["EABButton" .. i], nil
-            if btn and btn:IsVisible() then
+            -- eab-withincutoff 0: past the number of buttons the bar shows.
+            if OnShownBar(btn) and btn:GetAttribute("eab-withincutoff") ~= 0 then
                 slot = Plain(btn:GetAttribute("action"))
             else
                 btn = _G["ActionButton" .. i]
-                if btn and btn:IsVisible() then slot = Plain(btn.action) end
+                if OnShownBar(btn) then slot = Plain(btn.action) end
             end
             if not slot then break end
             list[i] = { index = i, slot = slot, button = btn }
@@ -77,10 +85,12 @@ end
 -- and fades. Our own frames only (pooled); Blizzard's are only read for
 -- their position. Several spells learned at once fly one after the other.
 local FLY_SIZE = 44
+local APPEAR, TRAVEL, LAND = 0.25, 1.1, 0.35 -- seconds
 local flyers, flights = {}, 0
 
-local function Center(frame)
-    if not (frame and frame:IsVisible()) then return end
+-- anyShown: the frame may be hidden (a button just filled shows a frame later).
+local function Center(frame, anyShown)
+    if not (frame and (anyShown or frame:IsVisible())) then return end
     local x, y = frame:GetCenter()
     if not x then return end
     local s = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
@@ -108,26 +118,35 @@ local function NewFlyer()
 
     local path = f:CreateAnimationGroup()
     -- Alpha 1 -> 1: holds the frame while the icon appears, then while it pops.
-    local hold = Step(path, "Alpha", 1, 0.15)
+    local hold = Step(path, "Alpha", 1, APPEAR)
     hold:SetFromAlpha(1); hold:SetToAlpha(1)
-    f.move = Step(path, "Translation", 2, 0.6)
+    f.move = Step(path, "Translation", 2, TRAVEL)
     f.move:SetSmoothing("IN_OUT")
-    hold = Step(path, "Alpha", 3, 0.25)
+    -- Landed: the button's own icon comes back as this one pops over it.
+    f.move:SetScript("OnFinished", function() f.Land() end)
+    hold = Step(path, "Alpha", 3, LAND)
     hold:SetFromAlpha(1); hold:SetToAlpha(1)
-    path:SetScript("OnFinished", function()
+    function f.Land()
+        if f.target then f.target:SetAlpha(1) end
+        f.target = nil
+    end
+    local function Done()
+        f.Land()
         f:Hide()
         flyers[#flyers + 1] = f
-    end)
+    end
+    path:SetScript("OnFinished", Done)
+    path:SetScript("OnStop", Done)
 
     local look = inner:CreateAnimationGroup()
     look:SetToFinalAlpha(true)
-    local fadeIn = Step(look, "Alpha", 1, 0.15)
+    local fadeIn = Step(look, "Alpha", 1, APPEAR)
     fadeIn:SetFromAlpha(0); fadeIn:SetToAlpha(1)
-    f.shrink = Step(look, "Scale", 2, 0.6)
+    f.shrink = Step(look, "Scale", 2, TRAVEL)
     f.shrink:SetSmoothing("IN_OUT")
-    local pop = Step(look, "Scale", 3, 0.25)
+    local pop = Step(look, "Scale", 3, LAND)
     pop:SetScaleFrom(1, 1); pop:SetScaleTo(1.35, 1.35)
-    local fadeOut = Step(look, "Alpha", 3, 0.25)
+    local fadeOut = Step(look, "Alpha", 3, LAND)
     fadeOut:SetFromAlpha(1); fadeOut:SetToAlpha(0)
 
     f.path, f.look = path, look
@@ -135,22 +154,30 @@ local function NewFlyer()
 end
 
 local function Fly(spellID, button)
-    local tx, ty, tw = Center(button)
-    if not tx then return end
     local sx, sy = Center(ClassTrainerTrainButton)
     if not sx then sx, sy = Center(ClassTrainerFrame) end
     if not sx then sx, sy = Center(PlayerSpellsFrame or SpellBookFrame) end
     if not sx then sx, sy = UIParent:GetWidth() / 2, UIParent:GetHeight() / 2 end
-    local f = table.remove(flyers) or NewFlyer()
-    f.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
-    f:ClearAllPoints()
-    f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", sx, sy)
-    f:SetSize(tw, tw)
-    f.move:SetOffset(tx - sx, ty - sy)
-    local r = FLY_SIZE / tw
-    f.shrink:SetScaleFrom(r, r); f.shrink:SetScaleTo(1, 1)
+    -- The spell is already on the button: its icon waits for this one to land.
+    local target = button.icon or button.Icon
+    if target then target:SetAlpha(0) end
     flights = flights + 1
-    C_Timer.After((flights - 1) * 0.2, function()
+    C_Timer.After((flights - 1) * 0.3, function()
+        -- Read when it flies: the button it lands on may only now be laid out.
+        local tx, ty, tw = Center(button, true)
+        if not tx or tw <= 0 then
+            if target then target:SetAlpha(1) end
+            return
+        end
+        local f = table.remove(flyers) or NewFlyer()
+        f.target = target
+        f.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
+        f:ClearAllPoints()
+        f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", sx, sy)
+        f:SetSize(tw, tw)
+        f.move:SetOffset(tx - sx, ty - sy)
+        local r = FLY_SIZE / tw
+        f.shrink:SetScaleFrom(r, r); f.shrink:SetScaleTo(1, 1)
         f:Show()
         f.path:Play()
         f.look:Play()
@@ -168,9 +195,14 @@ local function PlaceNew(newID, line, spell)
             PlaceAction(item.slot)
             ClearCursor()
             if not HasAction(item.slot) then return end
-            -- The button's number on the bar, not the paged slot (73 in a stance).
-            Report(EllesmereUI.Lf("Placed %1$s on action slot %2$d.", spell, item.index))
-            if item.button then Fly(newID, item.button) end
+            -- The fly-in already shows where it went; chat only says so when
+            -- there is no button to fly to (vehicle, another bar addon). The
+            -- button's number on the bar, not the paged slot (73 in a stance).
+            if item.button then
+                Fly(newID, item.button)
+            else
+                Report(EllesmereUI.Lf("Placed %1$s on action slot %2$d.", spell, item.index))
+            end
             return
         end
     end
@@ -194,14 +226,15 @@ local function Uprank(newID, line)
             count = count + 1
         end
     end
+    if count > 0 then return end
+    -- The rank once: on WoW Forever the spell link already carries it.
     local rank = C_Spell.GetSpellSubtext(newID)
-    local spell = (C_Spell.GetSpellLink(newID) or name) .. (rank and rank ~= "" and " (" .. rank .. ")" or "")
-    if count > 0 then
-        Report(count == 1 and EllesmereUI.Lf("Upranked %s on 1 action slot.", spell)
-            or EllesmereUI.Lf("Upranked %1$s on %2$d action slots.", spell, count))
-    else
-        PlaceNew(newID, line, spell)
+    local link = C_Spell.GetSpellLink(newID)
+    local spell = link or name
+    if rank and rank ~= "" and not (link and link:find(rank, 1, true)) then
+        spell = spell .. " (" .. rank .. ")"
     end
+    PlaceNew(newID, line, spell)
 end
 
 -- Placing actions needs no combat and an empty cursor; waits for both.
