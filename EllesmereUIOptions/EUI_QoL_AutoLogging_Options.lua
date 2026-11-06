@@ -78,6 +78,22 @@ local function SetWay(key, value)
     EllesmereUIDB.waypointCmd[key] = value
 end
 
+-- Reading creates nothing; only a change writes the table.
+local function MailExpiryOn(key)
+    local db = EllesmereUIDB
+    return db ~= nil and db.mailExpiry ~= nil and db.mailExpiry[key] == true
+end
+
+local function MailExpiryCfg()
+    if not EllesmereUIDB then return {} end
+    EllesmereUIDB.mailExpiry = EllesmereUIDB.mailExpiry or {}
+    return EllesmereUIDB.mailExpiry
+end
+
+local function ApplyMailExpiry()
+    if _G._EUI_ApplyMailExpiry then _G._EUI_ApplyMailExpiry() end
+end
+
 -- Built as the tail of the Quality of Life page (chained from BuildQoLPage),
 -- not as its own tab. Lays out from yOffset and returns the height used,
 -- like every other section builder.
@@ -343,6 +359,45 @@ local function BuildAutoLoggingPage(pageName, parent, yOffset)
         local alertsH = _G._EUI_BuildAlertsSection(parent, y, W, EllesmereUI.PP)
         y = y - alertsH
     end
+
+    ---------------------------------------------------------------------------
+    --  MAILBOX (runtime in EllesmereUIQoL_MailExpiry.lua and _MailPostage.lua)
+    ---------------------------------------------------------------------------
+    _, h = W:SectionHeader(parent, "MAILBOX", y); y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type    = "toggle",
+          text    = "Mail Expiry Warning",
+          tooltip = "When you open the mailbox, warns in chat about mail with gold or items that expires within 3 days.",
+          getValue = function() return MailExpiryOn("warning") end,
+          setValue = function(v)
+              MailExpiryCfg().warning = v
+              ApplyMailExpiry()
+          end },
+        { type    = "toggle",
+          text    = "Alt Mail Expiry Reminder",
+          tooltip = "The mailbox remembers when each character's first mail expires. At login, one chat line names the characters whose mail expires within 3 days. A character is remembered once its mailbox has been opened with this on.",
+          getValue = function() return MailExpiryOn("alts") end,
+          setValue = function(v)
+              MailExpiryCfg().alts = v
+              ApplyMailExpiry()
+          end }
+    ); y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type    = "toggle",
+          text    = "Postage Warning",
+          tooltip = "A line under the Send Mail window when the attached items sell to a vendor for less than the postage. Nothing is blocked.",
+          getValue = function() return EllesmereUIDB ~= nil and EllesmereUIDB.mailPostageWarn == true end,
+          setValue = function(v)
+              if not EllesmereUIDB then return end
+              EllesmereUIDB.mailPostageWarn = v or nil
+              if _G._EUI_ApplyMailPostage then _G._EUI_ApplyMailPostage() end
+          end },
+        EllesmereUI.BlankRowCfg()
+    ); y = y - h
+
+    _, h = W:Spacer(parent, y, 20); y = y - h
 
     ---------------------------------------------------------------------------
     --  BATTLE RES (no shared battle res charges on WoW Forever: the indicator
