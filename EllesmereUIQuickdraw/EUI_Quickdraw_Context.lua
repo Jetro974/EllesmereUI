@@ -58,6 +58,9 @@ local CONTEXTS = {
             -- recipe the game makes wait for a fire is a cooking one, and a
             -- character without Cooking simply does not see it.
             { kind = "dynamicprofession", index = 3 },
+            -- The campsite accessories carried right now (the professions'
+            -- pieces placed by a campfire), one cell each.
+            { kind = "campsite" },
             { kind = "emote", token = "SIT" },
             { kind = "emote", token = "HELLO" },
             -- Purple Dust Pouch, the toy that turns a campfire purple. Hidden
@@ -174,6 +177,8 @@ local function OpenFromHint(index)
         ns.Close()
         return
     end
+    -- What the bags hold now (Campsite Items is a view on them).
+    if I.usableMemo then wipe(I.usableMemo) end
     ns.Open(index)
     if not view:GetFrame():IsShown() then return end
     pickerFor = index
@@ -253,7 +258,11 @@ end
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:SetScript("OnEvent", function(_, event)
-    if event == "PLAYER_REGEN_DISABLED" then
+    if event == "BAG_UPDATE_DELAYED" then
+        -- Campsite Items follows the bags while a context menu is up for grabs.
+        if next(active) then RequestPush() end
+        return
+    elseif event == "PLAYER_REGEN_DISABLED" then
         fighting = true
     elseif event == "PLAYER_REGEN_ENABLED" then
         fighting = false
@@ -283,6 +292,7 @@ function ns.ContextRefresh()
             eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
             eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
             eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+            eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
             fighting = InCombatLockdown() and true or false
         else
             eventFrame:UnregisterAllEvents()
