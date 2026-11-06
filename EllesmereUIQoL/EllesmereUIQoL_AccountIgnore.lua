@@ -15,7 +15,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  the game's lists; a player removed from the account list leaves the game's
 --  list of each character as it logs in (EllesmereUIDB.accountIgnore.gone).
 --  Warn About Ignored Players (EllesmereUIDB.ignoredAlertEnabled) shows an
---  EllesmereUIQoL_Alerts line when someone on the list is in your group.
+--  EllesmereUIQoL_Alerts line when someone on the list invites you (the
+--  invite is still declined) or is in your group.
 --
 --  Taint: nothing of Blizzard's is written. The chat filter only returns true
 --  for a line to hide; the declines call the game's own functions from our
@@ -230,9 +231,11 @@ ev:SetScript("OnEvent", function(_, event, ...)
     elseif event == "GROUP_ROSTER_UPDATE" then
         CheckGroup()
     elseif event == "PARTY_INVITE_REQUEST" then
-        if Listed(Key((...))) then
+        local key = Key((...))
+        if Listed(key) then
             DeclineGroup()
             StaticPopup_Hide("PARTY_INVITE")
+            if AlertOn() then Warn(key) end
         end
     elseif event == "GUILD_INVITE_REQUEST" then
         if Listed(Key((...))) then

@@ -78,7 +78,7 @@ local function BuildAccountIgnoreSection(parent, y)
 
     _, h = W:DualRow(parent, y,
         { type="toggle", text="Warn About Ignored Players",
-          tooltip="Shows an alert when a player on your list is in your group.",
+          tooltip="Shows an alert when a player on your list invites you (the invite is still declined) or is in your group.",
           disabled=Off, disabledTooltip=REQ,
           getValue=function() return EllesmereUIDB and EllesmereUIDB.ignoredAlertEnabled or false end,
           setValue=function(v)

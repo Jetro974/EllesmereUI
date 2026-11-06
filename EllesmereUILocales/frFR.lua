@@ -6577,7 +6577,7 @@ L["One ignore list for all your characters, with no limit. A player on it is blo
 L["Ignored Players"] = "Joueurs ignorés"
 L["Untick a player to remove them from all your characters."] = "Décochez un joueur pour le retirer de tous vos personnages."
 L["Warn About Ignored Players"] = "Alerte joueurs ignorés"
-L["Shows an alert when a player on your list is in your group."] = "Affiche une alerte quand un joueur de votre liste se trouve dans votre groupe."
+L["Shows an alert when a player on your list invites you (the invite is still declined) or is in your group."] = "Affiche une alerte quand un joueur de votre liste vous invite (l'invitation reste refusée) ou se trouve dans votre groupe."
 L["Add Player"] = "Ajouter un joueur"
 L["Name, or Name-Realm for another realm."] = "Nom, ou Nom-Royaume pour un autre royaume."
 L["%s is on your ignore list"] = "%s est dans votre liste des ignorés"
