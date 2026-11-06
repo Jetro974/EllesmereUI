@@ -6265,3 +6265,6 @@ L["Apply Fill Color to all Bars"] = "Appliquer la couleur de remplissage à tout
 L["Apply Bar Texture to all Bars"] = "Appliquer la texture de barre à toutes les barres"
 L["Apply Label Text to all Bars"] = "Appliquer le texte du nom à toutes les barres"
 L["Apply Low Warning to all Bars"] = "Appliquer l'alerte niveau bas à toutes les barres"
+L["Battle Start"] = "Début de la bataille"
+L["Enable Battle Start Bar"] = "Activer la barre de début de bataille"
+L["Battle Start Bar Position"] = "Position de la barre de début de bataille"
