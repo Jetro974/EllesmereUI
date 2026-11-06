@@ -7,8 +7,8 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  spell learned, and the button shows the new rank.
 --  Place New Spells (its cog): a class spell learned for the first time also
 --  goes on the first empty slot of the main action bar, since the WoW Forever
---  client never places learned spells itself. Passives, higher ranks and
---  spells already on a bar are left alone. It goes on the page the bar shows
+--  client never places learned spells itself. Passives, higher ranks,
+--  profession spells and spells already on a bar are left alone. It goes on the page the bar shows
 --  (stances and forms page it) and its icon glides there from the trainer.
 -------------------------------------------------------------------------------
 local _, module = ...
@@ -34,6 +34,25 @@ local function RankAboveOne(id)
     if type(text) ~= "string" or issecretvalue(text) then return false end
     local n = tonumber(text:match("%d+"))
     return n ~= nil and n > 1
+end
+
+-- A spell of one of the player's professions (primary, cooking, fishing...):
+-- its spellbook block, read the way Quickdraw reads it (EUI_Quickdraw_Slots).
+local function IsProfessionSpell(id)
+    if not (GetProfessions and GetProfessionInfo) then return false end
+    local bank = Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player
+    local books = { GetProfessions() }
+    for i = 1, 5 do  -- holes for the missing ones, so no ipairs
+        local book = books[i]
+        if book then
+            local _, _, _, _, numSpells, offset = GetProfessionInfo(book)
+            for n = 1, (numSpells or 0) do
+                local info = C_SpellBook.GetSpellBookItemInfo(n + (offset or 0), bank)
+                if info and info.spellID == id then return true end
+            end
+        end
+    end
+    return false
 end
 
 local function OnBars(id)
@@ -187,7 +206,8 @@ end
 -- The first empty slot of the main action bar gets the new spell.
 local function PlaceNew(newID, line, spell)
     if not F.Get("placeNew") or line == GENERAL_SKILL_LINE then return end
-    if C_Spell.IsSpellPassive(newID) or RankAboveOne(newID) or OnBars(newID) then return end
+    if C_Spell.IsSpellPassive(newID) or RankAboveOne(newID) or OnBars(newID)
+       or IsProfessionSpell(newID) then return end
     for _, item in ipairs(MainBar()) do
         if not HasAction(item.slot) then
             C_Spell.PickupSpell(newID)
