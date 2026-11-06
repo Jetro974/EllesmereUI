@@ -444,8 +444,8 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
             disabledTooltip = function() return off() and TIP or "Low Warning" end,
             title = "Low Warning",
             rows = {
-                { type = "slider", label = "Warning Starts At", min = 10, max = 90, step = 5,
-                  tooltip = "How much of the bar is left when it starts turning red, in percent. It blinks over the last half of that.",
+                { type = "slider", label = "Warn When Left", min = 10, max = 90, step = 5,
+                  tooltip = "The warning starts when this much of the bar is left, in percent: the bar turns half red at once, fully red as it empties, and blinks once half of that is left.",
                   get = Get("lowWarnAt", 30), set = Set("lowWarnAt") },
             },
         })

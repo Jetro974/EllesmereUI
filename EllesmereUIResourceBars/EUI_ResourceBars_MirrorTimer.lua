@@ -414,7 +414,9 @@ local function Paint(obj, cfg, frac, seconds, rising, still)
     local alpha = 1
     local start = (cfg.lowWarnAt or 30) / 100
     if cfg.lowWarn and not rising and start > 0 and frac < start then
-        local t = 1 - frac / start   -- 0 at the threshold, 1 empty
+        -- Half way to red the moment the threshold is crossed (a slow slide
+        -- from the bar's colour went unseen), fully red when empty.
+        local t = 0.5 + 0.5 * (1 - frac / start)
         r = r + (WARN_R - r) * t
         g = g + (WARN_G - g) * t
         b = b + (WARN_B - b) * t
