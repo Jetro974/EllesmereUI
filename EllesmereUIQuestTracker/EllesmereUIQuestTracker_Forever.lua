@@ -733,10 +733,21 @@ local function ProgressOn()
         or Cfg("announceProgress")
 end
 
+-- Chat refuses the |4singular:plural; escape some locales put in objective
+-- texts (frFR "1/1 |4personnage tue:personnages tues;"): each one is resolved
+-- against the number just before it, as the game draws it.
+local function ResolvePlurals(text)
+    text = text:gsub("(%d+)([^|%d]*)|4([^:;]*):([^;]*);", function(n, between, one, many)
+        return n .. between .. (tonumber(n) == 1 and one or many)
+    end)
+    return (text:gsub("|4[^:;]*:([^;]*);", "%1"))
+end
+
 -- A finished objective, with a quest link. Party or instance group only; never
 -- raids, never in chat lockdown.
 local function Announce(questID, text)
     if not Cfg("announceProgress") or not text or text == "" then return end
+    text = ResolvePlurals(text)
     local quest = GetQuestLink(questID) or C_QuestLog.GetTitleForQuestID(questID) or ""
     local msg = "[EUI] " .. quest .. ": " .. text
     -- Dev mode: local chat frame only, so it can be tested solo.
