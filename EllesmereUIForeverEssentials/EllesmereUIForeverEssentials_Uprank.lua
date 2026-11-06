@@ -168,9 +168,14 @@ local function PlaceNew(newID, line, spell)
             PlaceAction(item.slot)
             ClearCursor()
             if not HasAction(item.slot) then return end
-            -- The button's number on the bar, not the paged slot (73 in a stance).
-            Report(EllesmereUI.Lf("Placed %1$s on action slot %2$d.", spell, item.index))
-            if item.button then Fly(newID, item.button) end
+            -- The fly-in already shows where it went; chat only says so when
+            -- there is no button to fly to (vehicle, another bar addon). The
+            -- button's number on the bar, not the paged slot (73 in a stance).
+            if item.button then
+                Fly(newID, item.button)
+            else
+                Report(EllesmereUI.Lf("Placed %1$s on action slot %2$d.", spell, item.index))
+            end
             return
         end
     end
