@@ -132,6 +132,28 @@ local function PlaceHint()
         (pos and pos.x) or HINT_X, (pos and pos.y) or HINT_Y)
 end
 PlaceHint()
+
+-- Shift + Left-Click and drag moves it, the house way (the Damage Meters
+-- strips, the minimap buttons); the same spot Unlock Mode stores.
+hint:SetMovable(true)
+hint:SetClampedToScreen(true)
+hint:SetScript("OnMouseDown", function(self, button)
+    if button == "LeftButton" and IsShiftKeyDown() and not InCombatLockdown() then
+        self.dragging = true
+        self:StartMoving()
+    end
+end)
+hint:SetScript("OnMouseUp", function(self)
+    if not self.dragging then return end
+    self.dragging = nil
+    self:StopMovingOrSizing()
+    local cx, cy = self:GetCenter()
+    local ux, uy = UIParent:GetCenter()
+    local p = P()
+    if p and cx and ux then p.contextHintPos = { x = cx - ux, y = cy - uy } end
+    PlaceHint()
+    self.dragged = true -- the click this release makes opens nothing
+end)
 hint:SetFrameStrata("MEDIUM")
 hint:RegisterForClicks("LeftButtonUp")
 hint:Hide()
@@ -222,6 +244,10 @@ end
 
 hint:SetScript("OnClick", function(self)
     GameTooltip:Hide()
+    if self.dragged or IsShiftKeyDown() then
+        self.dragged = nil
+        return
+    end
     if self.palette then OpenFromHint(self.palette) end
 end)
 -- Below the hint and its key: the menu opens round the cursor, which is on it.
@@ -232,6 +258,7 @@ hint:SetScript("OnEnter", function(self)
     GameTooltip:SetPoint("TOP", self, "BOTTOM", 0, -18)
     GameTooltip:SetText(EllesmereUI.L(CONTEXTS[self.contextKey].label))
     GameTooltip:AddLine(EllesmereUI.L("Click to open this menu."), 1, 1, 1, true)
+    GameTooltip:AddLine(EllesmereUI.L("Reposition this element with Shift+Click and Drag."), 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
 end)
 hint:SetScript("OnLeave", function() GameTooltip:Hide() end)
