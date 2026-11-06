@@ -84,6 +84,7 @@ end
 -- and fades. Our own frames only (pooled); Blizzard's are only read for
 -- their position. Several spells learned at once fly one after the other.
 local FLY_SIZE = 44
+local APPEAR, TRAVEL, LAND = 0.25, 1.1, 0.35 -- seconds
 local flyers, flights = {}, 0
 
 -- anyShown: the frame may be hidden (a button just filled shows a frame later).
@@ -116,26 +117,35 @@ local function NewFlyer()
 
     local path = f:CreateAnimationGroup()
     -- Alpha 1 -> 1: holds the frame while the icon appears, then while it pops.
-    local hold = Step(path, "Alpha", 1, 0.15)
+    local hold = Step(path, "Alpha", 1, APPEAR)
     hold:SetFromAlpha(1); hold:SetToAlpha(1)
-    f.move = Step(path, "Translation", 2, 0.6)
+    f.move = Step(path, "Translation", 2, TRAVEL)
     f.move:SetSmoothing("IN_OUT")
-    hold = Step(path, "Alpha", 3, 0.25)
+    -- Landed: the button's own icon comes back as this one pops over it.
+    f.move:SetScript("OnFinished", function() f.Land() end)
+    hold = Step(path, "Alpha", 3, LAND)
     hold:SetFromAlpha(1); hold:SetToAlpha(1)
-    path:SetScript("OnFinished", function()
+    function f.Land()
+        if f.target then f.target:SetAlpha(1) end
+        f.target = nil
+    end
+    local function Done()
+        f.Land()
         f:Hide()
         flyers[#flyers + 1] = f
-    end)
+    end
+    path:SetScript("OnFinished", Done)
+    path:SetScript("OnStop", Done)
 
     local look = inner:CreateAnimationGroup()
     look:SetToFinalAlpha(true)
-    local fadeIn = Step(look, "Alpha", 1, 0.15)
+    local fadeIn = Step(look, "Alpha", 1, APPEAR)
     fadeIn:SetFromAlpha(0); fadeIn:SetToAlpha(1)
-    f.shrink = Step(look, "Scale", 2, 0.6)
+    f.shrink = Step(look, "Scale", 2, TRAVEL)
     f.shrink:SetSmoothing("IN_OUT")
-    local pop = Step(look, "Scale", 3, 0.25)
+    local pop = Step(look, "Scale", 3, LAND)
     pop:SetScaleFrom(1, 1); pop:SetScaleTo(1.35, 1.35)
-    local fadeOut = Step(look, "Alpha", 3, 0.25)
+    local fadeOut = Step(look, "Alpha", 3, LAND)
     fadeOut:SetFromAlpha(1); fadeOut:SetToAlpha(0)
 
     f.path, f.look = path, look
@@ -147,12 +157,19 @@ local function Fly(spellID, button)
     if not sx then sx, sy = Center(ClassTrainerFrame) end
     if not sx then sx, sy = Center(PlayerSpellsFrame or SpellBookFrame) end
     if not sx then sx, sy = UIParent:GetWidth() / 2, UIParent:GetHeight() / 2 end
+    -- The spell is already on the button: its icon waits for this one to land.
+    local target = button.icon or button.Icon
+    if target then target:SetAlpha(0) end
     flights = flights + 1
-    C_Timer.After((flights - 1) * 0.2, function()
+    C_Timer.After((flights - 1) * 0.3, function()
         -- Read when it flies: the button it lands on may only now be laid out.
         local tx, ty, tw = Center(button, true)
-        if not tx or tw <= 0 then return end
+        if not tx or tw <= 0 then
+            if target then target:SetAlpha(1) end
+            return
+        end
         local f = table.remove(flyers) or NewFlyer()
+        f.target = target
         f.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
         f:ClearAllPoints()
         f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", sx, sy)
