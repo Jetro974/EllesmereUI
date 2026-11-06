@@ -34,6 +34,78 @@ local PAGE_RAIDTOOLS = "Raid Tools"
 local transformsPopup
 local transformsStaged = {}
 
+-------------------------------------------------------------------------------
+--  ACCOUNT IGNORE LIST section of the QoL page (runtime:
+--  EllesmereUIQoL_AccountIgnore.lua, EllesmereUI._AccountIgnore)
+-------------------------------------------------------------------------------
+local function BuildAccountIgnoreSection(parent, y)
+    local AI = EllesmereUI._AccountIgnore
+    if not AI then return y end
+    local W = EllesmereUI.Widgets
+    local REQ = "Account Ignore List"
+    local _, h, row
+    local function Off() return not AI.Enabled() end
+
+    _, h = W:SectionHeader(parent, "ACCOUNT IGNORE LIST", y);  y = y - h
+
+    row, h = W:DualRow(parent, y,
+        { type="toggle", text="Account Ignore List",
+          tooltip="One ignore list for all your characters, with no limit. A player on it is blocked on every character: their chat lines are hidden (guild chat aside) and their group invites, guild invites, duels and trades are declined. Players you ignore through the game join it. The list shows beside the game's Ignore window.",
+          getValue=AI.Enabled,
+          setValue=function(v)
+              AI.SetEnabled(v)
+              EllesmereUI:RefreshPage()
+          end },
+        { type="dropdown", text="Ignored Players",
+          tooltip="Untick a player to remove them from all your characters.",
+          disabled=Off, disabledTooltip=REQ,
+          values={ __placeholder="..." }, order={ "__placeholder" },
+          getValue=function() return "__placeholder" end, setValue=function() end }
+    );  y = y - h
+
+    -- The checkbox dropdown in place of the row's placeholder.
+    if not EllesmereUI._prebuilding then
+        local rgn = row._rightRegion
+        if rgn._control then rgn._control:Hide() end
+        local dd, refresh = EllesmereUI.BuildVisOptsCBDropdown(rgn, 220, rgn:GetFrameLevel() + 2, AI.Items,
+            AI.IsListed, AI.SetListed, nil, 10, true, nil, nil,
+            { disabled = Off, disabledTooltip = REQ, countLabel = true })
+        EllesmereUI.PanelPP.Point(dd, "RIGHT", rgn, "RIGHT", -20, 0)
+        rgn._control = dd
+        rgn._lastInline = nil
+        EllesmereUI.RegisterWidgetRefresh(refresh)
+    end
+
+    _, h = W:DualRow(parent, y,
+        { type="toggle", text="Warn About Ignored Players",
+          tooltip="Shows an alert when a player on your list is in your group.",
+          disabled=Off, disabledTooltip=REQ,
+          getValue=function() return EllesmereUIDB and EllesmereUIDB.ignoredAlertEnabled or false end,
+          setValue=function(v)
+              if not EllesmereUIDB then EllesmereUIDB = {} end
+              EllesmereUIDB.ignoredAlertEnabled = v
+              AI.Apply()
+              if EllesmereUI.Alerts then EllesmereUI.Alerts.Refresh() end
+          end },
+        { type="button", text="Add Player", width=220, noCapture=true,
+          disabled=Off, disabledTooltip=REQ,
+          onClick=function()
+              EllesmereUI:ShowInputPopup({
+                  title="Add Player",
+                  message="Name, or Name-Realm for another realm.",
+                  maxLetters=64,
+                  confirmText="Add",
+                  onConfirm=function(text)
+                      AI.AddTyped(text)
+                      EllesmereUI:RefreshPage()
+                  end,
+              })
+          end }
+    );  y = y - h
+
+    return y
+end
+
 local function ShowTransformsPopup()
     local data = EllesmereUI.HideTransformsData
     if not data then return end
@@ -266,78 +338,6 @@ local function ShowTransformsPopup()
     end
     transformsPopup._refreshRows()
     transformsPopup._dimmer:Show()
-end
-
--------------------------------------------------------------------------------
---  ACCOUNT IGNORE LIST section of the QoL page (runtime:
---  EllesmereUIQoL_AccountIgnore.lua, EllesmereUI._AccountIgnore)
--------------------------------------------------------------------------------
-local function BuildAccountIgnoreSection(parent, y)
-    local AI = EllesmereUI._AccountIgnore
-    if not AI then return y end
-    local W = EllesmereUI.Widgets
-    local REQ = "Account Ignore List"
-    local _, h, row
-    local function Off() return not AI.Enabled() end
-
-    _, h = W:SectionHeader(parent, "ACCOUNT IGNORE LIST", y);  y = y - h
-
-    row, h = W:DualRow(parent, y,
-        { type="toggle", text="Account Ignore List",
-          tooltip="Shares your ignored players between all your characters, with no limit on the list. Each character's game list still holds 50: names beyond that stay on the account list, where the alert sees them but the game does not block them. A name reaches your other characters at their next login.",
-          getValue=AI.Enabled,
-          setValue=function(v)
-              AI.SetEnabled(v)
-              EllesmereUI:RefreshPage()
-          end },
-        { type="dropdown", text="Ignored Players",
-          tooltip="Untick a player to remove them from all your characters.",
-          disabled=Off, disabledTooltip=REQ,
-          values={ __placeholder="..." }, order={ "__placeholder" },
-          getValue=function() return "__placeholder" end, setValue=function() end }
-    );  y = y - h
-
-    -- The checkbox dropdown in place of the row's placeholder.
-    if not EllesmereUI._prebuilding then
-        local rgn = row._rightRegion
-        if rgn._control then rgn._control:Hide() end
-        local dd, refresh = EllesmereUI.BuildVisOptsCBDropdown(rgn, 220, rgn:GetFrameLevel() + 2, AI.Items,
-            AI.IsListed, AI.SetListed, nil, 10, true, nil, nil,
-            { disabled = Off, disabledTooltip = REQ, countLabel = true })
-        EllesmereUI.PanelPP.Point(dd, "RIGHT", rgn, "RIGHT", -20, 0)
-        rgn._control = dd
-        rgn._lastInline = nil
-        EllesmereUI.RegisterWidgetRefresh(refresh)
-    end
-
-    _, h = W:DualRow(parent, y,
-        { type="toggle", text="Warn About Ignored Players",
-          tooltip="Shows an alert when a player on your list invites you or is in your group.",
-          disabled=Off, disabledTooltip=REQ,
-          getValue=function() return EllesmereUIDB and EllesmereUIDB.ignoredAlertEnabled or false end,
-          setValue=function(v)
-              if not EllesmereUIDB then EllesmereUIDB = {} end
-              EllesmereUIDB.ignoredAlertEnabled = v
-              AI.Apply()
-              if EllesmereUI.Alerts then EllesmereUI.Alerts.Refresh() end
-          end },
-        { type="button", text="Add Player", width=220, noCapture=true,
-          disabled=Off, disabledTooltip=REQ,
-          onClick=function()
-              EllesmereUI:ShowInputPopup({
-                  title="Add Player",
-                  message="Name, or Name-Realm for another realm.",
-                  maxLetters=64,
-                  confirmText="Add",
-                  onConfirm=function(text)
-                      AI.AddTyped(text)
-                      EllesmereUI:RefreshPage()
-                  end,
-              })
-          end }
-    );  y = y - h
-
-    return y
 end
 
 -------------------------------------------------------------------------------
