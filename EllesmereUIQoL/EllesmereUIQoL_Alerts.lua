@@ -9,6 +9,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --    Combat Alert     (EllesmereUIQoL.lua)   short
 --    Potion Ready     (below)                short
 --    Unspent Talents  (below)                persistent
+--    Ignored Player   (EllesmereUIQoL_AccountIgnore.lua)  short
 --  Nothing is built or registered for an alert until it is enabled.
 -------------------------------------------------------------------------------
 
@@ -31,6 +32,7 @@ local DEFS = {
     { id = "talent", sizeKey = "talentAlertTextSize", enabledKey = "talentAlertEnabled", persistent = true },
     { id = "combat", sizeKey = "combatAlertTextSize", enabledKey = "combatAlertEnabled", hold = 1.2 },
     { id = "potion", sizeKey = "potionAlertTextSize", enabledKey = "potionAlertEnabled", hold = 3 },
+    { id = "ignored", sizeKey = "ignoredAlertTextSize", enabledKey = "ignoredAlertEnabled", hold = 5 },
 }
 local lines = {}
 local anchor
