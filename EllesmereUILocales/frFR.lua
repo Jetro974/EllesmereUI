@@ -6535,6 +6535,5 @@ L["Apply Low Warning to all Bars"] = "Appliquer l'alerte niveau bas à toutes le
 L["Other Characters"] = "Autres personnages"
 L["Show Other Characters"] = "Afficher les autres personnages"
 L["Lists your other characters' hearthstones in the tooltip: where each is bound and when it is ready. A character appears once it has logged in with this on."] = "Liste dans l'infobulle les pierres de foyer de vos autres personnages : où chacune est liée et quand elle est prête. Un personnage apparaît après s'être connecté avec cette option active."
-=======
 L["Your changes only apply after a reload. Apply them and reload now? Otherwise they are discarded."] = "Vos changements ne s'appliquent qu'après un rechargement. Les appliquer et recharger maintenant ? Sinon, ils sont annulés."
 L["Discard Changes"] = "Annuler les changements"
