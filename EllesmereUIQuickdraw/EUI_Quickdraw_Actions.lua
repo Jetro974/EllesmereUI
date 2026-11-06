@@ -243,8 +243,8 @@ local usableMemo = setmetatable({}, { __mode = "k" })
 
 -- Campsite Items: one entry standing for every campsite accessory in the
 -- bags. WoW Forever's professions make these and they are placed by a
--- campfire (their use spell needs the "Camping Fire" spell focus, 2341;
--- wago.tools build 1.60.1.70425). UsableSlots puts one item cell per
+-- campfire (their use spell needs the "Camping Fire" spell focus, 2341, in
+-- the client's own data, build 1.60.1.70425). UsableSlots puts one item cell per
 -- accessory the character carries in its place, up to the menu's cap.
 local CAMPSITE_ITEMS = {
     278030, 279938, 279940, 279941, 279943, 279944, 279945, 279947, 279948,
