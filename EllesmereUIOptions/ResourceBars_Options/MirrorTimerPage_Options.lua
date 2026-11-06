@@ -46,6 +46,12 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
     local UNLOCK = K.unlock
     local TIP = K.name
     local function C() local p = DB(); return p and p.mirrorTimer and p.mirrorTimer[id] end
+    -- This bar's shipped settings (EUI_ResourceBars_Defaults.lua).
+    local function DefaultCfg()
+        local db = ns.ERB and ns.ERB.db
+        local d = db and db._profileDefaults
+        return d and d.mirrorTimer and d.mirrorTimer[id]
+    end
     local off = function() local c = C(); return not (c and c.enabled) end
 
     local function Refresh()
@@ -435,6 +441,27 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
                   function() local c = C(); return not (c and c.gradientEnabled) end,
                   function() if off() then return TIP end; return "Gradient" end),
               Swatch("fill", "Fill Color"),
+              -- This bar's own colour from the defaults, to come back to after
+              -- Apply All Settings From has brought another bar's: a click
+              -- puts it back; bright while the fill is something else.
+              { tooltip = "Default Color", hasAlpha = false,
+                getValue = function()
+                    local d = DefaultCfg()
+                    return (d and d.fillR or 1), (d and d.fillG or 1), (d and d.fillB or 1)
+                end,
+                setValue = function() end,
+                onClick = function()
+                    local c, d = C(), DefaultCfg()
+                    if not (c and d) then return end
+                    c.fillR, c.fillG, c.fillB, c.fillA = d.fillR, d.fillG, d.fillB, d.fillA
+                    Refresh(); EllesmereUI:RefreshPage()
+                end,
+                refreshAlpha = function()
+                    local c, d = C(), DefaultCfg()
+                    if not (c and d) then return 0.3 end
+                    local same = c.fillR == d.fillR and c.fillG == d.fillG and c.fillB == d.fillB
+                    return same and 0.3 or 1
+                end },
           } },
         GateKit({ type = "slider", text = "Background", min = 0, max = 100, step = 1,
           disabled = off, disabledTooltip = TIP,
