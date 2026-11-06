@@ -42,6 +42,8 @@ local BINDING_PREFIX = I.BINDING_PREFIX
 --
 --  aura   the spell ID of the player aura that says the context is on
 --  icon   the hint's texture (the aura's own icon)
+--  buff   the spell ID of the reward the situation gives, for a menu set to
+--         stand down while the player already has it (Hide When Buffed)
 --  label  the options dropdown's name for it
 --  seed   what a still-empty menu is given when the context is picked; the
 --         player fills it from there like any other menu
@@ -52,6 +54,8 @@ local CONTEXTS = {
         -- (measured on WoW Forever, 2026-11-05).
         aura  = 1283391,
         icon  = 7808147,
+        -- Camp Benefits, the hour-long reward of a camp (same build).
+        buff  = 1229741,
         label = "Near a Campfire",
         seed  = {
             -- Cooking, by position (the menu's Professions entries): every
@@ -76,8 +80,29 @@ ns.CONTEXTS, ns.CONTEXT_ORDER = CONTEXTS, CONTEXT_ORDER
 local active = {}
 local fighting = false
 
-function ns.ContextActive(key)
-    return active[key] == true
+-- Hide When Buffed (palette.contextSkipBuff): the menu stands down while the
+-- player has the context's reward with more than palette.contextSkipMinutes
+-- left (0: whenever it is up). Returns whether it stands down, and when not
+-- for a timed reason, how many seconds until it would come back.
+local function StandsDown(index, def)
+    local p = P()
+    local pal = p and index and p.palettes and p.palettes[index]
+    if type(pal) ~= "table" or not pal.contextSkipBuff or not def.buff then return false end
+    local get = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID
+    local aura = get and get(def.buff)
+    if not aura then return false end
+    local minutes = tonumber(pal.contextSkipMinutes) or 0
+    local exp = aura.expirationTime
+    if minutes <= 0 or type(exp) ~= "number" or exp == 0 then return true end
+    local over = exp - GetTime() - minutes * 60
+    if over > 0 then return true, over end
+    return false
+end
+
+function ns.ContextActive(key, index)
+    if active[key] ~= true then return false end
+    if index and StandsDown(index, CONTEXTS[key]) then return false end
+    return true
 end
 
 local function Measure(def)
@@ -247,6 +272,10 @@ ns.UpdateContextHint = UpdateHint
 -------------------------------------------------------------------------------
 --  Following the signal
 -------------------------------------------------------------------------------
+-- Which context menus are up for grabs, as one string: a menu standing down
+-- for Hide When Buffed changes it without any context flipping.
+local lastReach = ""
+local recheck -- the pending timer for a reward running down past its limit
 local function Evaluate()
     local changed = false
     local readable = not fighting and not InCombatLockdown()
@@ -257,6 +286,21 @@ local function Evaluate()
             changed = true
         end
     end
+    local reach, soonest = "", nil
+    for i = 1, PaletteCount() do
+        local key = ns.PaletteContext(i)
+        if key and active[key] then
+            local down, wait = StandsDown(i, CONTEXTS[key])
+            reach = reach .. (down and "0" or "1")
+            if wait and (not soonest or wait < soonest) then soonest = wait end
+        end
+    end
+    if reach ~= lastReach then
+        lastReach = reach
+        changed = true
+    end
+    if recheck then recheck:Cancel(); recheck = nil end
+    if soonest then recheck = C_Timer.NewTimer(soonest + 0.5, Evaluate) end
     if changed then
         -- KeyTarget reads ns.PaletteActive, which reads the contexts: the
         -- binding signature moves with them, so this rebinds only on a flip.

@@ -6551,3 +6551,7 @@ L["This overwrites this bar's current settings. Its position and enable state ar
 L["Copy every setting this bar shares with the bar you choose onto this bar."] = "Copie sur cette barre chaque réglage qu'elle partage avec la barre choisie."
 L["Default Color"] = "Couleur par défaut"
 L["Quickdraw Context"] = "Contexte Quickdraw"
+L["Hide When Buffed"] = "Masquer si déjà le bonus"
+L["Leaves this menu out while you already have %s."] = "Retire ce menu tant que vous avez déjà %s."
+L["Unless Under (min)"] = "Sauf sous (min)"
+L["The menu comes back once %s has fewer minutes left than this. 0: hidden for as long as it lasts."] = "Le menu revient quand il reste moins de minutes que ceci sur %s. 0 : masqué tant qu'il dure."
