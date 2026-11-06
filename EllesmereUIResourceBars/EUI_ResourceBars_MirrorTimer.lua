@@ -105,7 +105,7 @@ end
 -- Builds the children of obj.frame. obj is a KINDS entry, or a preview table
 -- the options page makes ({ frame = <its container> }); mk is its frame maker
 -- (the options page pool's CreateFrame there, so a rebuilt page reuses them).
-local MAX_DIGITS = 4
+local MAX_DIGITS = 5   -- cells: up to "mm:ss"
 
 local function BuildBar(obj, mk)
     local CreateFrame = mk or CreateFrame
@@ -343,7 +343,9 @@ local function ApplyLook(obj, cfg, onePx)
         local w = time:GetStringWidth() or 0
         if w > wideW then wide, wideW = tostring(n), w end
     end
-    obj.wideDigit = wide
+    obj.wideDigit, obj.digitW = wide, wideW
+    time:SetText(":")
+    obj.colonW = time:GetStringWidth() or 0
     obj.lastTime = nil
     time:SetText("")
 
@@ -372,21 +374,36 @@ local function Paint(obj, cfg, frac, seconds, rising, still)
     frac = math.max(0, math.min(frac or 0, 1))
     obj.bar:SetMinMaxValues(0, 1)
     obj.bar:SetValue(frac)
-    local txt = string.format("%d", math.max(0, math.floor((seconds or 0) + 0.5)))
+    -- Seconds under a minute, then m:ss (Breath can run 3 minutes, Feign
+    -- Death 6), as the game's own bar.
+    local secs = math.max(0, math.floor((seconds or 0) + 0.5))
+    local txt
+    if secs >= 60 then
+        txt = string.format("%d:%02d", math.floor(secs / 60), secs % 60)
+    else
+        txt = string.format("%d", secs)
+    end
     if txt ~= obj.lastTime then
         obj.lastTime = txt
         local n = math.min(#txt, MAX_DIGITS)
         txt = txt:sub(-n)
+        -- The box holds the same pattern in the widest digit, so it keeps its
+        -- size while the digits change; each cell is a digit's or the colon's width.
+        local wide = obj.wideDigit or "0"
         local time = obj.time
-        time:SetText(string.rep(obj.wideDigit or "0", n))
-        local cw = (time:GetStringWidth() or 0) / n
+        time:SetText((txt:gsub("%d", wide)))
+        local dw, colw = obj.digitW or 0, obj.colonW or 0
+        local x = 0
         for i = 1, MAX_DIGITS do
             local d = obj.digits[i]
             if i <= n and obj.timeShown then
+                local ch = txt:sub(i, i)
+                local w = (ch == ":") and colw or dw
                 d:ClearAllPoints()
-                d:SetPoint("CENTER", time, "LEFT", (i - 0.5) * cw, 0)
-                d:SetText(txt:sub(i, i))
+                d:SetPoint("CENTER", time, "LEFT", x + w / 2, 0)
+                d:SetText(ch)
                 d:Show()
+                x = x + w
             else
                 d:Hide()
             end
