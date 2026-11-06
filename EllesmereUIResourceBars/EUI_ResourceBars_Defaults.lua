@@ -505,6 +505,7 @@ local DEFAULTS = {
             fatigue = MirrorTimerDefaults(270, 1, 0.9, 0),
             feign   = MirrorTimerDefaults(240, 1, 0.7, 0),
             pvp     = MirrorTimerDefaults(210, 0.8, 0.1, 0.1),
+            countdown = MirrorTimerDefaults(180, 1, 0.8, 0.2),
         },
         -- Sunfury Arcane Mage Arcane Soul callout (EUI_ResourceBars_ArcaneSoul.lua).
         -- Flat colour keys per module convention; OFF by default, and nothing at

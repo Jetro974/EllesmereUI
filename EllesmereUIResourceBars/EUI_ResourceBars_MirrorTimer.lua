@@ -13,7 +13,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -- One bar per timer, each with its own settings, position and Unlock Mode
 -- mover, the way the action bars are one per bar: Breath (BREATH), Fatigue
 -- (EXHAUSTION), Feign Death (FEIGNDEATH, and DEATH, which Blizzard paints the
--- same way) and Battle Start (the battleground countdown, see KINDS). They
+-- same way), Battle Start and Group Countdown (the game's countdowns, see
+-- KINDS). They
 -- are configured on the Cast Bar page, picked from its bar selector.
 --
 -- Each bar: bg, border (every border style), a StatusBar in a clip frame, an
@@ -47,14 +48,23 @@ local KINDS = {
     { id = "feign",   unlock = "ERB_MirrorFeign",   name = "Feign Death", sampleFrac = 0.6,  order = 511,
       timers = { FEIGNDEATH = true, DEATH = true }, spell = 5384 },
 }
--- Battle Start: the battleground's countdown before the gates open, the bar of
--- the game's TimerTracker (START_TIMER with the PvP begin type, ended by
--- STOP_TIMER_OF_TYPE or a world change). No mirror timer: its time is counted
--- from the event's end time.
-local PVP_START = Enum and Enum.StartTimerType and Enum.StartTimerType.PvPBeginTimer
-if PVP_START then
+-- The game's TimerTracker bars, counted from the event's end time (no mirror
+-- timer behind them). Battle Start: the battleground's countdown before the
+-- gates open (START_TIMER with the PvP begin type; a world change drops it).
+-- Group Countdown: a group leader's /countdown (START_PLAYER_COUNTDOWN,
+-- CANCEL_PLAYER_COUNTDOWN), which lives through a world change.
+local START_TYPES = Enum and Enum.StartTimerType
+local START_KIND = {}  -- timer type -> kind
+if START_TYPES and START_TYPES.PvPBeginTimer then
     KINDS[#KINDS + 1] = { id = "pvp", unlock = "ERB_MirrorPvP", name = "Battle Start", sampleFrac = 0.55,
-        order = 512, timers = {}, startType = PVP_START }
+        order = 512, timers = {}, startType = START_TYPES.PvPBeginTimer }
+end
+if START_TYPES and START_TYPES.PlayerCountdown then
+    KINDS[#KINDS + 1] = { id = "countdown", unlock = "ERB_MirrorCountdown", name = "Group Countdown",
+        sampleFrac = 0.5, order = 513, timers = {}, startType = START_TYPES.PlayerCountdown, keepOnWorld = true }
+end
+for _, K in ipairs(KINDS) do
+    if K.startType then START_KIND[K.startType] = K end
 end
 -- The name the client itself gives the timer (its bar label: BREATH_LABEL,
 -- EXHAUSTION_LABEL; Feign Death has none, so the spell's name), so the
@@ -511,25 +521,25 @@ local function ApplyBlizzard()
         end
     end
     S.blizzHidden = any or nil
-    -- Battle Start: the bar of the game's battleground timer (its big final
-    -- numbers stay). Its fade animations set the bar's alpha, so the ticker
-    -- runs this again while ours counts.
-    local K = KIND_BY_ID.pvp
-    local tracker = K and _G.TimerTracker
+    -- The TimerTracker bars (their big final numbers stay). Their fade
+    -- animations set the bar's alpha, so the ticker runs this again while
+    -- ours count.
+    local tracker = _G.TimerTracker
     if tracker and tracker.timerList then
-        local cfg = Cfg(K.id)
-        local hide = cfg and cfg.enabled and cfg.hideBlizzard ~= false and K.active
+        local anyHidden = false
         for _, timer in ipairs(tracker.timerList) do
-            if timer.type == K.startType and timer.bar then
-                if hide then
+            local K = timer.type and START_KIND[timer.type]
+            if K and timer.bar then
+                local cfg = Cfg(K.id)
+                if cfg and cfg.enabled and cfg.hideBlizzard ~= false and K.active then
                     timer.bar:SetAlpha(0)
-                    S.trackerHidden = true
+                    anyHidden = true
                 elseif S.trackerHidden then
                     timer.bar:SetAlpha(timer.barShowing and 1 or 0)
                 end
             end
         end
-        if not hide then S.trackerHidden = nil end
+        S.trackerHidden = anyHidden or nil
     end
 end
 
@@ -600,11 +610,20 @@ local function StopTimer(timer)
     Restart()
 end
 
--- Battle Start: START_TIMER(timerType, timeSeconds, totalTime).
+-- A TimerTracker countdown of type timerType: seconds left out of total.
 local function StartCountdown(timerType, seconds, total)
-    local K = KIND_BY_ID.pvp
-    if not (K and Plain(timerType) and timerType == K.startType and Plain(seconds) and Plain(total)) then return end
-    if type(seconds) ~= "number" or type(total) ~= "number" or total <= 0 then return end
+    local K = Plain(timerType) and START_KIND[timerType]
+    if not (K and Plain(seconds) and Plain(total)) then return end
+    if type(seconds) ~= "number" or type(total) ~= "number" then return end
+    if total <= 0 or seconds <= 0 then  -- a cancelled countdown comes as 0, 0
+        if K.active then
+            K.active = nil
+            UpdateVisibility(K)
+            ApplyBlizzard()
+            Restart()
+        end
+        return
+    end
     local cfg = Cfg(K.id)
     if not (cfg and cfg.enabled and K.built) then return end
     K.active = { endTime = GetTime() + seconds, value = seconds * 1000, max = total * 1000,
@@ -615,8 +634,8 @@ local function StartCountdown(timerType, seconds, total)
 end
 
 local function StopCountdown(timerType)
-    local K = KIND_BY_ID.pvp
-    if not (K and K.active and Plain(timerType) and timerType == K.startType) then return end
+    local K = Plain(timerType) and START_KIND[timerType]
+    if not (K and K.active) then return end
     K.active = nil
     UpdateVisibility(K)
     ApplyBlizzard()
@@ -625,7 +644,9 @@ end
 
 -- The timers already running when a bar comes up (a /reload under water).
 local function Resync()
-    for _, K in ipairs(KINDS) do K.active = nil end
+    for _, K in ipairs(KINDS) do
+        if not K.keepOnWorld then K.active = nil end
+    end
     for i = 1, 3 do
         local timer, value, maxValue, _, paused, label = GetMirrorTimerInfo(i)
         if Plain(timer) and timer and timer ~= "UNKNOWN" then
@@ -655,6 +676,12 @@ eventFrame:SetScript("OnEvent", function(_, event, a1, a2, a3, _, a5, a6)
     elseif event == "START_TIMER" then
         StartCountdown(a1, a2, a3)
         C_Timer.After(0, ApplyBlizzard)
+    elseif event == "START_PLAYER_COUNTDOWN" then
+        -- initiatedByGuid, timeSeconds, totalTime, informChat, initiatedByName
+        StartCountdown(START_TYPES.PlayerCountdown, a2, a3)
+        C_Timer.After(0, ApplyBlizzard)
+    elseif event == "CANCEL_PLAYER_COUNTDOWN" then
+        StopCountdown(START_TYPES.PlayerCountdown)
     elseif event == "STOP_TIMER_OF_TYPE" then
         StopCountdown(a1)
     else -- PLAYER_ENTERING_WORLD (the game drops the battleground countdown too)
@@ -698,9 +725,13 @@ function ns.MT_Apply()
         eventFrame:RegisterEvent("MIRROR_TIMER_PAUSE")
         eventFrame:RegisterEvent("MIRROR_TIMER_STOP")
         eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-        if KIND_BY_ID.pvp then
+        if next(START_KIND) then
             eventFrame:RegisterEvent("START_TIMER")
             eventFrame:RegisterEvent("STOP_TIMER_OF_TYPE")
+        end
+        if KIND_BY_ID.countdown then
+            eventFrame:RegisterEvent("START_PLAYER_COUNTDOWN")
+            eventFrame:RegisterEvent("CANCEL_PLAYER_COUNTDOWN")
         end
         Resync()
     elseif not any and S.events then

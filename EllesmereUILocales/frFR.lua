@@ -6268,3 +6268,6 @@ L["Apply Low Warning to all Bars"] = "Appliquer l'alerte niveau bas à toutes le
 L["Battle Start"] = "Début de la bataille"
 L["Enable Battle Start Bar"] = "Activer la barre de début de bataille"
 L["Battle Start Bar Position"] = "Position de la barre de début de bataille"
+L["Group Countdown"] = "Compte à rebours de groupe"
+L["Enable Group Countdown Bar"] = "Activer la barre de compte à rebours de groupe"
+L["Group Countdown Bar Position"] = "Position de la barre de compte à rebours de groupe"
