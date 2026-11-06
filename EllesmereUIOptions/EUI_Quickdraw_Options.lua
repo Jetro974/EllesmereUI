@@ -2151,7 +2151,23 @@ initFrame:SetScript("OnEvent", function(self)
         return ns.PanelSlots and ns.PanelSlots(false) or {}
     end
 
+    -- A context's starter actions (EUI_Quickdraw_Context.lua), the toys only
+    -- when owned. Adding it also sets the context (SetContext, below).
+    local function ContextSlots(key)
+        return function()
+            local def = ns.CONTEXTS and ns.CONTEXTS[key]
+            local out = {}
+            for _, s in ipairs(def and def.seed or {}) do
+                if s.kind ~= "toy" or (PlayerHasToy and PlayerHasToy(s.id)) then
+                    out[#out + 1] = EllesmereUI.Lite.DeepCopy(s)
+                end
+            end
+            return out
+        end
+    end
+
     local PALETTE_PRESETS = {
+        { label = "Near a Campfire", build = ContextSlots("campfire"), context = "campfire" },
         { label = "Interface Panels", build = InterfacePanelSlots },
         { label = "Target Markers", build = TargetMarkerSlots },
         { label = "World Markers",  build = WorldMarkerSlots },
@@ -2174,6 +2190,8 @@ initFrame:SetScript("OnEvent", function(self)
     --  the new palette will hold; the Add button opens a chooser instead --
     --  empty, or seeded from one of the presets above.
     ---------------------------------------------------------------------------
+
+    local SetContext -- filled in by the Context row below
 
     -- slots comes in already built (the chooser built it to decide whether to
     -- offer the preset at all), and each table in it is fresh from the
@@ -2199,6 +2217,12 @@ initFrame:SetScript("OnEvent", function(self)
         end
         editPalette = count + 1
         HidePicker()
+        -- A context preset sets its context too (and the shared key); that
+        -- rebuilds the page.
+        if palette and preset and preset.context and SetContext then
+            SetContext(count + 1, preset.context)
+            return
+        end
         RebuildPage()
     end
 
@@ -3216,7 +3240,7 @@ initFrame:SetScript("OnEvent", function(self)
     -- context's starter actions, and a menu with no key of its own the key of
     -- the first everyday menu that has one, which it then takes over while the
     -- context is on (KeyTarget). The player builds the menu from there.
-    local function SetContext(idx, key)
+    SetContext = function(idx, key)
         local pal = Palette(idx)
         if not pal then return end
         local def = key ~= "" and ns.CONTEXTS and ns.CONTEXTS[key]
