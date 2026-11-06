@@ -12,8 +12,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  Spec uses) and KeyTarget hands the key to it first while its context is on.
 --  A small hint icon shows while a context menu is reachable, so the player
 --  knows there is something under the key right now. Clicking it opens the
---  menu's actions as a row of buttons above it, so a context menu works with
---  no key bound at all.
+--  menu, so a context menu works with no key bound at all.
 --
 --  The signal is an AURA the game puts on the player: no position, no polling.
 --  Out of combat only. Auras are not readable in combat on every client, and
@@ -34,8 +33,8 @@ local InCombatLockdown = InCombatLockdown
 local GetBindingKey = GetBindingKey
 
 local P, PaletteCount, RequestPush = I.P, I.PaletteCount, I.RequestPush
-local PA, UsableSlots = I.PA, I.UsableSlots
-local ResolveAction, FireInsecure, SlotDisplay = I.ResolveAction, I.FireInsecure, I.SlotDisplay
+local PA = I.PA
+local ResolveAction, FireInsecure = I.ResolveAction, I.FireInsecure
 local BINDING_PREFIX = I.BINDING_PREFIX
 
 -------------------------------------------------------------------------------
@@ -83,8 +82,8 @@ end
 --  The hint
 --
 --  The aura's icon with the key under it (when the menu has one), at a fixed
---  spot below the middle of the screen. A click opens the menu's actions
---  above it (the flyout below); a second click closes them.
+--  spot below the middle of the screen. A click opens the menu itself, as
+--  its key would (below); a second click closes it.
 --  Made here in the main chunk so its cost is billed to this addon.
 -------------------------------------------------------------------------------
 local HINT_SIZE = 36
@@ -102,138 +101,93 @@ hintKey:SetPoint("TOP", hint, "BOTTOM", 0, -3)
 hint:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 
 -------------------------------------------------------------------------------
---  The flyout: the context menu's actions as plain secure buttons laid out
---  the way the menu draws them -- its ring (Menu Radius, Icon Size, Scale,
---  arc span and rotation from its appearance), round the hint as its centre
---  -- and set up the way the menu's own cells fire (ResolveAction,
---  FireInsecure for the kinds with no secure action). Built and filled out of
---  combat only; every context drops at PLAYER_REGEN_DISABLED, and the flyout
---  with it.
+--  Opening the menu from the hint
+--
+--  The click opens the menu itself (ns.Open: its own layout, look, position
+--  and selection, whatever the menu is set to, as its key would), and a
+--  screen-wide secure button takes the next click: on the selected entry it
+--  fires that entry the way a release fires it (ResolveAction, FireInsecure
+--  for the kinds with no secure action); anywhere else it only closes the
+--  menu. Out of combat only: every context drops at PLAYER_REGEN_DISABLED,
+--  and the menu with it.
 -------------------------------------------------------------------------------
-local RING_GAP = 10 -- between two neighbouring icons, as the menu keeps them
-local flyout = CreateFrame("Frame", nil, hint)
-flyout:SetPoint("CENTER", hint, "CENTER", 0, 0)
-flyout:SetSize(1, 1)
-flyout:Hide()
-local flyButtons = {}
-local flyFor -- the palette index the flyout shows
+local liveView
+local picker = CreateFrame("Button", "EUIQuickdrawContextPicker", UIParent, "SecureActionButtonTemplate")
+picker:SetAllPoints(UIParent)
+picker:SetFrameStrata("FULLSCREEN_DIALOG")
+picker:RegisterForClicks("AnyUp")
+picker:SetAttribute("useOnKeyDown", false)
+picker:Hide()
+local pickerFor, pickedInsecure
 
-local function FlyButton(n)
-    local b = flyButtons[n]
-    if b then return b end
-    b = CreateFrame("Button", nil, flyout, "SecureActionButtonTemplate")
-    b:SetSize(40, 40)
-    b:RegisterForClicks("AnyUp", "AnyDown")
-    b:SetAttribute("useOnKeyDown", false)
-    b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetAllPoints()
-    b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    b.text:SetPoint("BOTTOM", b, "BOTTOM", 0, 2)
-    b.text:SetWidth(48)
-    b.text:SetWordWrap(false)
-    -- Kinds with no secure action fire from here; every click closes the row.
-    b:SetScript("PostClick", function(self, _, down)
-        if down then return end
-        if self.insecure then FireInsecure(self.insecure) end
-        if not InCombatLockdown() then flyout:Hide() end
-    end)
-    -- Away from the ring's centre, so it never covers the other entries.
-    b:SetScript("OnEnter", function(self)
-        if not self.name then return end
-        GameTooltip:SetOwner(self, "ANCHOR_NONE")
-        GameTooltip:ClearAllPoints()
-        if (self.dy or 0) >= 0 then
-            GameTooltip:SetPoint("BOTTOM", self, "TOP", 0, 4)
-        else
-            GameTooltip:SetPoint("TOP", self, "BOTTOM", 0, -4)
-        end
-        GameTooltip:SetText(self.name)
-        GameTooltip:Show()
-    end)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    flyButtons[n] = b
-    return b
+local function ClosePicker()
+    pickerFor, pickedInsecure = nil, nil
+    if InCombatLockdown() then return end
+    picker:SetAttribute("type", nil)
+    picker:Hide()
 end
 
-local function FillFlyout(index)
-    if InCombatLockdown() then return false end
-    local p = P()
-    local palette = p and p.palettes and p.palettes[index]
-    local view = PA(index)
-    local slots = palette and UsableSlots(palette, view) or {}
-    local list = {}
-    for _, slot in ipairs(slots) do
-        if slot.kind ~= "palette" then list[#list + 1] = slot end
-    end
-    local count = #list
-    -- The menu's ring: clockwise from straight up (plus its rotation), a full
-    -- circle or its arc span, and a radius that is the Menu Radius at least
-    -- and grows until neighbours no longer touch (as PaletteView:Geom does).
-    local size = (view and view.iconSize) or 40
-    local scale = (view and view.scale) or 1
-    local spanDeg = math.min(360, math.max(30, (view and view.arcSpan) or 360))
-    local rot = ((view and view.arcRotation) or 0) * math.pi / 180
-    local full = spanDeg >= 359.5
-    local span = spanDeg * math.pi / 180
-    local step, first
-    if full then
-        step, first = (count > 0) and (2 * math.pi / count) or 0, rot
+picker:SetScript("PreClick", function(self, button)
+    pickedInsecure = nil
+    if InCombatLockdown() then return end
+    self:SetAttribute("type", nil)
+    if button ~= "LeftButton" or not (liveView and pickerFor) then return end
+    local sel = liveView:GetSelection()
+    local slot = sel and liveView:CellSlot(sel)
+    if not slot or slot.kind == "palette" then return end
+    local t, key, value, clear = ResolveAction(slot, PA(pickerFor))
+    if t then
+        self:SetAttribute("type", t)
+        if key then self:SetAttribute(key, value) end
+        if clear then self:SetAttribute(clear, nil) end
     else
-        step = (count > 1) and (span / (count - 1)) or 0
-        first = rot - span * 0.5
+        pickedInsecure = slot
     end
-    local radius = (view and view.radius) or 100
-    if step > 0 then
-        radius = math.max(radius, (size + RING_GAP) / (2 * math.sin(math.min(step, math.pi) / 2)))
+end)
+picker:SetScript("PostClick", function()
+    local slot = pickedInsecure
+    if slot then FireInsecure(slot) end
+    -- Closing the menu closes the picker too (its OnHide hook, below).
+    if ns.Close then ns.Close() end
+    ClosePicker()
+end)
+
+-- The menu closes on its own too (its open timeout, a zone change): the
+-- picker goes with it.
+local function LiveView()
+    if not liveView and I.CreateLiveView then
+        liveView = I.CreateLiveView()
+        liveView:GetFrame():HookScript("OnHide", ClosePicker)
     end
-    flyout:SetScale(scale)
-    local n = 0
-    for _, slot in ipairs(list) do
-        n = n + 1
-        local b = FlyButton(n)
-        b:SetSize(size, size)
-        b.text:SetWidth(size + 8)
-        local t, key, value, clear = ResolveAction(slot, view)
-        b:SetAttribute("type", t)
-        if t and key then b:SetAttribute(key, value) end
-        if clear then b:SetAttribute(clear, nil) end
-        b.insecure = (not t) and slot or nil
-        local icon, name = SlotDisplay(slot)
-        if type(icon) == "table" and icon.atlas then b.icon:SetAtlas(icon.atlas) else b.icon:SetTexture(icon) end
-        b.name = name
-        b.text:SetText(slot.kind == "emote" and name or "")
-        local a = first + (n - 1) * step
-        local dx, dy = radius * math.sin(a), radius * math.cos(a)
-        b.dy = dy
-        b:ClearAllPoints()
-        b:SetPoint("CENTER", flyout, "CENTER", dx, dy)
-        b:Show()
+    return liveView
+end
+
+local function OpenFromHint(index)
+    if InCombatLockdown() or not ns.Open then return end
+    local view = LiveView()
+    if not view then return end
+    if view:GetFrame():IsShown() then
+        ns.Close()
+        return
     end
-    for i = n + 1, #flyButtons do flyButtons[i]:Hide() end
-    flyFor = index
-    return n > 0
+    ns.Open(index)
+    if not view:GetFrame():IsShown() then return end
+    pickerFor = index
+    picker:Show()
 end
 
 hint:SetScript("OnClick", function(self)
-    if InCombatLockdown() then return end
     GameTooltip:Hide()
-    if flyout:IsShown() then
-        flyout:Hide()
-    elseif self.palette and FillFlyout(self.palette) then
-        flyout:Show()
-    end
+    if self.palette then OpenFromHint(self.palette) end
 end)
--- Below the hint and its key, and not at all while the ring is open: the
--- ring is all round it.
+-- Below the hint and its key: the menu opens round the cursor, which is on it.
 hint:SetScript("OnEnter", function(self)
-    if not self.contextKey or flyout:IsShown() then return end
+    if not self.contextKey then return end
     GameTooltip:SetOwner(self, "ANCHOR_NONE")
     GameTooltip:ClearAllPoints()
     GameTooltip:SetPoint("TOP", self, "BOTTOM", 0, -18)
     GameTooltip:SetText(EllesmereUI.L(CONTEXTS[self.contextKey].label))
-    GameTooltip:AddLine(EllesmereUI.L("Click for this menu's actions."), 1, 1, 1, true)
+    GameTooltip:AddLine(EllesmereUI.L("Click to open this menu."), 1, 1, 1, true)
     GameTooltip:Show()
 end)
 hint:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -252,17 +206,18 @@ local function ReachableContextMenu()
 end
 
 local function UpdateHint()
-    if InCombatLockdown() then return end -- the flyout's buttons are secure
+    if InCombatLockdown() then return end -- the picker is secure
     local p = P()
     local i, key, k1
     if p and p.enabled and not fighting then i, key, k1 = ReachableContextMenu() end
     if not i then
-        flyout:Hide()
+        -- The menu the hint opened goes with the context.
+        if pickerFor and ns.Close then ns.Close() end
+        ClosePicker()
         hint.palette, hint.contextKey = nil, nil
         hint:Hide()
         return
     end
-    if flyout:IsShown() and flyFor ~= i then flyout:Hide() end
     hint.palette, hint.contextKey = i, key
     hintIcon:SetTexture(CONTEXTS[key].icon)
     hintKey:SetText(k1 and (GetBindingText and GetBindingText(k1) or k1) or "")

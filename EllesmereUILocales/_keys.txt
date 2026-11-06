@@ -373,7 +373,6 @@ Click a point on another element
 Click a talent to require it: Taken, then Not Taken, then cleared. Every condition must hold for the icon to show.
 Click any new feature to go directly to the setting
 Click elements to scroll to and highlight their options
-Click for this menu's actions.
 Click items to mark or unmark them as junk.
 Click spell for alert settings
 Click the link, then Ctrl+C to copy it
@@ -383,6 +382,7 @@ Click to edit this bar
 Click to edit.
 Click to link it in chat.
 Click to mail, right-click for options.
+Click to open this menu.
 Click to toggle
 Click to toggle: groups with this boss still alive
 Click-to-use is disabled in combat
