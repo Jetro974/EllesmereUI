@@ -102,16 +102,18 @@ hintKey:SetPoint("TOP", hint, "BOTTOM", 0, -3)
 hint:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 
 -------------------------------------------------------------------------------
---  The flyout: the context menu's actions as plain secure buttons in a row
---  above the hint, set up the way the menu's own cells fire (ResolveAction,
+--  The flyout: the context menu's actions as plain secure buttons laid out
+--  the way the menu draws them -- its ring (Menu Radius, Icon Size, Scale,
+--  arc span and rotation from its appearance), round the hint as its centre
+--  -- and set up the way the menu's own cells fire (ResolveAction,
 --  FireInsecure for the kinds with no secure action). Built and filled out of
 --  combat only; every context drops at PLAYER_REGEN_DISABLED, and the flyout
 --  with it.
 -------------------------------------------------------------------------------
-local FLY_SIZE, FLY_GAP = 32, 4
+local RING_GAP = 10 -- between two neighbouring icons, as the menu keeps them
 local flyout = CreateFrame("Frame", nil, hint)
-flyout:SetPoint("BOTTOM", hint, "TOP", 0, 6)
-flyout:SetSize(1, FLY_SIZE)
+flyout:SetPoint("CENTER", hint, "CENTER", 0, 0)
+flyout:SetSize(1, 1)
 flyout:Hide()
 local flyButtons = {}
 local flyFor -- the palette index the flyout shows
@@ -120,7 +122,7 @@ local function FlyButton(n)
     local b = flyButtons[n]
     if b then return b end
     b = CreateFrame("Button", nil, flyout, "SecureActionButtonTemplate")
-    b:SetSize(FLY_SIZE, FLY_SIZE)
+    b:SetSize(40, 40)
     b:RegisterForClicks("AnyUp", "AnyDown")
     b:SetAttribute("useOnKeyDown", false)
     b.icon = b:CreateTexture(nil, "ARTWORK")
@@ -129,7 +131,7 @@ local function FlyButton(n)
     b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     b.text:SetPoint("BOTTOM", b, "BOTTOM", 0, 2)
-    b.text:SetWidth(FLY_SIZE + 8)
+    b.text:SetWidth(48)
     b.text:SetWordWrap(false)
     -- Kinds with no secure action fire from here; every click closes the row.
     b:SetScript("PostClick", function(self, _, down)
@@ -137,9 +139,16 @@ local function FlyButton(n)
         if self.insecure then FireInsecure(self.insecure) end
         if not InCombatLockdown() then flyout:Hide() end
     end)
+    -- Away from the ring's centre, so it never covers the other entries.
     b:SetScript("OnEnter", function(self)
         if not self.name then return end
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetOwner(self, "ANCHOR_NONE")
+        GameTooltip:ClearAllPoints()
+        if (self.dy or 0) >= 0 then
+            GameTooltip:SetPoint("BOTTOM", self, "TOP", 0, 4)
+        else
+            GameTooltip:SetPoint("TOP", self, "BOTTOM", 0, -4)
+        end
         GameTooltip:SetText(self.name)
         GameTooltip:Show()
     end)
@@ -154,42 +163,75 @@ local function FillFlyout(index)
     local palette = p and p.palettes and p.palettes[index]
     local view = PA(index)
     local slots = palette and UsableSlots(palette, view) or {}
-    local n = 0
+    local list = {}
     for _, slot in ipairs(slots) do
-        if slot.kind ~= "palette" then
-            n = n + 1
-            local b = FlyButton(n)
-            local t, key, value, clear = ResolveAction(slot, view)
-            b:SetAttribute("type", t)
-            if t and key then b:SetAttribute(key, value) end
-            if clear then b:SetAttribute(clear, nil) end
-            b.insecure = (not t) and slot or nil
-            local icon, name = SlotDisplay(slot)
-            if type(icon) == "table" and icon.atlas then b.icon:SetAtlas(icon.atlas) else b.icon:SetTexture(icon) end
-            b.name = name
-            b.text:SetText(slot.kind == "emote" and name or "")
-            b:ClearAllPoints()
-            b:SetPoint("LEFT", flyout, "LEFT", (n - 1) * (FLY_SIZE + FLY_GAP), 0)
-            b:Show()
-        end
+        if slot.kind ~= "palette" then list[#list + 1] = slot end
+    end
+    local count = #list
+    -- The menu's ring: clockwise from straight up (plus its rotation), a full
+    -- circle or its arc span, and a radius that is the Menu Radius at least
+    -- and grows until neighbours no longer touch (as PaletteView:Geom does).
+    local size = (view and view.iconSize) or 40
+    local scale = (view and view.scale) or 1
+    local spanDeg = math.min(360, math.max(30, (view and view.arcSpan) or 360))
+    local rot = ((view and view.arcRotation) or 0) * math.pi / 180
+    local full = spanDeg >= 359.5
+    local span = spanDeg * math.pi / 180
+    local step, first
+    if full then
+        step, first = (count > 0) and (2 * math.pi / count) or 0, rot
+    else
+        step = (count > 1) and (span / (count - 1)) or 0
+        first = rot - span * 0.5
+    end
+    local radius = (view and view.radius) or 100
+    if step > 0 then
+        radius = math.max(radius, (size + RING_GAP) / (2 * math.sin(math.min(step, math.pi) / 2)))
+    end
+    flyout:SetScale(scale)
+    local n = 0
+    for _, slot in ipairs(list) do
+        n = n + 1
+        local b = FlyButton(n)
+        b:SetSize(size, size)
+        b.text:SetWidth(size + 8)
+        local t, key, value, clear = ResolveAction(slot, view)
+        b:SetAttribute("type", t)
+        if t and key then b:SetAttribute(key, value) end
+        if clear then b:SetAttribute(clear, nil) end
+        b.insecure = (not t) and slot or nil
+        local icon, name = SlotDisplay(slot)
+        if type(icon) == "table" and icon.atlas then b.icon:SetAtlas(icon.atlas) else b.icon:SetTexture(icon) end
+        b.name = name
+        b.text:SetText(slot.kind == "emote" and name or "")
+        local a = first + (n - 1) * step
+        local dx, dy = radius * math.sin(a), radius * math.cos(a)
+        b.dy = dy
+        b:ClearAllPoints()
+        b:SetPoint("CENTER", flyout, "CENTER", dx, dy)
+        b:Show()
     end
     for i = n + 1, #flyButtons do flyButtons[i]:Hide() end
-    flyout:SetWidth(math.max(1, n * (FLY_SIZE + FLY_GAP) - FLY_GAP))
     flyFor = index
     return n > 0
 end
 
 hint:SetScript("OnClick", function(self)
     if InCombatLockdown() then return end
+    GameTooltip:Hide()
     if flyout:IsShown() then
         flyout:Hide()
     elseif self.palette and FillFlyout(self.palette) then
         flyout:Show()
     end
 end)
+-- Below the hint and its key, and not at all while the ring is open: the
+-- ring is all round it.
 hint:SetScript("OnEnter", function(self)
-    if not self.contextKey then return end
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    if not self.contextKey or flyout:IsShown() then return end
+    GameTooltip:SetOwner(self, "ANCHOR_NONE")
+    GameTooltip:ClearAllPoints()
+    GameTooltip:SetPoint("TOP", self, "BOTTOM", 0, -18)
     GameTooltip:SetText(EllesmereUI.L(CONTEXTS[self.contextKey].label))
     GameTooltip:AddLine(EllesmereUI.L("Click for this menu's actions."), 1, 1, 1, true)
     GameTooltip:Show()
