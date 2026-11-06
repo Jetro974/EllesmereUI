@@ -6550,7 +6550,6 @@ L["Copy all settings from %1$s to %2$s?"] = "Copier tous les réglages de %1$s v
 L["This overwrites this bar's current settings. Its position and enable state are not changed."] = "Cela remplace les réglages actuels de cette barre. Sa position et son activation ne changent pas."
 L["Copy every setting this bar shares with the bar you choose onto this bar."] = "Copie sur cette barre chaque réglage qu'elle partage avec la barre choisie."
 L["Default Color"] = "Couleur par défaut"
-L["Quickdraw Context"] = "Contexte Quickdraw"
 L["Hide When Buffed"] = "Masquer si déjà le bonus"
 L["Leaves this menu out while you already have %s."] = "Retire ce menu tant que vous avez déjà %s."
 L["Unless Under (min)"] = "Sauf sous (min)"
