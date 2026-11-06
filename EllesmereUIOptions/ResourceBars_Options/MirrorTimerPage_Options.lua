@@ -315,6 +315,19 @@ function ns.ERB_BuildMirrorTimerPage(pageName, parent, yOffset, id)
     Sync(sparkRow._leftRegion, "Apply Show Spark to all Bars", { "showSpark" })
     Sync(sparkRow._rightRegion, "Apply Hide Blizzard Bar to all Bars", { "hideBlizzard" })
 
+    -- The countdowns (Battle Start, Group Countdown): Hide Under the Golden
+    -- Numbers, the game's own hand-over from its bar to its big numbers.
+    if K.numbersAt then
+        _, h = W:DualRow(parent, y,
+            { type = "toggle", text = "Hide Under the Golden Numbers",
+              tooltip = EllesmereUI.Lf("Hides this bar once the game switches to its big golden numbers (under %d seconds), so they show alone.", K.numbersAt),
+              disabled = off, disabledTooltip = TIP,
+              getValue = function() local c = C(); return c and c.hideUnderNumbers == true end,
+              setValue = Set("hideUnderNumbers") },
+            { type = "label", text = "" }
+        );  y = y - h
+    end
+
     _, h = W:Spacer(parent, y, 16);  y = y - h
 
     ---------------------------------------------------------------------------
