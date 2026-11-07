@@ -424,6 +424,23 @@ local function Build()
         WSkin.OnStylesChanged(PaintBackdrop)
     end
     title:SetText(EllesmereUI.L("Alts"))
+    -- A cog in the title band opens the Mail card's Shown Characters, where a
+    -- hidden character is ticked back on.
+    local cog = CreateFrame("Button", nil, panel)
+    cog:SetSize(14, 14)
+    local cogY = blizzLook and (FOREVER and -17 or -11) or -(topH / 2)
+    cog:SetPoint("RIGHT", panel, "TOPRIGHT", -(inset + 6), cogY)
+    cog:SetNormalTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\cogs.png")
+    cog:GetNormalTexture():SetAlpha(0.6)
+    cog:SetHighlightTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\cogs.png", "ADD")
+    cog:SetScript("OnClick", function()
+        EUI:NavigateToElementSettings("EllesmereUIBlizzardSkin", "Blizzard Window Skins", "ALT LIST", nil, "Shown Characters")
+    end)
+    cog:SetScript("OnEnter", function(self)
+        EUI.ShowWidgetTooltip(self, EllesmereUI.L("Shown Characters") .. "\n" .. EUI.COLOR_CODES.DIM
+            .. EllesmereUI.L("Choose which characters the list shows.") .. "|r", { anchor = "right", justify = "LEFT" })
+    end)
+    cog:SetScript("OnLeave", RowLeave)
     panel:SetWidth(PANEL_W)
     panel:SetClampedToScreen(true)
     -- It hangs outside the window: a click on its empty parts stays off the world.

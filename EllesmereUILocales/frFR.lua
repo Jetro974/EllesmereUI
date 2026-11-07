@@ -6605,3 +6605,4 @@ L["Log into your other characters to list them here."] = "Connectez-vous sur vos
 L["Your other characters are hidden by Shown Characters or Minimum Level."] = "Vos autres personnages sont masqués par Personnages affichés ou Niveau minimum."
 L["Only Warbound items can be mailed to this character."] = "Seuls les objets liés au bataillon peuvent être envoyés à ce personnage."
 L["Remove %s from the Alt List? It comes back when you next log into it."] = "Retirer %s de la liste des autres personnages ? Il revient à votre prochaine connexion sur ce personnage."
+L["Choose which characters the list shows."] = "Choisissez les personnages que la liste affiche."
