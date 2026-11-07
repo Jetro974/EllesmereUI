@@ -317,28 +317,51 @@ ns.UpdateContextHint = UpdateHint
 --  registry, no hook on its secure-adjacent buttons; the right click stays
 --  Blizzard's (it cancels the aura). The buff's tooltip says so.
 -------------------------------------------------------------------------------
--- The context whose aura this is, when its menu is the one the hint opens now.
-local function HintAura(auraInstanceID)
-    if not hint.palette or not hint.contextKey or not auraInstanceID then return false end
-    local data = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
-        and C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)
+-- The context a player aura belongs to (by spell ID), or nil.
+local function ContextOfAura(auraInstanceID, index)
+    local data
+    if auraInstanceID and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
+        data = C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)
+    end
+    if not data and index and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+        data = C_UnitAuras.GetAuraDataByIndex("player", index, "HELPFUL")
+    end
     local spellID = data and data.spellId
-    if spellID == nil or (issecretvalue and issecretvalue(spellID)) then return false end
-    local def = CONTEXTS[hint.contextKey]
-    return def ~= nil and def.aura == spellID
+    if spellID == nil or (issecretvalue and issecretvalue(spellID)) then return nil end
+    for key, def in pairs(CONTEXTS) do
+        if def.aura == spellID then return key end
+    end
+    return nil
+end
+
+-- The menu of that context the player can open right now (the hint's own), or nil.
+local function MenuFor(key)
+    local i, reachKey = ReachableContextMenu()
+    if i and reachKey == key then return i end
+    return nil
 end
 
 if EventRegistry and EventRegistry.RegisterCallback then
     EventRegistry:RegisterCallback("BuffButton.OnClick", function(_, auraButton, mouseButton)
         if mouseButton ~= "LeftButton" or InCombatLockdown() then return end
         local info = auraButton and auraButton.buttonInfo
-        if info and HintAura(info.auraInstanceID) then OpenFromHint(hint.palette) end
+        local key = info and ContextOfAura(info.auraInstanceID, info.index)
+        if not key then return end
+        local i = MenuFor(key)
+        if i then
+            OpenFromHint(i)
+        else
+            -- The buff is there but no menu answers: say why rather than nothing.
+            EllesmereUI.Print(EllesmereUI.Lf("No Quickdraw menu is set for %s.", EllesmereUI.L(CONTEXTS[key].label)))
+        end
     end, hint)
 end
 
 if GameTooltip and GameTooltip.SetUnitAuraByAuraInstanceID then
     hooksecurefunc(GameTooltip, "SetUnitAuraByAuraInstanceID", function(tooltip, unit, auraInstanceID)
-        if unit ~= "player" or InCombatLockdown() or not HintAura(auraInstanceID) then return end
+        if unit ~= "player" or InCombatLockdown() then return end
+        local key = ContextOfAura(auraInstanceID)
+        if not key or not MenuFor(key) then return end
         tooltip:AddLine(EllesmereUI.L("Click to open this menu."), 0.4, 0.8, 1, true)
         tooltip:Show()
     end)
