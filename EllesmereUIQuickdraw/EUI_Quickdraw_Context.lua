@@ -311,6 +311,40 @@ end
 ns.UpdateContextHint = UpdateHint
 
 -------------------------------------------------------------------------------
+--  The aura itself: a left click on the context's own buff in Blizzard's buff
+--  bar opens the same menu as the hint. Blizzard fires BuffButton.OnClick for
+--  every buff click (AuraButtonMixin:OnClick), so this is a callback on its
+--  registry, no hook on its secure-adjacent buttons; the right click stays
+--  Blizzard's (it cancels the aura). The buff's tooltip says so.
+-------------------------------------------------------------------------------
+-- The context whose aura this is, when its menu is the one the hint opens now.
+local function HintAura(auraInstanceID)
+    if not hint.palette or not hint.contextKey or not auraInstanceID then return false end
+    local data = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
+        and C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)
+    local spellID = data and data.spellId
+    if spellID == nil or (issecretvalue and issecretvalue(spellID)) then return false end
+    local def = CONTEXTS[hint.contextKey]
+    return def ~= nil and def.aura == spellID
+end
+
+if EventRegistry and EventRegistry.RegisterCallback then
+    EventRegistry:RegisterCallback("BuffButton.OnClick", function(_, auraButton, mouseButton)
+        if mouseButton ~= "LeftButton" or InCombatLockdown() then return end
+        local info = auraButton and auraButton.buttonInfo
+        if info and HintAura(info.auraInstanceID) then OpenFromHint(hint.palette) end
+    end, hint)
+end
+
+if GameTooltip and GameTooltip.SetUnitAuraByAuraInstanceID then
+    hooksecurefunc(GameTooltip, "SetUnitAuraByAuraInstanceID", function(tooltip, unit, auraInstanceID)
+        if unit ~= "player" or InCombatLockdown() or not HintAura(auraInstanceID) then return end
+        tooltip:AddLine(EllesmereUI.L("Click to open this menu."), 0.4, 0.8, 1, true)
+        tooltip:Show()
+    end)
+end
+
+-------------------------------------------------------------------------------
 --  Following the signal
 -------------------------------------------------------------------------------
 -- Which context menus are up for grabs, as one string: a menu standing down
