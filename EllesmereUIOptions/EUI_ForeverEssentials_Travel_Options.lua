@@ -311,6 +311,10 @@ _G._EUI_BuildFlightTimerPage = function(pageName, parent, yOffset)
               get = function() return FT.Get("exitBorderCustom") end,
               set = function(v) Set("exitBorderCustom", v) end },
             offsetX, offsetY,
+            { type = "toggle", label = "Hide Blizzard Request Stop",
+              tooltip = "Hides Blizzard's own Request Stop button while this bar and its button show.",
+              get = function() return FT.Get("hideBlizzardStop") end,
+              set = function(v) Set("hideBlizzardStop", v) end },
         } })
 
     local separatorRow
