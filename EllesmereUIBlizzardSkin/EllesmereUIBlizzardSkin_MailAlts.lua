@@ -13,9 +13,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  Characters Shown (mailAltListMax) and Minimum Level (mailAltListMinLevel).
 --  The cog in the title opens the list's own menu, on the spot: the ignored
 --  characters shown too (dimmed and marked, this session only), Sort By, Max
---  Characters Shown and Minimum Level; a right click on the title shows the
---  ignored ones too. A right click on an ignored character offers Show This
---  Character Again. Nothing here opens the EllesmereUI options.
+--  Characters Shown and Minimum Level. A right click on an ignored character
+--  offers Show This Character Again. Nothing here opens the EllesmereUI options.
 --
 --  The roster, EllesmereUIDB.mailAltRoster (by player GUID, which a rename
 --  keeps), is written at every login and logout even while the list is off
@@ -450,27 +449,6 @@ local function Build()
         WSkin.OnStylesChanged(PaintBackdrop)
     end
     title:SetText(EllesmereUI.L("Alts"))
-    -- The title band, right click: the ignored characters shown too, or not.
-    -- Built before the cog, which sits above it and keeps its own clicks.
-    local band = CreateFrame("Button", nil, panel)
-    band:SetPoint("TOPLEFT", panel, "TOPLEFT", inset, 0)
-    band:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -(inset + 24), 0)
-    band:SetHeight(blizzLook and FOREVER and 30 or topH)
-    band:RegisterForClicks("RightButtonUp")
-    band:SetScript("OnClick", function(self)
-        EUI.ShowContextMenu(self, {
-            { text = showIgnored and "Hide Ignored Characters" or "Show Ignored Characters",
-              onClick = function()
-                  showIgnored = not showIgnored
-                  Changed()
-              end },
-        })
-    end)
-    band:SetScript("OnEnter", function(self)
-        EUI.ShowWidgetTooltip(self, EllesmereUI.L("Alts") .. "\n" .. EUI.COLOR_CODES.DIM
-            .. EllesmereUI.L("Right-click: show or hide the ignored characters.") .. "|r", { anchor = "right", justify = "LEFT" })
-    end)
-    band:SetScript("OnLeave", RowLeave)
     -- A cog in the title band: the list's own menu, on the spot.
     local cog = CreateFrame("Button", nil, panel)
     cog:SetSize(14, 14)
@@ -587,7 +565,7 @@ Paint = function()
         emptyNote:SetText(mailable == 0
             and EllesmereUI.L("Log into your other characters to list them here.")
             or (EllesmereUI.L("Your other characters are hidden by Shown Characters or Minimum Level.")
-                .. (ignoredCount > 0 and ("\n" .. EllesmereUI.L("Right-click the title to show the ignored ones.")) or "")))
+                .. (ignoredCount > 0 and ("\n" .. EllesmereUI.L("The cog shows the ignored ones.")) or "")))
         emptyNote:Show()
         h = topH + EMPTY_PAD * 2 + math.ceil(emptyNote:GetStringHeight())
     end
