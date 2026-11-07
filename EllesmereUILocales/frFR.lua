@@ -6587,3 +6587,5 @@ L["Right-click to remove from your account ignore list."] = "Clic droit pour ret
 L["Players you ignore on any character are listed here and blocked on all of them."] = "Les joueurs que vous ignorez sur un personnage s'affichent ici et sont bloqués sur tous."
 L["Remove Player"] = "Retirer le joueur"
 L["Takes this player off your account ignore list, on every character."] = "Retire ce joueur de la liste des ignorés du compte, sur tous les personnages."
+L["Hide Blizzard Request Stop"] = "Masquer « Demande d'arrêt » de Blizzard"
+L["Hides Blizzard's own Request Stop button while this bar and its button show."] = "Masque le bouton « Demande d'arrêt » de Blizzard tant que cette barre et son bouton s'affichent."
