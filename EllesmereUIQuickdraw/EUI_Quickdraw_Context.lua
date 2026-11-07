@@ -230,7 +230,9 @@ local function LiveView()
     return liveView
 end
 
-local function OpenFromHint(index)
+-- below: a frame the menu hangs under instead of opening round the cursor
+-- (a buff in the screen's top corner would push it off the screen).
+local function OpenFromHint(index, below)
     if InCombatLockdown() or not ns.Open then return end
     local view = LiveView()
     if not view then return end
@@ -241,7 +243,15 @@ local function OpenFromHint(index)
     -- What the bags hold now (Campsite Items is a view on them).
     if I.usableMemo then wipe(I.usableMemo) end
     ns.Open(index)
-    if not view:GetFrame():IsShown() then return end
+    local frame = view:GetFrame()
+    if not frame:IsShown() then return end
+    if below then
+        frame:ClearAllPoints()
+        frame:SetPoint("TOP", below, "BOTTOM", 0, -12)
+        frame:SetClampedToScreen(true)
+        -- Which side the caption hangs on follows where the menu landed.
+        if view.PlaceHubText then view:PlaceHubText() end
+    end
     pickerFor = index
     picker:Show()
 end
@@ -349,7 +359,7 @@ if EventRegistry and EventRegistry.RegisterCallback then
         if not key then return end
         local i = MenuFor(key)
         if i then
-            OpenFromHint(i)
+            OpenFromHint(i, auraButton)
         else
             -- The buff is there but no menu answers: say why rather than nothing.
             EllesmereUI.Print(EllesmereUI.Lf("No Quickdraw menu is set for %s.", EllesmereUI.L(CONTEXTS[key].label)))
