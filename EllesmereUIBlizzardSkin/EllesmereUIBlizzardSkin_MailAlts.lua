@@ -47,7 +47,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  The panel's look is latched at login with the mail window's own skin
 --  (which applies at login, its style changes needing a reload): EllesmereUI
 --  and Modern draw the window theme (eui <-> modern repaints live), Blizz
---  Default draws Blizzard's own DefaultPanelTemplate.
+--  Default draws Blizzard's own DefaultPanelTemplate (on WoW Forever, the
+--  mail window's own border and background, and Forever's class icons).
 -------------------------------------------------------------------------------
 local _, ns = ...
 local WSkin = ns.WSkin
@@ -320,7 +321,14 @@ end
 
 local function DressIcon(tex, class)
     local coords
-    if blizzLook then
+    if blizzLook and FOREVER then
+        -- WoW Forever: its own class icons (the character-create sheet there
+        -- is laid out differently from retail's coordinates).
+        tex:SetTexCoord(0, 1, 0, 1)
+        tex:SetAtlas("classicon-" .. tostring(class):lower())
+        tex:Show()
+        return
+    elseif blizzLook then
         coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
         if coords then tex:SetTexture(BLIZZ_CLASS_ICONS) end
     else
@@ -367,9 +375,27 @@ local function Build()
     -- Named: a frame of ours the window skin's art sweeps leave alone.
     if blizzLook then
         topH, inset, gap = BLIZZ_TOP, BLIZZ_INSET, BLIZZ_GAP
-        panel = CreateFrame("Frame", "EllesmereUIMailAltList", SendMailFrame, "DefaultPanelTemplate")
-        panel:SetTitleOffsets(6, -6)
-        title = panel:GetTitleText()
+        if FOREVER then
+            -- WoW Forever's mail window is a ButtonFrameTemplate: the same
+            -- border (its no-portrait layout) and rock background, drawn on a
+            -- plain frame (the template's mixins would add gamepad focus).
+            panel = CreateFrame("Frame", "EllesmereUIMailAltList", SendMailFrame)
+            local bg = panel:CreateTexture(nil, "BACKGROUND", nil, -6)
+            bg:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock", "REPEAT", "REPEAT")
+            bg:SetHorizTile(true)
+            bg:SetVertTile(true)
+            bg:SetPoint("TOPLEFT", 2, -21)
+            bg:SetPoint("BOTTOMRIGHT", -2, 2)
+            local border = CreateFrame("Frame", nil, panel, "NineSlicePanelTemplate")
+            border:SetAllPoints()
+            NineSliceUtil.ApplyLayoutByName(border, "ButtonFrameTemplateNoPortrait")
+            title = border:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            title:SetPoint("TOP", panel, "TOP", 0, -5)
+        else
+            panel = CreateFrame("Frame", "EllesmereUIMailAltList", SendMailFrame, "DefaultPanelTemplate")
+            panel:SetTitleOffsets(6, -6)
+            title = panel:GetTitleText()
+        end
     else
         topH, inset, gap = EUI_TOP, EUI_INSET, EUI_GAP
         panel = CreateFrame("Frame", "EllesmereUIMailAltList", SendMailFrame)
