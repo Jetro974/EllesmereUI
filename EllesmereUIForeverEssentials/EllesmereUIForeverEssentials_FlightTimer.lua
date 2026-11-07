@@ -60,9 +60,6 @@ local DEFAULTS = {
     destText = "show", destSize = 12, destX = 0, destY = 0,
     timeText = "show", timeSize = 12, timeX = 0, timeY = 0,
     showTotal = false, earlyExit = true, fade = false,
-    -- Blizzard's own Request Stop button (the vehicle leave button) goes
-    -- invisible and unclickable while the bar and its exit button show.
-    hideBlizzardStop = false,
 }
 
 local BAR_TEXTURES, BAR_TEXTURE_NAMES, BAR_TEXTURE_ORDER = EllesmereUI.BuildBarTextureTables()
@@ -362,34 +359,7 @@ end
 
 -- Early exit button right of the bar, built on first enable. Greyed out once a
 -- landing is requested, as Blizzard's leave button does.
--- Blizzard's Request Stop button: alpha and mouse only, never moved, shown
--- or hidden (its visibility and place stay Blizzard's). The mouse is a
--- protected frame's, so in combat it waits for the combat queue.
-local blizzStopHidden, blizzStopMouse
-local SyncBlizzStop
-SyncBlizzStop = function(hide)
-    local btn = _G.MainMenuBarVehicleLeaveButton
-    if not btn then return end
-    hide = hide and true or false
-    if hide ~= (blizzStopHidden == true) then
-        btn:SetAlpha(hide and 0 or 1)
-        blizzStopHidden = hide or nil
-    end
-    if blizzStopMouse == hide then return end
-    if InCombatLockdown() then
-        EllesmereUI.CombatQueue.Defer("EUI_FlightTimerBlizzStop", function()
-            SyncBlizzStop(blizzStopHidden)
-        end)
-        return
-    end
-    btn:EnableMouse(not hide)
-    blizzStopMouse = hide
-end
-
 local function StyleExit(b, fl)
-    if b == bar then
-        SyncBlizzStop(fl ~= nil and Get("earlyExit") and Get("hideBlizzardStop"))
-    end
     local btn = b.exit
     if not Get("earlyExit") then
         if btn then btn:Hide() end
@@ -542,7 +512,6 @@ end
 
 local function EndFlight()
     flight = nil
-    SyncBlizzStop(false)
     if ticker then ticker:Cancel(); ticker = nil end
     if bar then ShowBar(false) end
 end
