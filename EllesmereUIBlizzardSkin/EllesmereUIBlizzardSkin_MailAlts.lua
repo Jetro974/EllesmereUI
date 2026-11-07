@@ -11,9 +11,11 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  The card also keeps Shown Characters (EllesmereUIDB.mailAltHidden, by
 --  player GUID) and, in the toggle's cog, Sort By (mailAltListSort), Max
 --  Characters Shown (mailAltListMax) and Minimum Level (mailAltListMinLevel).
---  A right click on the title shows the ignored characters too, dimmed and
---  marked, for this session only; a right click on one of them offers Show
---  This Character Again, so nobody has to open the settings to undo an ignore.
+--  The cog in the title opens the list's own menu, on the spot: the ignored
+--  characters shown too (dimmed and marked, this session only), Sort By, Max
+--  Characters Shown and Minimum Level; a right click on the title shows the
+--  ignored ones too. A right click on an ignored character offers Show This
+--  Character Again. Nothing here opens the EllesmereUI options.
 --
 --  The roster, EllesmereUIDB.mailAltRoster (by player GUID, which a rename
 --  keeps), is written at every login and logout even while the list is off
@@ -469,8 +471,7 @@ local function Build()
             .. EllesmereUI.L("Right-click: show or hide the ignored characters.") .. "|r", { anchor = "right", justify = "LEFT" })
     end)
     band:SetScript("OnLeave", RowLeave)
-    -- A cog in the title band opens the Mail card's Shown Characters, where a
-    -- hidden character is ticked back on.
+    -- A cog in the title band: the list's own menu, on the spot.
     local cog = CreateFrame("Button", nil, panel)
     cog:SetSize(14, 14)
     local cogY = blizzLook and (FOREVER and -17 or -11) or -(topH / 2)
@@ -478,12 +479,37 @@ local function Build()
     cog:SetNormalTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\cogs.png")
     cog:GetNormalTexture():SetAlpha(0.6)
     cog:SetHighlightTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\cogs.png", "ADD")
-    cog:SetScript("OnClick", function()
-        EUI:NavigateToElementSettings("EllesmereUIBlizzardSkin", "Blizzard Window Skins", "ALT LIST", nil, "Shown Characters")
+    cog:SetScript("OnClick", function(self)
+        EUI.HideWidgetTooltip()
+        local function Set(key, value)
+            if EllesmereUIDB then EllesmereUIDB[key] = value end
+            Changed()
+        end
+        local sort = Setting("mailAltListSort", DEFAULT_SORT)
+        local function SortItem(value, label)
+            return { text = label, isActive = sort == value, onClick = function() Set("mailAltListSort", value) end }
+        end
+        EUI.ShowContextMenu(self, {
+            { text = showIgnored and "Hide Ignored Characters" or "Show Ignored Characters",
+              onClick = function()
+                  showIgnored = not showIgnored
+                  Changed()
+              end },
+            "---",
+            { text = "Sort By", children = {
+                SortItem("recent", "Last Played"), SortItem("level", "Level"), SortItem("name", "Name"),
+            } },
+            { text = "Max Characters Shown", isInput = true, min = 1,
+              getValue = function() return Clamp(NumberSetting("mailAltListMax", DEFAULT_MAX), 1, MAX_ROWS) end,
+              setValue = function(v) Set("mailAltListMax", Clamp(v, 1, MAX_ROWS)) end },
+            { text = "Minimum Level", isInput = true, min = 1,
+              getValue = function() return NumberSetting("mailAltListMinLevel", DEFAULT_MIN_LEVEL) end,
+              setValue = function(v) Set("mailAltListMinLevel", Clamp(v, 1, GetMaxLevelForLatestExpansion())) end },
+        })
     end)
     cog:SetScript("OnEnter", function(self)
-        EUI.ShowWidgetTooltip(self, EllesmereUI.L("Shown Characters") .. "\n" .. EUI.COLOR_CODES.DIM
-            .. EllesmereUI.L("Choose which characters the list shows.") .. "|r", { anchor = "right", justify = "LEFT" })
+        EUI.ShowWidgetTooltip(self, EllesmereUI.L("Alts") .. "\n" .. EUI.COLOR_CODES.DIM
+            .. EllesmereUI.L("Click for the list's options.") .. "|r", { anchor = "right", justify = "LEFT" })
     end)
     cog:SetScript("OnLeave", RowLeave)
     panel:SetWidth(PANEL_W)
