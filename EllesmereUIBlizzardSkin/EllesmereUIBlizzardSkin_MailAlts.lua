@@ -11,6 +11,9 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  The card also keeps Shown Characters (EllesmereUIDB.mailAltHidden, by
 --  player GUID) and, in the toggle's cog, Sort By (mailAltListSort), Max
 --  Characters Shown (mailAltListMax) and Minimum Level (mailAltListMinLevel).
+--  A right click on the title shows the ignored characters too, dimmed and
+--  marked, for this session only; a right click on one of them offers Show
+--  This Character Again, so nobody has to open the settings to undo an ignore.
 --
 --  The roster, EllesmereUIDB.mailAltRoster (by player GUID, which a rename
 --  keeps), is written at every login and logout even while the list is off
@@ -69,6 +72,7 @@ local ICON_SIZE  = 16
 local LIST_PAD   = 4        -- above the first row and below the last
 local EMPTY_PAD  = 10       -- around the empty-list note
 local LIMITED_ALPHA = 0.55  -- a row that takes Warbound items only
+local IGNORED_ALPHA = 0.45  -- an ignored character, shown on request
 -- The two looks' geometry: the title band's height, the list's side inset and
 -- the gap to the window beside it (Blizzard's metal corners reach past their frame).
 local EUI_TOP, EUI_INSET, EUI_GAP       = 25, 1, 4
@@ -94,7 +98,10 @@ local sortRoster                  -- the roster the comparators read during one 
 local menuGuid                    -- the row the right-click menu was opened on
 local myGuid                      -- this character, read at login (never in its own list)
 local paintedGen, paintedFaction  -- the class colour palette and faction the list was painted with
-local MENU
+local MENU, IGNORED_MENU, Changed
+local showIgnored = false         -- the title's right click: ignored characters listed too (this session)
+local ignoredShown = {}           -- player GUIDs of the ignored characters in the shown list
+local ignoredCount = 0            -- ignored characters this page could mail
 
 -------------------------------------------------------------------------------
 --  Settings and the roster
@@ -219,7 +226,8 @@ local SORTS = { recent = ByRecent, level = ByLevel, name = ByName }
 
 local function Collect()
     wipe(shown)
-    mailable = 0
+    wipe(ignoredShown)
+    mailable, ignoredCount = 0, 0
     local roster = Roster()
     local faction = PlainString((UnitFactionGroup("player")))
     paintedFaction = faction
@@ -234,15 +242,28 @@ local function Collect()
         if guid ~= me and type(e) == "table" and type(e.name) == "string" and e.realmKey
            and (not own or e.realmKey == own) then
             mailable = mailable + 1
-            if not (hidden and hidden[guid]) and (e.level or 0) >= minLevel then
+            if hidden and hidden[guid] then
+                ignoredCount = ignoredCount + 1
+                if showIgnored then ignoredShown[guid] = true end
+            elseif (e.level or 0) >= minLevel then
                 shown[#shown + 1] = guid
             end
         end
     end
+    local comparator = SORTS[Setting("mailAltListSort", DEFAULT_SORT)] or ByRecent
     sortRoster = roster
-    sort(shown, SORTS[Setting("mailAltListSort", DEFAULT_SORT)] or ByRecent)
-    sortRoster = nil
+    sort(shown, comparator)
     for i = #shown, Clamp(NumberSetting("mailAltListMax", DEFAULT_MAX), 1, MAX_ROWS) + 1, -1 do shown[i] = nil end
+    -- The ignored ones, when asked: after the others, up to the list's top.
+    if showIgnored then
+        local extra = {}
+        for guid in pairs(ignoredShown) do extra[#extra + 1] = guid end
+        sort(extra, comparator)
+        for i = 1, #extra do
+            if #shown >= MAX_ROWS then ignoredShown[extra[i]] = nil else shown[#shown + 1] = extra[i] end
+        end
+    end
+    sortRoster = nil
 end
 
 -------------------------------------------------------------------------------
@@ -258,6 +279,9 @@ local function RowEnter(self)
     local head = e.name
     if self._foreign then head = head .. " - " .. (e.realm or e.realmKey) end
     local text = EUI.HexColor(c.r, c.g, c.b) .. head .. "|r\n" .. Describe(e)
+    if self._ignored then
+        text = text .. "\n" .. EllesmereUI.L("Ignored: right-click to show it again.")
+    end
     if self._limited then
         text = text .. "\n" .. (FOREVER and EllesmereUI.L("Your mail cannot reach the other faction.")
             or EllesmereUI.L("Only Warbound items can be mailed to this character."))
@@ -275,7 +299,7 @@ local function RowClick(self, button)
     if not self._guid then return end
     if button == "RightButton" then
         menuGuid = self._guid
-        EUI.ShowContextMenu(self, MENU)
+        EUI.ShowContextMenu(self, self._ignored and IGNORED_MENU or MENU)
         return
     end
     local box = SendMailNameEditBox
@@ -424,6 +448,27 @@ local function Build()
         WSkin.OnStylesChanged(PaintBackdrop)
     end
     title:SetText(EllesmereUI.L("Alts"))
+    -- The title band, right click: the ignored characters shown too, or not.
+    -- Built before the cog, which sits above it and keeps its own clicks.
+    local band = CreateFrame("Button", nil, panel)
+    band:SetPoint("TOPLEFT", panel, "TOPLEFT", inset, 0)
+    band:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -(inset + 24), 0)
+    band:SetHeight(blizzLook and FOREVER and 30 or topH)
+    band:RegisterForClicks("RightButtonUp")
+    band:SetScript("OnClick", function(self)
+        EUI.ShowContextMenu(self, {
+            { text = showIgnored and "Hide Ignored Characters" or "Show Ignored Characters",
+              onClick = function()
+                  showIgnored = not showIgnored
+                  Changed()
+              end },
+        })
+    end)
+    band:SetScript("OnEnter", function(self)
+        EUI.ShowWidgetTooltip(self, EllesmereUI.L("Alts") .. "\n" .. EUI.COLOR_CODES.DIM
+            .. EllesmereUI.L("Right-click: show or hide the ignored characters.") .. "|r", { anchor = "right", justify = "LEFT" })
+    end)
+    band:SetScript("OnLeave", RowLeave)
     -- A cog in the title band opens the Mail card's Shown Characters, where a
     -- hidden character is ticked back on.
     local cog = CreateFrame("Button", nil, panel)
@@ -479,7 +524,8 @@ Paint = function()
         else
             limited = not realms[e.realmKey]
         end
-        r._guid, r._foreign, r._limited = guid, foreign, limited
+        local ignored = ignoredShown[guid] == true
+        r._guid, r._foreign, r._limited, r._ignored = guid, foreign, limited, ignored
         -- Mail addresses another realm's character as "Name-Realm", and a
         -- WoW Forever character by its full name, "Name Surname".
         if FOREVER then
@@ -494,9 +540,10 @@ Paint = function()
         else
             r._name:SetText(foreign and (e.name .. FOREIGN_SERVER_LABEL) or e.name)
         end
+        if ignored then r._name:SetText(r._name:GetText() .. " " .. EUI.COLOR_CODES.DIM .. EllesmereUI.L("(ignored)") .. "|r") end
         r._name:SetTextColor(c.r, c.g, c.b)
         r._lvl:SetText(e.level or "")
-        r:SetAlpha(limited and LIMITED_ALPHA or 1)
+        r:SetAlpha(ignored and IGNORED_ALPHA or (limited and LIMITED_ALPHA or 1))
         r:Show()
     end
     local owner = EUI._WidgetTooltipOwner()
@@ -504,7 +551,7 @@ Paint = function()
         local r = rows[i]
         if owner == r then EUI.HideWidgetTooltip(true) end
         r:Hide()
-        r._guid, r._target, r._limited = nil, nil, nil
+        r._guid, r._target, r._limited, r._ignored = nil, nil, nil, nil
     end
     local h
     if n > 0 then
@@ -513,7 +560,8 @@ Paint = function()
     else
         emptyNote:SetText(mailable == 0
             and EllesmereUI.L("Log into your other characters to list them here.")
-            or EllesmereUI.L("Your other characters are hidden by Shown Characters or Minimum Level."))
+            or (EllesmereUI.L("Your other characters are hidden by Shown Characters or Minimum Level.")
+                .. (ignoredCount > 0 and ("\n" .. EllesmereUI.L("Right-click the title to show the ignored ones.")) or "")))
         emptyNote:Show()
         h = topH + EMPTY_PAD * 2 + math.ceil(emptyNote:GetStringHeight())
     end
@@ -579,7 +627,7 @@ end
 
 -- A change from the right-click menu: the list, and the open options page's
 -- Shown Characters summary.
-local function Changed()
+Changed = function()
     dirty = true
     if panel and panel:IsVisible() then
         Paint()
@@ -633,6 +681,16 @@ MENU = {
               end,
           })
       end },
+}
+
+-- An ignored character (shown on request): undo the ignore, or forget it.
+IGNORED_MENU = {
+    { text = "Show This Character Again",
+      tooltip = "Lists it again, as if ticked in Shown Characters.",
+      onClick = function()
+          if menuGuid then SetShown(menuGuid, true); Changed() end
+      end },
+    MENU[2],
 }
 
 -------------------------------------------------------------------------------
