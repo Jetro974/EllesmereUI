@@ -48,7 +48,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  (which applies at login, its style changes needing a reload): EllesmereUI
 --  and Modern draw the window theme (eui <-> modern repaints live), Blizz
 --  Default draws Blizzard's own DefaultPanelTemplate (on WoW Forever, the
---  mail window's own border and background, and Forever's class icons).
+--  game's plain dialog box, and Forever's class icons).
 -------------------------------------------------------------------------------
 local _, ns = ...
 local WSkin = ns.WSkin
@@ -73,6 +73,7 @@ local LIMITED_ALPHA = 0.55  -- a row that takes Warbound items only
 -- the gap to the window beside it (Blizzard's metal corners reach past their frame).
 local EUI_TOP, EUI_INSET, EUI_GAP       = 25, 1, 4
 local BLIZZ_TOP, BLIZZ_INSET, BLIZZ_GAP = 21, 8, 10
+local FOREVER_TOP, FOREVER_INSET        = 28, 8   -- the dialog box: title inside its border
 local EUI_CLASS_ICONS   = "Interface\\AddOns\\EllesmereUI\\media\\icons\\class-full\\modern.tga"
 local BLIZZ_CLASS_ICONS = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 local SHELL_ART         = "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png"
@@ -377,27 +378,19 @@ local function Build()
     if blizzLook then
         topH, inset, gap = BLIZZ_TOP, BLIZZ_INSET, BLIZZ_GAP
         if FOREVER then
-            -- WoW Forever's mail window is a ButtonFrameTemplate: the same
-            -- border (its no-portrait layout) and rock background, drawn on a
-            -- plain frame (the template's mixins would add gamepad focus).
-            panel = CreateFrame("Frame", "EllesmereUIMailAltList", SendMailFrame)
-            local bg = panel:CreateTexture(nil, "BACKGROUND", nil, -6)
-            bg:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock", "REPEAT", "REPEAT")
-            bg:SetHorizTile(true)
-            bg:SetVertTile(true)
-            bg:SetPoint("TOPLEFT", 2, -21)
-            bg:SetPoint("BOTTOMRIGHT", -2, 2)
-            local border = CreateFrame("Frame", nil, panel, "NineSlicePanelTemplate")
-            border:SetAllPoints()
-            NineSliceUtil.ApplyLayoutByName(border, "ButtonFrameTemplateNoPortrait")
-            -- The layout's top corners stand 16 above the frame, where the mail
-            -- window's portrait and close button cover them; here they would
-            -- poke out as two posts, so they sit flush with the top instead.
-            local tl, tr = border.TopLeftCorner, border.TopRightCorner
-            if tl then tl:ClearAllPoints(); tl:SetPoint("TOPLEFT", border, "TOPLEFT", -8, 0) end
-            if tr then tr:ClearAllPoints(); tr:SetPoint("TOPRIGHT", border, "TOPRIGHT", 2, 0) end
-            title = border:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            title:SetPoint("TOP", panel, "TOP", 0, -5)
+            -- WoW Forever: its frame borders are built for a portrait and a
+            -- close button (their top corners stand above the frame), so the
+            -- list takes the game's plain dialog box instead.
+            topH, inset = FOREVER_TOP, FOREVER_INSET
+            panel = CreateFrame("Frame", "EllesmereUIMailAltList", SendMailFrame, "BackdropTemplate")
+            panel:SetBackdrop({
+                bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+                edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+                tile = true, tileSize = 32, edgeSize = 24,
+                insets = { left = 6, right = 6, top = 6, bottom = 6 },
+            })
+            title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            title:SetPoint("TOP", panel, "TOP", 0, -10)
         else
             panel = CreateFrame("Frame", "EllesmereUIMailAltList", SendMailFrame, "DefaultPanelTemplate")
             panel:SetTitleOffsets(6, -6)
@@ -507,7 +500,7 @@ Paint = function()
         emptyNote:Show()
         h = topH + EMPTY_PAD * 2 + math.ceil(emptyNote:GetStringHeight())
     end
-    if blizzLook then h = h + 2 end   -- the frame's bottom edge
+    if blizzLook then h = h + (FOREVER and 8 or 2) end   -- the frame's bottom edge
     panel:SetHeight(h)
     if bgArt then WSkin.CoverFit(bgArt, PANEL_W, h) end
     if owner then ReplayHover() end
