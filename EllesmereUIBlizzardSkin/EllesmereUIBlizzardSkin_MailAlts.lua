@@ -62,7 +62,8 @@ local wipe, sort = wipe, table.sort
 
 local DEFAULT_MAX, DEFAULT_MIN_LEVEL, DEFAULT_SORT = 10, 1, "recent"
 local MAX_ROWS   = 20       -- the Max Characters Shown slider's top
-local PANEL_W    = 170
+-- WoW Forever lists "Name Surname": a wider panel.
+local PANEL_W    = EllesmereUI.IS_FOREVER and 200 or 170
 local ROW_H      = 22
 local ICON_SIZE  = 16
 local LIST_PAD   = 4        -- above the first row and below the last
@@ -389,6 +390,12 @@ local function Build()
             local border = CreateFrame("Frame", nil, panel, "NineSlicePanelTemplate")
             border:SetAllPoints()
             NineSliceUtil.ApplyLayoutByName(border, "ButtonFrameTemplateNoPortrait")
+            -- The layout's top corners stand 16 above the frame, where the mail
+            -- window's portrait and close button cover them; here they would
+            -- poke out as two posts, so they sit flush with the top instead.
+            local tl, tr = border.TopLeftCorner, border.TopRightCorner
+            if tl then tl:ClearAllPoints(); tl:SetPoint("TOPLEFT", border, "TOPLEFT", -8, 0) end
+            if tr then tr:ClearAllPoints(); tr:SetPoint("TOPRIGHT", border, "TOPRIGHT", 2, 0) end
             title = border:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             title:SetPoint("TOP", panel, "TOP", 0, -5)
         else
@@ -472,7 +479,11 @@ Paint = function()
         end
         DressIcon(r._icon, e.class)
         local c = EUI.GetClassColor(e.class)
-        r._name:SetText(foreign and (e.name .. FOREIGN_SERVER_LABEL) or e.name)
+        if FOREVER then
+            r._name:SetText(e.surname and (e.name .. " " .. e.surname) or e.name)
+        else
+            r._name:SetText(foreign and (e.name .. FOREIGN_SERVER_LABEL) or e.name)
+        end
         r._name:SetTextColor(c.r, c.g, c.b)
         r._lvl:SetText(e.level or "")
         r:SetAlpha(limited and LIMITED_ALPHA or 1)
