@@ -37,13 +37,26 @@ local function BuildTrinketMenuPage(pageName, parent, yOffset)
 
     _, h = W:DualRow(parent, y,
         { type="toggle", text="Trinket Menu",
-          tooltip="Your two trinkets as buttons: click one to use it, hover it for the trinkets in your bags and click one to equip it there. In combat the swap waits until combat ends. Move it in Unlock Mode.",
+          tooltip="Hover a trinket for every trinket you carry and click one to equip it there. In combat the swap waits until combat ends. Right-click trinkets in the menu to rank them: out of combat, when the worn one is on cooldown, the first ready one goes on.",
           getValue=function() return not off() end,
           setValue=EllesmereUI.SectionToggleSetValue(function(v) Set("enabled", v) end) },
         { type="slider", text="Icon Size", min=20, max=64, step=1,
           disabled=off, disabledTooltip="Trinket Menu",
           getValue=function() return Get("iconSize") or 36 end,
           setValue=function(v) Set("iconSize", v) end })
+    y = y - h
+
+    _, h = W:DualRow(parent, y,
+        { type="toggle", text="Show Trinket Buttons",
+          tooltip="Your two trinkets as buttons on screen: click one to use it. Move them in Unlock Mode. Their key bindings (Key Bindings > EllesmereUI) work even while the buttons are hidden.",
+          disabled=off, disabledTooltip="Trinket Menu",
+          getValue=function() return Get("showBar") ~= false end,
+          setValue=function(v) Set("showBar", v) end },
+        { type="toggle", text="Menu on Action Bars",
+          tooltip="The same menu opens on an action bar button holding a worn trinket (or a /use 13 or /use 14 macro), and a trinket on your bars follows its slot when you swap.",
+          disabled=off, disabledTooltip="Trinket Menu",
+          getValue=function() return Get("onBars") ~= false end,
+          setValue=function(v) Set("onBars", v) end })
     y = y - h
 
     _, h = W:Spacer(parent, y, 20); y = y - h

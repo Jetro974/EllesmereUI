@@ -1,0 +1,4 @@
+<Bindings>
+	<Binding name="CLICK EllesmereUITrinketTop:LeftButton" header="EUI_TRINKETS" category="EllesmereUI" />
+	<Binding name="CLICK EllesmereUITrinketBottom:LeftButton" category="EllesmereUI" />
+</Bindings>
