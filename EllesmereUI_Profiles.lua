@@ -1476,6 +1476,7 @@ local REFRESH_ADDON_STEPS = {
         if _G._EABR_RegisterUnlock then _G._EABR_RegisterUnlock() end
         if _G._ECL_RegisterUnlock then _G._ECL_RegisterUnlock() end
         if _G._EUI_BattleRes_RegisterUnlock then _G._EUI_BattleRes_RegisterUnlock() end
+        if _G._EUI_TrinketMenu_RegisterUnlock then _G._EUI_TrinketMenu_RegisterUnlock() end
         if _G._EDB_RegisterUnlock then _G._EDB_RegisterUnlock() end
     end,
 }

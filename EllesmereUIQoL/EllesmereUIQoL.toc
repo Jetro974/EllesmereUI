@@ -24,6 +24,7 @@ EllesmereUIQoL_MailExpiry.lua
 EllesmereUIQoL_MailPostage.lua
 EllesmereUIQoL_Shifter.lua
 EllesmereUIQoL_MovementAlert.lua
+EllesmereUIQoL_TrinketMenu.lua
 EllesmereUIQoL_RaidTools.lua
 EllesmereUIQoL_RaidBuffCheck.lua
 EllesmereUIQoL_SelfCombatText.lua
