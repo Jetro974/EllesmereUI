@@ -1843,20 +1843,22 @@ initFrame:SetScript("OnEvent", function(self)
             })
         end
 
-        -- Row 4: Login Tips (EllesmereUI_LoginTips.lua) | blank
-        _, h = W:DualRow(parent, y,
-            { type="toggle", text="Login Tips",
-              tooltip="At login, prints one short chat tip about an EllesmereUI feature you have not used yet. Type /euitips to see one now.",
-              -- Off by default.
-              getValue=function()
-                  return EllesmereUIDB and EllesmereUIDB.loginTips == true
-              end,
-              setValue=function(v)
-                  if not EllesmereUIDB then EllesmereUIDB = {} end
-                  EllesmereUIDB.loginTips = v
-              end },
-            { type="label", text="" }
-        );  y = y - h
+        -- Row 4: Login Tips | blank. Only where the game mode has a tip list
+        -- (EllesmereUI_LoginTips.lua): none on retail yet.
+        if EllesmereUI.LoginTips and EllesmereUI.LoginTips.HasTips() then
+            _, h = W:DualRow(parent, y,
+                { type="toggle", text="Login Tips",
+                  tooltip="At login, prints one short chat tip about EllesmereUI. Type /euitips to see one now.",
+                  getValue=function()
+                      return EllesmereUIDB and EllesmereUIDB.loginTips == true or false
+                  end,
+                  setValue=function(v)
+                      if not EllesmereUIDB then EllesmereUIDB = {} end
+                      EllesmereUIDB.loginTips = v or nil
+                  end },
+                EllesmereUI.BlankRowCfg()
+            ); y = y - h
+        end
 
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
