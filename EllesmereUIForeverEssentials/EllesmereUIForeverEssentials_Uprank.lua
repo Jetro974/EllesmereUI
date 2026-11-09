@@ -447,6 +447,9 @@ local function OnEvent(_, event, spellID, skillLineIndex, isGuildPerkSpell)
         learned[spellID] = true
         if F.Get("placeNew") and not isGuildPerkSpell then
             placeQueue[#placeQueue + 1] = { id = spellID, line = Plain(skillLineIndex) }
+            -- Placed in the event itself, as before the uprank moved to a check
+            -- on the next frame: by then the slot may be filled and the fly-in lost.
+            Flush()
         end
     elseif event == "SPELLS_CHANGED" then
         if firstScan then
