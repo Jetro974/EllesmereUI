@@ -488,7 +488,7 @@ local DEFAULTS = {
             unlockPos     = nil,
         },
         -- Mirror Timers: the timer bars (Breath, Fatigue, Feign Death and the
-        -- countdowns), set in the TIMER BARS section of the Cast Bars page.
+        -- countdowns), set in the OTHER BARS section of the Cast Bars page.
         mirrorTimer = {
             breath  = MirrorTimerDefaults(300, 0, 0.5, 1),
             fatigue = MirrorTimerDefaults(270, 1, 0.9, 0),

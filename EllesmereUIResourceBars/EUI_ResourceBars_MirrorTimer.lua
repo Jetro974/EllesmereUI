@@ -13,7 +13,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -- One bar per timer, each with its own position and Unlock Mode mover:
 -- Breath (BREATH), Fatigue (EXHAUSTION), Feign Death (FEIGNDEATH, and DEATH,
 -- which Blizzard paints the same way), Battle Start and Group Countdown (the
--- game's countdowns, see KINDS). They are set in the TIMER BARS section of
+-- game's countdowns, see KINDS). They are set in the OTHER BARS section of
 -- the Cast Bars page.
 --
 -- The look is the Player Cast Bar's (View): size, border, texture,

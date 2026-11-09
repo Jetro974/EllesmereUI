@@ -1,7 +1,7 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  ResourceBars_Options\MirrorTimerPage_Options.lua
---  Resource Bars options: the TIMER BARS section at the bottom of the Cast
+--  Resource Bars options: the OTHER BARS section at the bottom of the Cast
 --  Bars page (Breath, Fatigue, Feign Death and the countdowns). The bars are
 --  drawn like the Player Cast Bar (EUI_ResourceBars_MirrorTimer.lua, View),
 --  so a row is a bar's switch and fill colour, and its cog holds what is its
@@ -104,7 +104,7 @@ function ns.ERB_BuildTimerBarRows(parent, y)
     end
 
     _, h = W:Spacer(parent, y, 16);  y = y - h
-    _, h = W:SectionHeader(parent, "TIMER BARS", y);  y = y - h
+    _, h = W:SectionHeader(parent, "OTHER BARS", y);  y = y - h
 
     -- Two bars per row.
     for i = 1, #kinds, 2 do
