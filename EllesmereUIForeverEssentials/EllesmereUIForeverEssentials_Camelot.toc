@@ -21,6 +21,9 @@ EllesmereUIForeverEssentials_LFGZones.lua
 EllesmereUIForeverEssentials_JunkItems.lua
 EllesmereUIForeverEssentials_SimplifiedStats.lua
 EllesmereUIForeverEssentials_GatherSkill.lua
+# Recipes in Tooltips (its data first)
+EllesmereUIForeverEssentials_RecipeData.lua
+EllesmereUIForeverEssentials_Recipes.lua
 EllesmereUIForeverEssentials_MapFade.lua
 EllesmereUIForeverEssentials_InGameNavigation.lua
 EllesmereUIForeverEssentials_ActiveForm.lua

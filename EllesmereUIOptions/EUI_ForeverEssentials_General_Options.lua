@@ -296,6 +296,19 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
         })
     end
 
+    -- Recipes in Tooltips (EllesmereUIForeverEssentials_Recipes.lua)
+    local RT = EllesmereUI._RecipeTips
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Recipes in Tooltips",
+          tooltip = "A recipe's tooltip says which of your characters know it, can learn it or lack the skill, each colored by what it would do for their skill. A character shows up once it has logged in with this on.",
+          getValue = function() return RT.Get("enabled") end,
+          setValue = function(v)
+              RT.Cfg().enabled = v
+              RT.Apply()
+          end },
+        BLANK()
+    );  y = y - h
+
     -- Auto Summon Pet | Favorites per Character
     -- (EllesmereUIForeverEssentials_PetSummon.lua), while the Pet Journal exists.
     local PS = EllesmereUI._PetSummon
