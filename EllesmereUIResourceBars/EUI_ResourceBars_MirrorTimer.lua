@@ -93,15 +93,10 @@ for _, K in ipairs(KINDS) do
 end
 ns.MT_KINDS, ns.MT_KIND_BY_ID = KINDS, KIND_BY_ID
 
--- Bar shells + ticker host at FILE SCOPE (attribution rule, see _erbEventFrame
--- in the main file): the OnEvent and OnLoop work bills ResourceBars. Children
--- stay lazy.
-for _, K in ipairs(KINDS) do
-    K.frame = CreateFrame("Frame", "ERB_Mirror_" .. K.id, UIParent)
-    K.frame:Hide()
-end
+-- The one inert frame at FILE SCOPE (attribution rule, see _erbEventFrame in
+-- the main file): its OnEvent and the ticker's OnLoop bill ResourceBars. The
+-- bars and the ticker are made on first enable.
 local eventFrame = CreateFrame("Frame")
-local tickFrame = CreateFrame("Frame")
 
 local S = {}   -- events, blizzHidden, unlockHooked
 
@@ -559,7 +554,8 @@ local function AnyRunning()
     return false
 end
 
-local ticker = EllesmereUI.Tick.NewAnimTicker(tickFrame, function()
+local ticker
+local function Tick()
     local running = false
     for _, K in ipairs(KINDS) do
         local a = K.active
@@ -592,10 +588,15 @@ local ticker = EllesmereUI.Tick.NewAnimTicker(tickFrame, function()
     end
     if S.trackerHidden then ApplyBlizzard() end
     return running
-end, 0.05)
+end
 
 local function Restart()
-    if AnyRunning() then ticker.Start() else ticker.Stop() end
+    if AnyRunning() then
+        ticker = ticker or EllesmereUI.Tick.NewAnimTicker(eventFrame, Tick, 0.05)
+        ticker.Start()
+    elseif ticker then
+        ticker.Stop()
+    end
 end
 
 local function IsPaused(v)
@@ -715,6 +716,7 @@ local function ApplyKind(K)
         return false
     end
     if not K.built then
+        K.frame = CreateFrame("Frame", "ERB_Mirror_" .. K.id, UIParent)
         K.frame:SetFrameLevel(15)
         BuildBar(K)
     end
@@ -776,10 +778,10 @@ function ns.MT_MakeUnlockElements(MK, Rebuild)
 
     local out = {}
     for _, K in ipairs(KINDS) do
-        local id, f = K.id, K.frame
+        local id = K.id
         out[#out + 1] = MK({
             key = K.unlock, label = KindName(K), group = "Resource Bars", order = K.order,
-            getFrame = function() return K.built and f or nil end,
+            getFrame = function() return K.built and K.frame or nil end,
             isHidden = function() local cfg = Cfg(id); return not (cfg and cfg.enabled) end,
             getSize  = function()
                 local v = View(K)
@@ -806,8 +808,8 @@ function ns.MT_MakeUnlockElements(MK, Rebuild)
                 local cfg = Cfg(id); if not cfg then return end
                 cfg.unlockPos = { point = point, relPoint = relPoint or point, x = x, y = y }
                 if not EllesmereUI._unlockActive and K.built then
-                    f:ClearAllPoints()
-                    f:SetPoint(point, UIParent, relPoint or point, x, y)
+                    K.frame:ClearAllPoints()
+                    K.frame:SetPoint(point, UIParent, relPoint or point, x, y)
                 end
             end,
             loadPos = function()
@@ -825,9 +827,9 @@ function ns.MT_MakeUnlockElements(MK, Rebuild)
                 local cfg = Cfg(id)
                 local pos = cfg and cfg.unlockPos
                 if not (pos and K.built) then return end
-                local sx, sy = ns.SnapXY(pos.x, pos.y, f, pos)
-                f:ClearAllPoints()
-                f:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, sx, sy)
+                local sx, sy = ns.SnapXY(pos.x, pos.y, K.frame, pos)
+                K.frame:ClearAllPoints()
+                K.frame:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, sx, sy)
             end,
         })
     end
