@@ -33,7 +33,6 @@ local NIGHT_FROM, NIGHT_TO = 21, 6         -- game-clock hours that count as nig
 --   chars[player GUID]      own = Favorites per Character, favorites = { [pet GUID] = true },
 --                           dismissed = the player put the pet away (until they summon one)
 --   rules[key]              mode = "next" | "favorites" | "chosen" | "none", pets = { [pet GUID] = true }
---   zones[mapID]            the zone's name, for its "zone:<mapID>" rule
 local F = module.Feature("petSummon", { enabled = false })
 local IsEnabled = F.Enabled
 
@@ -60,7 +59,7 @@ local function IsNight()
     return h >= NIGHT_FROM or h < NIGHT_TO
 end
 
--- The fixed circumstances; zones come first and holidays after the instances.
+-- The circumstances; holidays come after the instances.
 -- s: the state read once per decision (Snapshot).
 local RULES = {
     { key = "dungeon",   name = "Dungeons",        default = "none", test = function(s) return s.inst == "party" end },
@@ -172,12 +171,6 @@ local function Resolve()
             return key, mode, list
         end
         return key, mode
-    end
-    local zones = F.Read().zones
-    local map = zones and C_Map.GetBestMapForUnit("player")
-    if map and zones[map] then
-        local key, mode, list = Try("zone:" .. map)
-        if key then return key, mode, list end
     end
     local s = Snapshot()
     local holidays
@@ -431,16 +424,9 @@ local function RefreshJournal()
     if scroll and scroll.ForEachFrame then scroll:ForEachFrame(MarkListButton) end
 end
 
--- Every circumstance a pet can be added to, in decision order:
--- { key, name } (zones: the saved ones, then the current one).
+-- Every circumstance a pet can be added to, in decision order: { key, name }.
 local function Circumstances()
     local out = {}
-    local zones = F.Read().zones
-    local map = C_Map.GetBestMapForUnit("player")
-    if zones then
-        for id, name in pairs(zones) do out[#out + 1] = { key = "zone:" .. id, name = name, zone = id } end
-        table.sort(out, function(a, b) return a.name < b.name end)
-    end
     for _, r in ipairs(RULES) do
         if r.holidays then
             for _, h in ipairs(HOLIDAYS) do out[#out + 1] = { key = h.key, name = L(h.name), holiday = true } end
@@ -448,12 +434,7 @@ local function Circumstances()
             out[#out + 1] = { key = r.key, name = L(r.name) }
         end
     end
-    return out, map, zones and map and zones[map]
-end
-
-local function ZoneName(map)
-    local info = map and C_Map.GetMapInfo(map)
-    return info and info.name
+    return out
 end
 
 -- A pet's right-click menu. The owner is its list button or the pet card,
@@ -485,18 +466,7 @@ local function AddMenuEntry(owner, root)
                 RulesChanged()
             end)
     end
-    local list, map, here = Circumstances()
-    if map and not here and ZoneName(map) then
-        sub:CreateButton(L("This Zone") .. ": " .. ZoneName(map), function()
-            local cfg = F.Cfg()
-            cfg.zones = cfg.zones or {}
-            cfg.zones[map] = ZoneName(map)
-            SetPet("zone:" .. map, petGUID, true)
-            SetMode("zone:" .. map, "chosen")
-            RulesChanged()
-        end)
-    end
-    for _, c in ipairs(list) do
+    for _, c in ipairs(Circumstances()) do
         if c.holiday then
             events = events or sub:CreateButton(L("Seasonal Events"))
             Check(events, c.key, c.name)
@@ -534,29 +504,10 @@ end
 
 local function BuildRulesMenu(_, root)
     root:CreateTitle(L("Auto Summon Pet"))
-    local list, map, here = Circumstances()
-    local zonesMenu = root:CreateButton(L("Zones"))
-    if map and not here and ZoneName(map) then
-        zonesMenu:CreateButton(L("Add Current Zone") .. ": " .. ZoneName(map), function()
-            local cfg = F.Cfg()
-            cfg.zones = cfg.zones or {}
-            cfg.zones[map] = ZoneName(map)
-            RulesChanged()
-        end)
-    end
     local holidays = UsesHolidays() and ActiveHolidays() or {}
     local eventsMenu
-    for _, c in ipairs(list) do
-        if c.zone then
-            local sub = ModeMenu(zonesMenu, c.key, c.name, c.zone == map)
-            sub:CreateDivider()
-            sub:CreateButton(L("Remove Zone"), function()
-                local cfg = F.Cfg()
-                if cfg.zones then cfg.zones[c.zone] = nil end
-                if cfg.rules then cfg.rules[c.key] = nil end
-                RulesChanged()
-            end)
-        elseif c.holiday then
+    for _, c in ipairs(Circumstances()) do
+        if c.holiday then
             eventsMenu = eventsMenu or root:CreateButton(L("Seasonal Events"))
             ModeMenu(eventsMenu, c.key, c.name, holidays[c.key])
         else

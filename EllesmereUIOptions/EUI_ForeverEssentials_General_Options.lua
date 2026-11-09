@@ -287,7 +287,7 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
     if PS and C_PetJournal then
         _, h = W:DualRow(parent, y,
             { type = "toggle", text = "Auto Summon Pet",
-              tooltip = "Brings a pet back after loading screens, flights and deaths; a pet you dismiss stays away. The cog on the Pet Journal picks which pets come out where: zones, cities, groups, seasonal events.",
+              tooltip = "Brings a pet back after loading screens, flights and deaths; a pet you dismiss stays away. The cog on the Pet Journal picks which pets come out where: instances, cities, groups, seasonal events.",
               getValue = function() return PS.Get("enabled") end,
               setValue = function(v)
                   PS.Cfg().enabled = v
