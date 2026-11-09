@@ -6955,7 +6955,7 @@ L["Click for the list's options."] = "Clic : les options de la liste."
 L["Last Played"] = "Joué en dernier"
 -- EUI Tips (EllesmereUI_LoginTips.lua, EllesmereUI_LoginTips_Forever.lua)
 L["At login, prints one short chat tip about EllesmereUI. Type /euitips to see one now."] = "À la connexion, affiche dans le chat une courte astuce sur EllesmereUI. Tapez /euitips pour en voir une maintenant."
-L["In Unlock Mode, frames stacked on top of each other can be cycled with the scroll wheel: pick the modifier under Overlap Cycling."] = "En mode Déverrouillage, la molette fait défiler les cadres superposés : choisissez le modificateur dans Cycle des chevauchements."
+L["In Unlock Mode, frames stacked on top of each other can be cycled with the scroll wheel: pick the modifier under Overlap Cycling."] = "En mode Déverrouillage, la molette fait défiler les cadres superposés : choisissez le modificateur dans « Cycle de superposition »."
 L["The Search Features box in the options finds any setting by name, in English or in your language."] = "La recherche des options trouve n'importe quel réglage par son nom, en anglais ou en français."
 L["Type /ee to open the global settings, or /eui for every module."] = "Tapez /ee pour ouvrir les réglages généraux, ou /eui pour tous les modules."
 L["Type /kb, hover an action button and press a key to bind it."] = "Tapez /kb, survolez un bouton d'action et appuyez sur une touche pour l'assigner."
