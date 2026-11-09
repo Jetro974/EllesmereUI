@@ -977,6 +977,17 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
                 get = function() return FI.Get(key) end,
                 set = function(v) SetFish(key, v) end }
         end
+        -- Fishing Outfit: the Equipment Manager's sets when the page is built.
+        local outfitValues, outfitOrder = { [""] = "None" }, { "" }
+        if C_EquipmentSet then
+            for _, id in ipairs(C_EquipmentSet.GetEquipmentSetIDs() or {}) do
+                local name = C_EquipmentSet.GetEquipmentSetInfo(id)
+                if name then
+                    outfitValues[tostring(id)] = name
+                    outfitOrder[#outfitOrder + 1] = tostring(id)
+                end
+            end
+        end
         -- A label half has no control: the cog sits left of the keybind
         -- button, which also bounds the label.
         EllesmereUI.BuildInlineCog(rgn, {
@@ -985,6 +996,12 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
                 fishRow("Reel In With the Key", "Once the bobber bites and is on screen, the Fishing Key reels it in.", "reel"),
                 fishRow("Bobber Indicator", "Shows whether the key will reel in. Place it in Unlock Mode.", "indicator"),
                 fishRow("Apply Lure", "With no lure on your pole, the key applies your best lure first.", "lure"),
+                { type = "dropdown", label = "Fishing Outfit",
+                  tooltip = "An Equipment Manager set (pole, hat, gloves...) the key puts on before it casts.",
+                  values = outfitValues, order = outfitOrder,
+                  get = function() local id = FI.Get("outfit"); return id and tostring(id) or "" end,
+                  set = function(v) SetFish("outfit", tonumber(v)) end },
+                fishRow("Put Gear Back", "When you stop fishing, what the pole or the outfit replaced goes back on: weapons at once, even in combat, the rest when the fight ends.", "gearBack"),
             },
             anchorTo = kbBtn,
             disabled = function() return FI.Get("key") == nil end,
@@ -1006,6 +1023,34 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
           tooltip = "While you fish: music and ambience down, effects up, sound on in the background.",
           getValue = function() return FI.Get("sound") end,
           setValue = function(v) SetFish("sound", v) end },
+        { type = "toggle", text = "Auto Loot While Fishing",
+          tooltip = "Turns the game's Auto Loot on while you fish and back to how it was after.",
+          getValue = function() return FI.Get("autoLoot") end,
+          setValue = function(v) SetFish("autoLoot", v) end }
+    );  y = y - h
+
+    -- Catch Log and Fishing Extravaganza share one window
+    -- (EllesmereUIForeverEssentials_FishingLog.lua), placed in Unlock Mode.
+    local FL = EllesmereUI._FishingLog
+    local function SetLog(key, v)
+        FL.Cfg()[key] = v
+        FL.Apply()
+    end
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Catch Log",
+          tooltip = "While you fish, a small window lists what you have caught at this spot and how often; a fish's tooltip says where you caught it. Place it in Unlock Mode.",
+          getValue = function() return FL.Get("enabled") end,
+          setValue = function(v) SetLog("enabled", v) end },
+        { type = "toggle", text = "Bags Full Warning",
+          tooltip = "While you fish, a warning and a sound once only one free bag slot is left: a catch with no room is lost.",
+          getValue = function() return FI.Get("bagAlert") end,
+          setValue = function(v) SetFish("bagAlert", v) end }
+    );  y = y - h
+    _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Fishing Extravaganza",
+          tooltip = "During the Stranglethorn Fishing Extravaganza, the window shows your Speckled Tastyfish out of 40 and the time left, and at 40 a message and a sound tell you to go to Booty Bay.",
+          getValue = function() return FL.Get("contest") end,
+          setValue = function(v) SetLog("contest", v) end },
         BLANK()
     );  y = y - h
 

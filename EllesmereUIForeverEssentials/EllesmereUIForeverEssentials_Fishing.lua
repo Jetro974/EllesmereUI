@@ -10,6 +10,15 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  Double-Click     a pole in hand: a quick second right-click on the world
 --                   casts (its own Apply Lure in its cog).
 --  Fishing Sounds   music and ambience down, effects up, for the session.
+--  Fishing Outfit   (the key's cog) an Equipment Manager set the key puts on
+--                   before it casts.
+--  Put Gear Back    (the key's cog) when the session ends, what the pole or
+--                   the outfit replaced goes back on: weapons at once, even
+--                   in combat, the rest when the fight ends.
+--  Auto Loot        the game's Auto Loot on for the session.
+--  Bags Full        a warning while fishing once one free bag slot is left.
+--  The Catch Log (EllesmereUIForeverEssentials_FishingLog.lua) follows the
+--  session through module.fishingListeners.
 --
 --  Every action is a real key press or click on a secure button, bound out
 --  of combat only. A session starts with a cast and ends on moving, combat
@@ -22,10 +31,16 @@ local BUTTON_NAME = "EllesmereUIFishingCastButton"
 -- Settings live in EllesmereUIDB.fishing; unset keys read these. key: the
 -- Fishing Key (nil: none); held: [set] = { [cvar] = the value before };
 -- pos: where Unlock Mode put the Bobber Indicator.
+-- outfit: the Fishing Outfit's set ID (nil: none); gear: [slot] = the item
+-- link worn there before the session (false: empty), for Put Gear Back.
 local F = module.Feature("fishing", {
     reel = true, indicator = true, lure = true,
     doubleClick = false, clickLure = false, sound = false,
+    gearBack = false, autoLoot = false, bagAlert = false,
 }, { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 })
+
+-- fn(on) for each listener when a session starts (true) or ends (false).
+module.fishingListeners = module.fishingListeners or {}
 
 -- The Fishing ranks, highest first.
 local FISHING_SPELLS = { 18248, 7732, 7731, 7620 }
@@ -36,6 +51,10 @@ local LURES = { 6533, 6532, 7307, 6530, 6811, 6529 }
 
 -- The bobber (game object ID).
 local BOBBER = 35591
+
+-- The slots a pole takes, and the ones the game lets change in combat.
+local POLE_SLOTS = { INVSLOT_MAINHAND, INVSLOT_OFFHAND }
+local WEAPON_SLOTS = { [INVSLOT_MAINHAND] = true, [INVSLOT_OFFHAND] = true, [INVSLOT_RANGED or 18] = true }
 
 local DOUBLE_CLICK_DELAY = 0.4  -- seconds at most between the two right-clicks
 local DISARM_DELAY = 1          -- no release by then: the right-click goes back to the game
@@ -55,11 +74,17 @@ local SOUND_CVARS = {
     Sound_SFXVolume = function(before) return math.max(before, 0.8) end,
     Sound_EnableSoundWhenGameIsInBG = function() return 1 end,
 }
+local LOOT_CVARS = {
+    autoLootDefault = function() return 1 end,
+}
 
 local function KeyOn() return F.Get("key") ~= nil end
 local function ReelOn() return KeyOn() and F.Get("reel") end
 local function IndicatorOn() return ReelOn() and F.Get("indicator") end
-local function AnyOn() return KeyOn() or F.Get("doubleClick") or F.Get("sound") end
+local function AnyOn()
+    return KeyOn() or F.Get("doubleClick") or F.Get("sound") or F.Get("autoLoot") or F.Get("bagAlert")
+        or (module.FishingLogWanted ~= nil and module.FishingLogWanted())
+end
 
 local ev = CreateFrame("Frame")
 local clickOwner = CreateFrame("Frame")  -- holds the double-click's binding
@@ -72,6 +97,8 @@ local clickArmed = false      -- the right-click is bound to the button
 local lastRightClick = 0
 local armedAt = 0             -- when the right-click was bound to the button
 local worldHooked = false
+local outfitTried = false     -- the outfit was looked at for this session
+local bagWarned = false       -- Bags Full spoke for this low
 
 -------------------------------------------------------------------------------
 --  Helpers
@@ -117,6 +144,105 @@ local function BestLure()
     for i = 1, #LURES do
         if C_Item.GetItemCount(LURES[i]) > 0 then return LURES[i] end
     end
+end
+
+-------------------------------------------------------------------------------
+--  Fishing Outfit and Put Gear Back
+-------------------------------------------------------------------------------
+-- The Fishing Outfit's set ID while that set still exists.
+local function Outfit()
+    local id = F.Get("outfit")
+    if id and C_EquipmentSet and C_EquipmentSet.GetEquipmentSetInfo(id) then return id end
+end
+
+-- The slots a set fills, from its item IDs: GetItemLocations crashes the WoW
+-- Forever client for some sets (see BuildSetGearLookup in Bags).
+local function OutfitSlots(id)
+    local slots, items = {}, C_EquipmentSet.GetItemIDs(id) or {}
+    local ignored = C_EquipmentSet.GetIgnoredSlots(id) or {}
+    for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+        local item = items[slot]
+        if not ignored[slot] and item and item > 0 then slots[#slots + 1] = slot end
+    end
+    return slots
+end
+
+-- What is worn in the slots about to change, kept in the settings so a
+-- reload mid-session still finds it. A slot already kept holds on to what
+-- was there before the first change.
+local function NoteGear(slots)
+    if not F.Get("gearBack") then return end
+    local cfg = F.Cfg()
+    local gear = cfg.gear or {}
+    for i = 1, #slots do
+        local slot = slots[i]
+        if gear[slot] == nil then gear[slot] = GetInventoryItemLink("player", slot) or false end
+    end
+    cfg.gear = gear
+end
+
+-- Puts back what NoteGear kept. A slot that was empty stays as it is. In
+-- combat the game takes weapon changes only: the rest waits for its end.
+local function GearBack()
+    outfitTried = false
+    local gear = F.Read().gear
+    if not gear then return end
+    local combat, left = InCombatLockdown(), false
+    for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+        local link = gear[slot]
+        if link ~= nil then
+            if combat and not WEAPON_SLOTS[slot] then
+                left = true
+            else
+                if link and GetInventoryItemLink("player", slot) ~= link then C_Item.EquipItemByName(link, slot) end
+                gear[slot] = nil
+            end
+        end
+    end
+    if left then
+        EllesmereUI.CombatQueue.Defer("FishingGear", GearBack)
+    else
+        F.Cfg().gear = nil
+    end
+end
+
+-- The key's first press of a session puts the outfit on when it is not
+-- worn yet; true when it did (that press casts nothing). Out of combat.
+local function WearOutfit()
+    local id = KeyOn() and Outfit()
+    if not id or outfitTried then return false end
+    outfitTried = true
+    if select(4, C_EquipmentSet.GetEquipmentSetInfo(id)) then return false end
+    NoteGear(OutfitSlots(id))
+    C_EquipmentSet.UseEquipmentSet(id)
+    return true
+end
+
+-------------------------------------------------------------------------------
+--  Bags Full
+-------------------------------------------------------------------------------
+-- Free slots in the bags fish can go to (no profession bags).
+local function FreeSlots()
+    local free = 0
+    for bag = 0, NUM_BAG_SLOTS do
+        local n, family = C_Container.GetContainerNumFreeSlots(bag)
+        if family == 0 then free = free + (n or 0) end
+    end
+    return free
+end
+
+-- Once per low: a free slot back above one lets it speak again.
+local function CheckBags()
+    local free = FreeSlots()
+    if free > 1 then
+        bagWarned = false
+        return
+    end
+    if bagWarned then return end
+    bagWarned = true
+    local text = free == 0 and "Bags full: the next catch is lost." or "One free bag slot left."
+    UIErrorsFrame:AddMessage(EllesmereUI.L(text), 1, 0.1, 0.1)
+    PlaySound(SOUNDKIT.RAID_WARNING)
 end
 
 -- The game object ID in a "GameObject-0-...-35591-..." GUID, or nil.
@@ -273,23 +399,41 @@ end
 -------------------------------------------------------------------------------
 --  Session
 -------------------------------------------------------------------------------
+local function Notify(on)
+    local listeners = module.fishingListeners
+    for i = 1, #listeners do listeners[i](on) end
+end
+
 local function StartSession()
     if ReelOn() then Hold("reel", REEL_CVARS) end
     if F.Get("sound") then Hold("sound", SOUND_CVARS) end
+    if F.Get("autoLoot") then Hold("loot", LOOT_CVARS) end
     if inSession then return end
     inSession = true
     ev:RegisterEvent("PLAYER_STARTED_MOVING")
     if ReelOn() then ev:RegisterEvent("PLAYER_SOFT_INTERACT_CHANGED") end
+    if F.Get("bagAlert") then
+        ev:RegisterEvent("BAG_UPDATE_DELAYED")
+        bagWarned = false
+        CheckBags()
+    end
+    Notify(true)
 end
 
-local function EndSession()
+-- loading: a loading screen is starting, the gear goes back after it
+-- (PLAYER_ENTERING_WORLD).
+local function EndSession(loading)
     StopReel()
     Release("reel")
     Release("sound")
+    Release("loot")
+    if loading then outfitTried = false else GearBack() end
     if not inSession then return end
     inSession = false
     ev:UnregisterEvent("PLAYER_STARTED_MOVING")
     ev:UnregisterEvent("PLAYER_SOFT_INTERACT_CHANGED")
+    ev:UnregisterEvent("BAG_UPDATE_DELAYED")
+    Notify(false)
 end
 
 -- Built out of combat (the caller checks).
@@ -306,8 +450,14 @@ local function BuildButton()
     castButton:SetScript("PreClick", function(self, _, down)
         if InCombatLockdown() then return end
         if down then
+            -- The key's first press dresses in the outfit; the next one casts.
+            if not clickArmed and WearOutfit() then
+                self:SetAttribute("type", nil)
+                return
+            end
             -- An armed double-click keeps reading its own Apply Lure, not the key's.
             UpdateCastButton(clickArmed)
+            if self:GetAttribute("type") == "item" then NoteGear(POLE_SLOTS) end
         elseif self:GetAttribute("type") == "spell" then
             StartSession()
         end
@@ -373,6 +523,11 @@ ev:SetScript("OnEvent", function(_, event, _, arg2, arg3)
         UpdateIndicator()
     elseif event == "SPELLS_CHANGED" then
         ResolveFishing()
+    elseif event == "BAG_UPDATE_DELAYED" then
+        CheckBags()
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- What a session left on when a loading screen ended it.
+        if not inSession and not InCombatLockdown() then GearBack() end
     else
         -- PLAYER_STARTED_MOVING, PLAYER_REGEN_DISABLED (bindings can still
         -- change), PLAYER_LEAVING_WORLD
@@ -381,12 +536,12 @@ ev:SetScript("OnEvent", function(_, event, _, arg2, arg3)
             clickArmed = false
         end
         lineOut = false
-        EndSession()
+        EndSession(event == "PLAYER_LEAVING_WORLD")
         UpdateIndicator()
     end
 end)
 
-local FEATURE_EVENTS = { "SPELLS_CHANGED", "PLAYER_REGEN_DISABLED", "PLAYER_LEAVING_WORLD" }
+local FEATURE_EVENTS = { "SPELLS_CHANGED", "PLAYER_REGEN_DISABLED", "PLAYER_LEAVING_WORLD", "PLAYER_ENTERING_WORLD" }
 
 -- Login and the options; takes effect immediately in both directions. The
 -- button and the bindings only change out of combat: in combat the apply
@@ -405,6 +560,8 @@ local function Apply()
             for set in pairs(held) do Release(set) end
         end
     end
+    -- Put Gear Back turned off: nothing kept goes back any more.
+    if F.Read().gear and not F.Get("gearBack") then F.Cfg().gear = nil end
     EndSession()
     Disarm()
     if castButton then ClearOverrideBindings(castButton) end
