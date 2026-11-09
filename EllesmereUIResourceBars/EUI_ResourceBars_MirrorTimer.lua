@@ -10,16 +10,17 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -- surfaces. This file reads the same call at 20 Hz, only while an unpaused
 -- timer is up; nothing at all runs the rest of the time.
 --
--- One bar per timer, each with its own settings, position and Unlock Mode
--- mover, the way the action bars are one per bar: Breath (BREATH), Fatigue
--- (EXHAUSTION), Feign Death (FEIGNDEATH, and DEATH, which Blizzard paints the
--- same way), Battle Start and Group Countdown (the game's countdowns, see
--- KINDS). They
--- are configured on the Cast Bar page, picked from its bar selector.
+-- One bar per timer, each with its own position and Unlock Mode mover:
+-- Breath (BREATH), Fatigue (EXHAUSTION), Feign Death (FEIGNDEATH, and DEATH,
+-- which Blizzard paints the same way), Battle Start and Group Countdown (the
+-- game's countdowns, see KINDS). They are set in the TIMER BARS section of
+-- the Cast Bars page.
 --
--- Each bar: bg, border (every border style), a StatusBar in a clip frame, an
--- optional spark and two texts (the game's label, the seconds left), each
--- placed left, right or center with its own size, offsets and colour.
+-- The look is the Player Cast Bar's (View): size, border, texture,
+-- background, spark, corners, its Spell Text as the timer's name and its
+-- Duration Text as the seconds left, and its style. A bar's own settings are
+-- its switch, fill colour, Low Warning, Hide Blizzard Bar and, with Own Size,
+-- its width and height.
 --
 -- Low Warning (optional, per bar): once a draining bar is down to Warn When
 -- Left, it turns red and blinks. A refilling bar never warns. Both ride the
@@ -30,7 +31,6 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 -- the others keep showing. Off by default: nothing is built, registered or
 -- hidden until a bar is turned on.
 --
--- The build and style code is shared with the options preview (ns.MT_*).
 
 local _, ns = ...
 local EllesmereUI = _G.EllesmereUI
@@ -118,6 +118,19 @@ local function Cfg(id)
 end
 ns.MT_Cfg = Cfg
 
+-- What a bar is drawn with: the Player Cast Bar's settings, and its own width
+-- and height while Own Size is on. Its fill colour and Low Warning are
+-- painted from its own settings (Paint). Made on Apply, never per tick.
+local function View(K)
+    local ERB = ns.ERB
+    local p = ERB and ERB.db and ERB.db.profile
+    local cast, own = p and p.castBar, Cfg(K.id)
+    if not (cast and own) then return nil end
+    local v = setmetatable({}, { __index = cast })
+    if own.ownSize then v.width, v.height = own.width, own.height end
+    return v
+end
+
 -- A restricted answer is no answer: the bar keeps what it last showed.
 local function Plain(v)
     return not (issecretvalue and issecretvalue(v))
@@ -127,13 +140,10 @@ end
 --  One bar: build, look, paint (shared with the options preview)
 -------------------------------------------------------------------------------
 
--- Builds the children of obj.frame. obj is a KINDS entry, or a preview table
--- the options page makes ({ frame = <its container> }); mk is its frame maker
--- (the options page pool's CreateFrame there, so a rebuilt page reuses them).
+-- Builds the children of obj.frame (obj: a KINDS entry).
 local MAX_DIGITS = 5   -- cells: up to "mm:ss"
 
-local function BuildBar(obj, mk)
-    local CreateFrame = mk or CreateFrame
+local function BuildBar(obj)
     local f = obj.frame
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
@@ -208,7 +218,6 @@ local function BuildBar(obj, mk)
     end
     obj.built = true
 end
-ns.MT_BuildBar = BuildBar
 
 -- A text on its side of the bar: left, right or center (none hides it).
 local function PlaceText(fs, f, side, size, x, y, r, g, b, a)
@@ -236,9 +245,8 @@ end
 local function StockStyle()
     return (ns.ERB_CastStyle and ns.ERB_CastStyle()) or "eui"
 end
-ns.MT_StockStyle = StockStyle
 
--- Size, border, texture, background, spark and texts from cfg.
+-- Size, border, texture, background, spark and texts from cfg (a View).
 local function ApplyLook(obj, cfg, onePx)
     local f = obj.frame
     local PP = EllesmereUI.PP
@@ -348,18 +356,21 @@ local function ApplyLook(obj, cfg, onePx)
         spark:Hide()
     end
 
-    PlaceText(obj.label, f, cfg.labelSide or "left", cfg.labelSize or 11, cfg.labelX or 0, cfg.labelY or 0,
-        cfg.labelR or 1, cfg.labelG or 1, cfg.labelB or 1, cfg.labelA or 1)
-    PlaceText(obj.time, f, cfg.timeSide or "right", cfg.timeSize or 11, cfg.timeX or 0, cfg.timeY or 0,
-        cfg.timeR or 1, cfg.timeG or 1, cfg.timeB or 1, cfg.timeA or 1)
+    -- The cast bar's Spell Text names the timer, its Duration Text counts it.
+    local labelSide = (cfg.showSpellText == false) and "none" or (cfg.spellTextSide or "left")
+    local timeSide = (cfg.showTimer == false) and "none" or (cfg.timerSide or "right")
+    PlaceText(obj.label, f, labelSide, cfg.spellTextSize or 11, cfg.spellTextX or 0, cfg.spellTextY or 0,
+        cfg.spellTextR or 1, cfg.spellTextG or 1, cfg.spellTextB or 1, cfg.spellTextA or 1)
+    PlaceText(obj.time, f, timeSide, cfg.timerSize or 11, cfg.timerX or 0, cfg.timerY or 0,
+        cfg.timerR or 1, cfg.timerG or 1, cfg.timerB or 1, cfg.timerA or 1)
     -- Digit cells: same font and colour; the box itself is never seen.
     local time = obj.time
     time:SetAlpha(0)
-    obj.timeShown = (cfg.timeSide or "right") ~= "none"
+    obj.timeShown = timeSide ~= "none"
     for i = 1, MAX_DIGITS do
         local d = obj.digits[i]
-        ns.SetRBFont(d, ns.GetRBFont(), cfg.timeSize or 11)
-        d:SetTextColor(cfg.timeR or 1, cfg.timeG or 1, cfg.timeB or 1, cfg.timeA or 1)
+        ns.SetRBFont(d, ns.GetRBFont(), cfg.timerSize or 11)
+        d:SetTextColor(cfg.timerR or 1, cfg.timerG or 1, cfg.timerB or 1, cfg.timerA or 1)
         if not obj.timeShown then d:Hide() end
     end
     local wide, wideW = "0", -1
@@ -387,14 +398,13 @@ local function ApplyLook(obj, cfg, onePx)
         EllesmereUI.RoundCorners(f, 0)
     end
 end
-ns.MT_ApplyLook = ApplyLook
 
 local WARN_R, WARN_G, WARN_B = 1, 0.1, 0.1
 local PULSE_PERIOD = 0.6   -- seconds per blink
 
--- Fill, seconds and colour for a bar at fraction `frac` of its maximum.
--- `still`: the previews, which nothing ticks, so no pulse (it would freeze
--- half-faded).
+-- Fill, seconds and colour for a bar at fraction `frac` of its maximum, from
+-- the bar's own settings (fill colour, Low Warning). `still`: the Unlock Mode
+-- sample, which nothing ticks, so no pulse (it would freeze half-faded).
 local function Paint(obj, cfg, frac, seconds, rising, still)
     frac = math.max(0, math.min(frac or 0, 1))
     obj.bar:SetMinMaxValues(0, 1)
@@ -447,17 +457,10 @@ local function Paint(obj, cfg, frac, seconds, rising, still)
             alpha = 0.35 + 0.65 * math.abs(s)
         end
     end
-    local tex = obj.bar:GetStatusBarTexture()
-    if cfg.gradientEnabled then
-        tex:SetGradient(cfg.gradientDir or "HORIZONTAL", CreateColor(r, g, b, a),
-            CreateColor(cfg.gradientR or 0.2, cfg.gradientG or 0.2, cfg.gradientB or 0.8, cfg.gradientA or 1))
-    else
-        tex:SetVertexColor(1, 1, 1, 1)
-        obj.bar:SetStatusBarColor(r, g, b, a)
-    end
+    obj.bar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
+    obj.bar:SetStatusBarColor(r, g, b, a)
     obj.frame:SetAlpha(alpha)
 end
-ns.MT_Paint = Paint
 
 -------------------------------------------------------------------------------
 --  The live bars
@@ -477,10 +480,11 @@ local function PaintLive(K, cfg)
 end
 
 -- Position: the unlock anchor chain first, then a saved unlock position, then
--- the CENTER offsets (the GCD bar's three-way split).
-local function ApplyPosition(K, cfg)
+-- the CENTER offsets (the GCD bar's three-way split). cfg: the bar's own
+-- settings; view: its look (the size).
+local function ApplyPosition(K, cfg, view)
     local f = K.frame
-    f:SetSize(cfg.width or 200, cfg.height or 20)
+    f:SetSize(view.width or 220, view.height or 20)
     if EllesmereUI._TryOverrideAnchor and EllesmereUI._TryOverrideAnchor(K.unlock, f) then
         return
     end
@@ -714,10 +718,11 @@ local function ApplyKind(K)
         K.frame:SetFrameLevel(15)
         BuildBar(K)
     end
-    K.frame:SetFrameStrata(cfg.frameStrata or "MEDIUM")
+    local view = View(K)
+    K.frame:SetFrameStrata(view.frameStrata or "MEDIUM")
     K.frame:Show()
-    ApplyPosition(K, cfg)
-    ApplyLook(K, cfg)
+    ApplyPosition(K, cfg, view)
+    ApplyLook(K, view)
     PaintLive(K, cfg)
     UpdateVisibility(K)
     return true
@@ -776,15 +781,23 @@ function ns.MT_MakeUnlockElements(MK, Rebuild)
             key = K.unlock, label = KindName(K), group = "Resource Bars", order = K.order,
             getFrame = function() return K.built and f or nil end,
             isHidden = function() local cfg = Cfg(id); return not (cfg and cfg.enabled) end,
-            getSize  = function() local cfg = Cfg(id); return (cfg and cfg.width or 200), (cfg and cfg.height or 20) end,
-            getMatchPad = function() return ns.ERB_EuiBorderPad(Cfg(id)) end,
+            getSize  = function()
+                local v = View(K)
+                return (v and v.width or 220), (v and v.height or 20)
+            end,
+            getMatchPad = function() return ns.ERB_EuiBorderPad(View(K)) end,
+            -- A resize here gives the bar its own size (Own Size), from the one it shows.
             setWidth = function(_, w)
-                local cfg = Cfg(id); if not cfg then return end
+                local cfg, v = Cfg(id), View(K); if not (cfg and v) then return end
+                cfg.height = v.height
+                cfg.ownSize = true
                 cfg.width = PP.Snap(math.max(w, 10))
                 Rebuild()
             end,
             setHeight = function(_, h)
-                local cfg = Cfg(id); if not cfg then return end
+                local cfg, v = Cfg(id), View(K); if not (cfg and v) then return end
+                cfg.width = v.width
+                cfg.ownSize = true
                 cfg.height = PP.Snap(math.max(h, 4))
                 Rebuild()
             end,
