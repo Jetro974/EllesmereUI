@@ -10,9 +10,10 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  palette.context names one entry of CONTEXTS; nil is "always". A context
 --  menu shares another menu's key (palette.keyShare, the same share Assign to
 --  Spec uses) and KeyTarget hands the key to it first while its context is on.
---  A small hint icon shows while a context menu is reachable, so the player
---  knows there is something under the key right now. Clicking it opens the
---  menu, so a context menu works with no key bound at all.
+--  A left click on the context's own buff opens the menu, so a context menu
+--  works with no key bound at all. A menu can also show a floating hint icon
+--  while it is reachable (palette.contextHint, off by default), which opens
+--  it the same way.
 --
 --  The signal is an AURA the game puts on the player: no position, no polling.
 --  Out of combat only. Auras are not readable in combat on every client, and
@@ -118,8 +119,9 @@ end
 --  The hint
 --
 --  The aura's icon with the key under it (when the menu has one), at a fixed
---  spot below the middle of the screen. A click opens the menu itself, as
---  its key would (below); a second click closes it.
+--  spot below the middle of the screen, for a menu with Floating Icon on
+--  (palette.contextHint). A click opens the menu itself, as its key would
+--  (below); a second click closes it.
 --  Made here in the main chunk so its cost is billed to this addon.
 -------------------------------------------------------------------------------
 local HINT_SIZE = 36
@@ -314,6 +316,14 @@ local function UpdateHint()
         return
     end
     hint.palette, hint.contextKey = i, key
+    -- Floating Icon off: the buff's click alone opens the menu, which stays
+    -- open if it was.
+    local pal = p.palettes and p.palettes[i]
+    if not (type(pal) == "table" and pal.contextHint) then
+        GameTooltip:Hide()
+        hint:Hide()
+        return
+    end
     hintIcon:SetTexture(CONTEXTS[key].icon)
     hintKey:SetText(k1 and (GetBindingText and GetBindingText(k1) or k1) or "")
     hint:Show()
