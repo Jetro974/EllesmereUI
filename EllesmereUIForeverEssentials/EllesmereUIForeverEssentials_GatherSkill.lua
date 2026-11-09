@@ -65,18 +65,24 @@ local function Forget()
     memoN = 0
 end
 
+-- A node name as the lookup keys it: the client writes some apostrophes
+-- typographic (U+2019) and some straight, and the case of a word can differ.
+local function Key(name)
+    return (name:gsub("\226\128\153", "'"):lower())
+end
+
 local function AddHerb(itemID)
     local name = C_Item.GetItemNameByID(itemID)
     if not name then return false end
-    nodes[name] = { HERBALISM, HERBS[itemID] }
+    nodes[Key(name)] = { HERBALISM, HERBS[itemID] }
     return true
 end
 
 local function Build()
     nodes = {}
     for name, lvl in pairs(ORES) do
-        nodes[EllesmereUI.L(name)] = { MINING, lvl }
-        nodes[name] = { MINING, lvl }
+        nodes[Key(EllesmereUI.L(name))] = { MINING, lvl }
+        nodes[Key(name)] = { MINING, lvl }
     end
     for itemID in pairs(HERBS) do
         if not AddHerb(itemID) then
@@ -130,7 +136,7 @@ local function MinimapLine(text)
     local out, changed = {}, false
     for part in (text .. "\n"):gmatch("(.-)\n") do
         local name = part:gsub("|T.-|t", ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):match("^%s*(.-)%s*$")
-        local node = nodes[name]
+        local node = nodes[Key(name)]
         if node then
             local skill = Skill(node[1])
             local color = (skill and skill >= node[2]) and Hex(OddsColor(skill, node[2])) or "|cffff2020"
@@ -172,7 +178,7 @@ local function OnObjectTooltip(tooltip, data)
     local title = lines and lines[1] and lines[1].leftText
     if not title or issecretvalue(title) then return end
     if not nodes then Build() end
-    local node = nodes[title]
+    local node = nodes[Key(title)]
     if not node then return end
     local skillName = C_Spell.GetSpellName(node[1] == MINING and MINING_SPELL or HERBALISM_SPELL)
     if not skillName then return end
