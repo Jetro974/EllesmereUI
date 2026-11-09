@@ -3,33 +3,206 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 -------------------------------------------------------------------------------
 --  EllesmereUIForeverEssentials_PetSummon.lua  (WoW Forever only)
 --  Auto Summon Pet: once the game takes the companion pet away (death,
---  loading screen, taxi, vehicle...), summons one again a moment later: a
---  random favorite, or any random pet while none is a favorite, as the
---  journal's random pet button. A pet the player dismisses (Dismiss, or its
---  journal toggle) stays dismissed until they summon one again. Never in
---  combat, dungeons, raids, PvP, stealth or while mounted.
+--  loading screen, taxi, vehicle...), summons one again a moment later. A pet
+--  the player dismisses (Dismiss, or its journal toggle) stays dismissed until
+--  they summon one again. Never in combat, stealth or while mounted.
 --
---  Favorites per Character (a per-character setting): this character picks
---  among its own favorites instead of the account's. They are chosen from a
---  pet's right-click menu in the Pet Journal and marked with a blue star in
---  its list. While it has none, the account's favorites are used.
+--  Which pet: the first circumstance (RULES, most specific first) whose rule
+--  is not "next" decides: its chosen pets, the favorites, or none. The
+--  defaults keep the original behavior: favorites, none in instances. Rules
+--  are set from a cog on the Pet Journal, and a pet's right-click menu adds
+--  it to a circumstance. On entering a "chosen" circumstance a pet out that is
+--  not one of its pets is swapped; on entering a "none" one it is put away.
+--
+--  Favorites: a random favorite, or any random pet while none is a favorite,
+--  as the journal's random pet button. Favorites per Character (a
+--  per-character setting): this character picks among its own favorites,
+--  chosen from a pet's right-click menu and marked with a blue star.
 --
 --  Summoning is plain API, refused in combat only. The player's dismissals
---  are the two calls read from hooksecurefunc; one from an action bar runs
---  in the client, so that pet comes back at the next of the events below.
---  Events and hooks only exist once the feature has been on.
+--  are the two calls read from hooksecurefunc. Events and hooks only exist
+--  once the feature has been on.
 -------------------------------------------------------------------------------
 local _, module = ...
 local DELAY = 2  -- seconds after a trigger: lets a load, landing or resurrection settle
 local STAR = "PetJournal-FavoritesIcon"   -- the journal's favorite star, tinted blue below
+local NIGHT_FROM, NIGHT_TO = 21, 6         -- game-clock hours that count as night
 
 -- Settings live in EllesmereUIDB.petSummon; unset keys read these.
 --   enabled                 Auto Summon Pet
 --   chars[player GUID]      own = Favorites per Character, favorites = { [pet GUID] = true },
 --                           dismissed = the player put the pet away (until they summon one)
+--   rules[key]              mode = "next" | "favorites" | "chosen" | "none", pets = { [pet GUID] = true }
+--   zones[mapID]            the zone's name, for its "zone:<mapID>" rule
 local F = module.Feature("petSummon", { enabled = false })
 local IsEnabled = F.Enabled
 
+-------------------------------------------------------------------------------
+--  Circumstances
+-------------------------------------------------------------------------------
+-- Holidays by their calendar ids (the client's Holidays table on WoW Forever).
+local HOLIDAYS = {
+    { key = "holiday:lunar",     name = "Lunar Festival",          ids = { [327] = true } },
+    { key = "holiday:love",      name = "Love is in the Air",      ids = { [335] = true } },
+    { key = "holiday:noble",     name = "Noblegarden",             ids = { [181] = true } },
+    { key = "holiday:children",  name = "Children's Week",         ids = { [201] = true } },
+    { key = "holiday:midsummer", name = "Midsummer Fire Festival", ids = { [341] = true } },
+    { key = "holiday:fireworks", name = "Fireworks Spectacular",   ids = { [62] = true } },
+    { key = "holiday:harvest",   name = "Harvest Festival",        ids = { [321] = true } },
+    { key = "holiday:hallow",    name = "Hallow's End",            ids = { [324] = true } },
+    { key = "holiday:winter",    name = "Feast of Winter Veil",    ids = { [141] = true } },
+    { key = "holiday:darkmoon",  name = "Darkmoon Faire",          ids = { [263] = true, [264] = true } },
+    { key = "holiday:fishing",   name = "Stranglethorn Fishing Extravaganza", ids = { [301] = true } },
+}
+
+local function IsNight()
+    local h = GetGameTime()
+    return h >= NIGHT_FROM or h < NIGHT_TO
+end
+
+-- The fixed circumstances; zones come first and holidays after the instances.
+-- s: the state read once per decision (Snapshot).
+local RULES = {
+    { key = "dungeon",   name = "Dungeons",        default = "none", test = function(s) return s.inst == "party" end },
+    { key = "raid",      name = "Raids",           default = "none", test = function(s) return s.inst == "raid" end },
+    { key = "pvp",       name = "Battlegrounds",   default = "none", test = function(s) return s.inst == "pvp" end },
+    { key = "arena",     name = "Arenas",          default = "none", test = function(s) return s.inst == "arena" end },
+    { holidays = true },
+    { key = "raidgroup", name = "In a Raid Group", group = true, test = function() return IsInRaid() end },
+    { key = "group",     name = "In a Group",      group = true, test = function() return IsInGroup() end },
+    { key = "rest",      name = "Cities and Inns", test = function() return IsResting() end },
+    { key = "night",     name = "At Night",        test = function(s) return s.night end },
+    { key = "day",       name = "By Day",          test = function(s) return not s.night end },
+    { key = "world",     name = "Open World",      default = "favorites", test = function() return true end },
+}
+local DEFAULT_MODE = {}
+for _, r in ipairs(RULES) do
+    if r.key then DEFAULT_MODE[r.key] = r.default or "next" end
+end
+
+local function Rule(key, create)
+    local rules = create and F.Cfg() or F.Read()
+    if create then
+        rules.rules = rules.rules or {}
+        rules.rules[key] = rules.rules[key] or {}
+    end
+    return rules.rules and rules.rules[key]
+end
+
+local function ModeOf(key)
+    local r = Rule(key)
+    return (r and r.mode) or DEFAULT_MODE[key] or "next"
+end
+
+local function SetMode(key, mode)
+    Rule(key, true).mode = mode
+end
+
+local function HasPet(key, petGUID)
+    local r = Rule(key)
+    return r ~= nil and r.pets ~= nil and r.pets[petGUID] == true
+end
+
+local function SetPet(key, petGUID, on)
+    local r = Rule(key, true)
+    r.pets = r.pets or {}
+    r.pets[petGUID] = on or nil
+end
+
+-- A rule's pets that can be summoned now.
+local function ChosenPets(key)
+    local list = {}
+    local r = Rule(key)
+    if not (r and r.pets) then return list end
+    for petGUID in pairs(r.pets) do
+        if C_PetJournal.PetIsSummonable(petGUID) then list[#list + 1] = petGUID end
+    end
+    return list
+end
+
+-- Whether any rule of a kind is in use (decides which events are worth having).
+local function AnyRule(match)
+    local rules = F.Read().rules
+    if not rules then return false end
+    for key, r in pairs(rules) do
+        if r.mode and r.mode ~= "next" and match(key) then return true end
+    end
+    return false
+end
+local function UsesHolidays() return AnyRule(function(k) return k:find("^holiday:") ~= nil end) end
+local function UsesGroups() return AnyRule(function(k) return k == "group" or k == "raidgroup" end) end
+
+-- Today's holidays from the game calendar: { [holiday key] = true }. The
+-- calendar may show another month: today is read at its offset from it.
+local function ActiveHolidays()
+    local out = {}
+    if not (C_Calendar and C_DateAndTime) then return out end
+    local now = C_DateAndTime.GetCurrentCalendarTime()
+    local shown = C_Calendar.GetMonthInfo(0)
+    if not (now and shown) then return out end
+    local offset = (now.year - shown.year) * 12 + (now.month - shown.month)
+    for i = 1, C_Calendar.GetNumDayEvents(offset, now.monthDay) do
+        local e = C_Calendar.GetDayEvent(offset, now.monthDay, i)
+        local id = e and e.eventID
+        local kind = e and e.calendarType
+        if kind and not issecretvalue(kind) and kind == "HOLIDAY" and id and not issecretvalue(id) then
+            for _, h in ipairs(HOLIDAYS) do
+                if h.ids[id] then out[h.key] = true end
+            end
+        end
+    end
+    return out
+end
+
+local function Snapshot()
+    local _, inst = IsInInstance()
+    return { inst = inst, night = IsNight() }
+end
+
+-- The deciding circumstance: its key and mode ("favorites", "chosen" with
+-- its summonable pets, or "none"). A "chosen" rule with no pet it can
+-- summon passes to the next one.
+local function Resolve()
+    local function Try(key)
+        local mode = ModeOf(key)
+        if mode == "next" then return nil end
+        if mode == "chosen" then
+            local list = ChosenPets(key)
+            if #list == 0 then return nil end
+            return key, mode, list
+        end
+        return key, mode
+    end
+    local zones = F.Read().zones
+    local map = zones and C_Map.GetBestMapForUnit("player")
+    if map and zones[map] then
+        local key, mode, list = Try("zone:" .. map)
+        if key then return key, mode, list end
+    end
+    local s = Snapshot()
+    local holidays
+    for _, r in ipairs(RULES) do
+        if r.holidays then
+            if UsesHolidays() then
+                holidays = holidays or ActiveHolidays()
+                for _, h in ipairs(HOLIDAYS) do
+                    if holidays[h.key] then
+                        local key, mode, list = Try(h.key)
+                        if key then return key, mode, list end
+                    end
+                end
+            end
+        elseif r.test(s) then
+            local key, mode, list = Try(r.key)
+            if key then return key, mode, list end
+        end
+    end
+    return "world", "favorites"
+end
+
+-------------------------------------------------------------------------------
+--  Favorites
+-------------------------------------------------------------------------------
 -- This character's settings; nil until written, unless create.
 local function CharCfg(create)
     local cfg = create and F.Cfg() or F.Read()
@@ -69,11 +242,16 @@ local function OwnFavorites()
     return list
 end
 
+-------------------------------------------------------------------------------
+--  Summoning
+-------------------------------------------------------------------------------
 local ev = CreateFrame("Frame")
 local timer
 local hooked = false
 local userDismissed = false  -- the player put the pet away themselves (also kept per character)
 local current          -- the pet we last saw out (nil: none)
+local lastKey          -- the circumstance the last decision was made in
+local ownCall = false  -- our own summon or dismissal is running (the hooks skip it)
 
 -- The dismissal outlives a reload or a relog: written only when it changes.
 local function SetDismissed(on)
@@ -84,12 +262,37 @@ local function SetDismissed(on)
 end
 
 local function CanSummonNow()
-    if UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
-       or UnitInVehicle("player") or IsMounted() or IsStealthed() then
+    return not (UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
+        or UnitInVehicle("player") or IsMounted() or IsStealthed())
+end
+
+local function SummonGUID(petGUID)
+    ownCall = true
+    C_PetJournal.SummonPetByGUID(petGUID)
+    ownCall = false
+end
+
+local function SummonFavorite()
+    local own = OwnFavorites()
+    if #own > 0 then
+        SummonGUID(own[math.random(#own)])
+    else
+        -- As the journal's random pet button: all pets while none is a favorite.
+        C_PetJournal.SummonRandomPet(C_PetJournal.HasFavoritePets())
+    end
+end
+
+-- Whether a pet out may stay on entering a circumstance: any pet under
+-- "favorites" (as before rules), one of its pets under "chosen".
+local function Allowed(petGUID, mode, list)
+    if mode == "none" then return false end
+    if mode == "chosen" then
+        for i = 1, #list do
+            if list[i] == petGUID then return true end
+        end
         return false
     end
-    local _, kind = IsInInstance()
-    return kind ~= "party" and kind ~= "raid" and kind ~= "pvp" and kind ~= "arena"
+    return true
 end
 
 local Queue
@@ -98,7 +301,7 @@ local Queue
 -- waits for its end on the combat queue.
 local function Summon()
     timer = nil
-    if not IsEnabled() or userDismissed or C_PetJournal.GetSummonedPetGUID() then return end
+    if not IsEnabled() or userDismissed then return end
     if InCombatLockdown() then
         EllesmereUI.CombatQueue.Defer("PetSummon", Queue)
         return
@@ -110,12 +313,26 @@ local function Summon()
         ev:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
         return
     end
-    local own = OwnFavorites()
-    if #own > 0 then
-        C_PetJournal.SummonPetByGUID(own[math.random(#own)])
+    local key, mode, list = Resolve()
+    local out = C_PetJournal.GetSummonedPetGUID()
+    local entered = key ~= lastKey
+    lastKey = key
+    if out then
+        -- A pet out stays unless this circumstance just began and does not allow it.
+        if not entered or Allowed(out, mode, list) then return end
+        if mode == "none" then
+            ownCall = true
+            C_PetJournal.DismissSummonedPet()
+            ownCall = false
+            return
+        end
+    elseif mode == "none" then
+        return
+    end
+    if mode == "chosen" then
+        SummonGUID(list[math.random(#list)])
     else
-        -- As the journal's random pet button: all pets while none is a favorite.
-        C_PetJournal.SummonRandomPet(C_PetJournal.HasFavoritePets())
+        SummonFavorite()
     end
 end
 
@@ -124,11 +341,13 @@ Queue = function()
     timer = C_Timer.NewTimer(DELAY, Summon)
 end
 
--- After which a missing pet may come back (COMPANION_UPDATE: the pet out).
+-- After which a missing pet may come back (COMPANION_UPDATE: the pet out),
+-- or a new circumstance begins.
 local EVENTS = {
     "COMPANION_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_ALIVE",
     "PLAYER_UNGHOST", "PLAYER_CONTROL_GAINED", "UNIT_EXITED_VEHICLE",
     "UPDATE_STEALTH", "PLAYER_MOUNT_DISPLAY_CHANGED",
+    "ZONE_CHANGED_NEW_AREA", "PLAYER_UPDATE_RESTING",
 }
 
 ev:SetScript("OnEvent", function(_, event, arg1)
@@ -151,15 +370,41 @@ end)
 -- The player's own dismissals: DismissSummonedPet, or SummonPetByGUID on the
 -- pet out (the journal's toggle). The pet out is the one we last saw: the
 -- post-hook may run once it is gone.
-local function OnDismiss() SetDismissed(true) end
+local function OnDismiss()
+    if not ownCall then SetDismissed(true) end
+end
 local function OnSummonByGUID(guid)
-    if guid and guid == current then SetDismissed(true) end
+    if not ownCall and guid and guid == current then SetDismissed(true) end
+end
+
+-- The events a rule in use needs: groups and the calendar (opened once).
+local calendarOpened = false
+local function SyncRuleEvents()
+    local on = IsEnabled()
+    if on and UsesGroups() then ev:RegisterEvent("GROUP_ROSTER_UPDATE") else ev:UnregisterEvent("GROUP_ROSTER_UPDATE") end
+    if on and UsesHolidays() then
+        ev:RegisterEvent("CALENDAR_UPDATE_EVENT_LIST")
+        if not calendarOpened then
+            calendarOpened = true
+            C_Calendar.OpenCalendar()
+        end
+    else
+        ev:UnregisterEvent("CALENDAR_UPDATE_EVENT_LIST")
+    end
+end
+
+-- A rule changed: the next decision starts afresh.
+local function RulesChanged()
+    SyncRuleEvents()
+    lastKey = nil
+    if IsEnabled() and not userDismissed then Queue() end
 end
 
 -------------------------------------------------------------------------------
---  Pet Journal: this character's favorites
+--  Pet Journal: favorites, circumstances
 -------------------------------------------------------------------------------
 local function ShowsOwn() return IsEnabled() and OwnOn() end
+local L = EllesmereUI.L
 
 -- The blue star on a list button, beside the journal's own; kept in a weak
 -- table, nothing is stored on the journal's buttons.
@@ -186,20 +431,160 @@ local function RefreshJournal()
     if scroll and scroll.ForEachFrame then scroll:ForEachFrame(MarkListButton) end
 end
 
+-- Every circumstance a pet can be added to, in decision order:
+-- { key, name } (zones: the saved ones, then the current one).
+local function Circumstances()
+    local out = {}
+    local zones = F.Read().zones
+    local map = C_Map.GetBestMapForUnit("player")
+    if zones then
+        for id, name in pairs(zones) do out[#out + 1] = { key = "zone:" .. id, name = name, zone = id } end
+        table.sort(out, function(a, b) return a.name < b.name end)
+    end
+    for _, r in ipairs(RULES) do
+        if r.holidays then
+            for _, h in ipairs(HOLIDAYS) do out[#out + 1] = { key = h.key, name = L(h.name), holiday = true } end
+        else
+            out[#out + 1] = { key = r.key, name = L(r.name) }
+        end
+    end
+    return out, map, zones and map and zones[map]
+end
+
+local function ZoneName(map)
+    local info = map and C_Map.GetMapInfo(map)
+    return info and info.name
+end
+
 -- A pet's right-click menu. The owner is its list button or the pet card,
 -- whose petID is the owned pet's GUID, or the list button's icon, whose
 -- parent holds it (PetJournal_ShowPetDropdown; the menu passes no context).
 local function AddMenuEntry(owner, root)
     local petGUID = owner and (owner.petID or (owner.GetParent and owner:GetParent()
         and owner:GetParent().petID))
-    if not (petGUID and ShowsOwn()) then return end
+    if not (petGUID and IsEnabled()) then return end
     root:CreateDivider()
-    root:CreateCheckbox(EllesmereUI.L("Favorite for This Character"),
-        function() return IsOwnFavorite(petGUID) end,
-        function()
-            SetOwnFavorite(petGUID, not IsOwnFavorite(petGUID))
-            RefreshJournal()
+    if OwnOn() then
+        root:CreateCheckbox(L("Favorite for This Character"),
+            function() return IsOwnFavorite(petGUID) end,
+            function()
+                SetOwnFavorite(petGUID, not IsOwnFavorite(petGUID))
+                RefreshJournal()
+            end)
+    end
+    -- Ticking a circumstance makes it use its chosen pets.
+    local sub = root:CreateButton(L("Auto Summon In"))
+    local events
+    local function Check(parent, key, name)
+        parent:CreateCheckbox(name,
+            function() return HasPet(key, petGUID) end,
+            function()
+                local on = not HasPet(key, petGUID)
+                SetPet(key, petGUID, on)
+                if on then SetMode(key, "chosen") end
+                RulesChanged()
+            end)
+    end
+    local list, map, here = Circumstances()
+    if map and not here and ZoneName(map) then
+        sub:CreateButton(L("This Zone") .. ": " .. ZoneName(map), function()
+            local cfg = F.Cfg()
+            cfg.zones = cfg.zones or {}
+            cfg.zones[map] = ZoneName(map)
+            SetPet("zone:" .. map, petGUID, true)
+            SetMode("zone:" .. map, "chosen")
+            RulesChanged()
         end)
+    end
+    for _, c in ipairs(list) do
+        if c.holiday then
+            events = events or sub:CreateButton(L("Seasonal Events"))
+            Check(events, c.key, c.name)
+        else
+            Check(sub, c.key, c.name)
+        end
+    end
+end
+
+-- The journal's cog: every circumstance and its rule.
+local MODES = { "next", "favorites", "chosen", "none" }
+local MODE_NAMES = { next = "Next Rule", favorites = "Favorites", chosen = "Chosen Pets", none = "None" }
+
+local function ModeMenu(parent, key, name, active)
+    local label = name
+    local mode = ModeOf(key)
+    if mode ~= "next" then label = label .. "  |cff888888(" .. L(MODE_NAMES[mode]) .. ")|r" end
+    if active then label = label .. "  |cff0cd29d" .. L("(now)") .. "|r" end
+    local sub = parent:CreateButton(label)
+    for _, m in ipairs(MODES) do
+        local text = L(MODE_NAMES[m])
+        if m == "chosen" then
+            local r = Rule(key)
+            local n = 0
+            if r and r.pets then for _ in pairs(r.pets) do n = n + 1 end end
+            text = text .. " (" .. n .. ")"
+        end
+        sub:CreateRadio(text, function() return ModeOf(key) == m end, function()
+            SetMode(key, m)
+            RulesChanged()
+        end)
+    end
+    return sub
+end
+
+local function BuildRulesMenu(_, root)
+    root:CreateTitle(L("Auto Summon Pet"))
+    local list, map, here = Circumstances()
+    local zonesMenu = root:CreateButton(L("Zones"))
+    if map and not here and ZoneName(map) then
+        zonesMenu:CreateButton(L("Add Current Zone") .. ": " .. ZoneName(map), function()
+            local cfg = F.Cfg()
+            cfg.zones = cfg.zones or {}
+            cfg.zones[map] = ZoneName(map)
+            RulesChanged()
+        end)
+    end
+    local holidays = UsesHolidays() and ActiveHolidays() or {}
+    local eventsMenu
+    for _, c in ipairs(list) do
+        if c.zone then
+            local sub = ModeMenu(zonesMenu, c.key, c.name, c.zone == map)
+            sub:CreateDivider()
+            sub:CreateButton(L("Remove Zone"), function()
+                local cfg = F.Cfg()
+                if cfg.zones then cfg.zones[c.zone] = nil end
+                if cfg.rules then cfg.rules[c.key] = nil end
+                RulesChanged()
+            end)
+        elseif c.holiday then
+            eventsMenu = eventsMenu or root:CreateButton(L("Seasonal Events"))
+            ModeMenu(eventsMenu, c.key, c.name, holidays[c.key])
+        else
+            ModeMenu(root, c.key, c.name)
+        end
+    end
+end
+
+local cog
+local function BuildCog()
+    if cog or not (PetJournal and PetJournal.SummonRandomPetSpellFrame and MenuUtil) then return end
+    cog = CreateFrame("Button", nil, PetJournal)
+    cog:SetSize(24, 24)
+    cog:SetPoint("RIGHT", PetJournal.SummonRandomPetSpellFrame, "LEFT", -8, 0)
+    local tex = cog:CreateTexture(nil, "ARTWORK")
+    tex:SetAllPoints()
+    tex:SetTexture(EllesmereUI.COGS_ICON)
+    cog:SetAlpha(0.7)
+    cog:SetScript("OnEnter", function(self)
+        self:SetAlpha(1)
+        EllesmereUI.ShowWidgetTooltip(self, L("Auto Summon Pet: which pets come out where."))
+    end)
+    cog:SetScript("OnLeave", function(self)
+        self:SetAlpha(0.7)
+        EllesmereUI.HideWidgetTooltip()
+    end)
+    cog:SetScript("OnClick", function(self) MenuUtil.CreateContextMenu(self, BuildRulesMenu) end)
+    cog:SetShown(IsEnabled())
 end
 
 local journalHooked = false
@@ -207,6 +592,7 @@ local function HookJournal()
     if journalHooked or not PetJournal_InitPetButton then return end
     journalHooked = true
     hooksecurefunc("PetJournal_InitPetButton", MarkListButton)
+    BuildCog()
 end
 
 local function HookPetJournal()
@@ -236,9 +622,11 @@ local function ApplyPetSummon(fresh)
     if not C_PetJournal then return end
     RefreshJournal()
     local on = IsEnabled()
+    if cog then cog:SetShown(on) end
     for i = 1, #EVENTS do
         if on then ev:RegisterEvent(EVENTS[i]) else ev:UnregisterEvent(EVENTS[i]) end
     end
+    SyncRuleEvents()
     if not on then
         ev:UnregisterEvent("UNIT_SPELLCAST_STOP")
         ev:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
@@ -252,6 +640,7 @@ local function ApplyPetSummon(fresh)
         HookPetJournal()
     end
     current = C_PetJournal.GetSummonedPetGUID()
+    lastKey = nil
     -- A dismissal from an earlier session holds until a pet is out again.
     local c = CharCfg()
     if c and c.dismissed and (current or fresh) then c.dismissed = nil end
