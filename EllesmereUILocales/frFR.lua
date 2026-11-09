@@ -7049,3 +7049,5 @@ L["A recipe's tooltip says which of your characters know it, can learn it or lac
 L["Known by:"] = "Connue de :"
 L["Can learn it:"] = "Peut l'apprendre :"
 L["Skill too low:"] = "Niveau trop bas :"
+-- == Forever Essentials: Gathering Skill, Skinning ==
+L["Also adds the skill a skinnable corpse needs to its tooltip."] = "Ajoute aussi le niveau qu'un corps dépeçable demande à son infobulle."

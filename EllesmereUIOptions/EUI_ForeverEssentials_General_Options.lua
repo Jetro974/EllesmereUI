@@ -290,6 +290,13 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
                       GS.Cfg().minimap = v
                       GS.Apply()
                   end },
+                { type = "toggle", label = "Skinning",
+                  tooltip = "Also adds the skill a skinnable corpse needs to its tooltip.",
+                  get = function() return GS.Get("skinning") end,
+                  set = function(v)
+                      GS.Cfg().skinning = v
+                      GS.Apply()
+                  end },
             },
             disabled = function() return not GS.Get("enabled") end,
             disabledTooltip = "Gathering Skill in Tooltips",

@@ -10,6 +10,10 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  minimap (off by default, in the cog): a tracked node's name on the
 --  minimap's mouseover tooltip gains its required skill in that color
 --  ("Silverleaf (1)"), red when you cannot gather it.
+--  skinning (off by default, in the cog): a skinnable corpse's "Skinnable"
+--  line gains the skill it needs, from its level as Classic sets it (1 up to
+--  level 10, then ten points a level up to 20, then five times the level), in
+--  the same colors.
 --
 --  World object tooltips carry no object ID, so a node is known by its name:
 --  a herb node bears its herb's name, read from the herb item in the client's
@@ -21,9 +25,9 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 
 -- Settings live in EllesmereUIDB.gatherSkill; unset keys read these.
-local F = module.Feature("gatherSkill", { enabled = false, minimap = false })
+local F = module.Feature("gatherSkill", { enabled = false, minimap = false, skinning = false })
 
-local HERBALISM, MINING = 182, 186          -- skill lines
+local HERBALISM, MINING, SKINNING = 182, 186, 393  -- skill lines
 local HERBALISM_SPELL, MINING_SPELL = 2366, 2575
 
 -- Herb item ID = the skill its node needs.
@@ -185,6 +189,37 @@ local function OnObjectTooltip(tooltip, data)
     end
 end
 
+-- The skill a skinnable creature of that level needs.
+local function SkinningNeed(level)
+    if level <= 10 then return 1 end
+    if level <= 20 then return (level - 10) * 10 end
+    return level * 5
+end
+
+local function OnUnitTooltip(tooltip)
+    if tooltip ~= GameTooltip or not (F.Enabled() and F.Get("skinning")) or not UNIT_SKINNABLE_LEATHER then return end
+    local _, unit = tooltip:GetUnit()
+    if not unit or issecretvalue(unit) then return end
+    local level = UnitLevel(unit)
+    if not level or issecretvalue(level) or level < 1 then return end
+    for i = 2, tooltip:NumLines() do
+        local fs = _G["GameTooltipTextLeft" .. i]
+        local text = fs and fs:GetText()
+        if text and not issecretvalue(text) and text == UNIT_SKINNABLE_LEATHER then
+            local need = SkinningNeed(level)
+            fs:SetText(("%s (%d)"):format(text, need))
+            local skill = Skill(SKINNING)
+            if skill and skill >= need then
+                fs:SetTextColor(OddsColor(skill, need))
+            else
+                fs:SetTextColor(1, 0.125, 0.125)
+            end
+            tooltip:Show()
+            return
+        end
+    end
+end
+
 -- The tooltip hook goes in the first time the setting is on; off, it returns
 -- at once and no event is registered.
 local function Apply()
@@ -209,6 +244,7 @@ local function Apply()
     hooked = true
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Object, OnObjectTooltip)
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.MinimapMouseover, OnMinimapTooltip)
+    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, OnUnitTooltip)
 end
 
 -- Options-page entry points.
