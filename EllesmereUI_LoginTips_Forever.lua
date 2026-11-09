@@ -86,7 +86,7 @@ Tips.Register("forever", function()
           show = Goto("EllesmereUIResourceBars", "Swing Timer") },
         { id = "cast_latency", addon = "EllesmereUIResourceBars",
           text = EllesmereUI.L("The cast bar's Latency Overlay shades the end of your cast, so you know when to queue the next spell."),
-          show = Goto("EllesmereUIResourceBars", "Cast Bar", "LATENCY") },
+          show = Goto("EllesmereUIResourceBars", "Cast Bars", "LATENCY") },
         { id = "out_of_range", addon = "EllesmereUIActionBars",
           text = EllesmereUI.L("Out of Range Coloring tints an action button red while your target is out of range."),
           show = Goto("EllesmereUIActionBars", "Bar Display", "ICON EFFECTS") },

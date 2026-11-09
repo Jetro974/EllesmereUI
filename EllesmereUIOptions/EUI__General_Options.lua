@@ -535,7 +535,7 @@ EllesmereUI._WHATSNEW_PATCHES = {
                 module = "Resource Bars",
                 title  = "Merge Craft Batches",
                 desc   = "While crafting several items, the player cast bar can run as one bar across the whole batch instead of refilling for every craft",
-                nav    = { module = "EllesmereUIResourceBars", page = "Cast Bar", section = "DISPLAY", highlight = "Craft Batches" },
+                nav    = { module = "EllesmereUIResourceBars", page = "Cast Bars", section = "DISPLAY", highlight = "Craft Batches" },
             },
             {
                 -- The Rested Indicator row of EXTRAS on the Main Frames page with the Player frame
@@ -1028,7 +1028,7 @@ EllesmereUI._WHATSNEW_PATCHES = {
                 module = "Resource Bars",
                 title  = "Full Craft Time",
                 desc   = "While crafting several items, the player cast bar can count down the whole batch and show the craft count, here and on Unit Frames",
-                nav    = { module = "EllesmereUIResourceBars", page = "Cast Bar",
+                nav    = { module = "EllesmereUIResourceBars", page = "Cast Bars",
                            section = "DISPLAY", highlight = "Craft Batches" },
             },
             {
