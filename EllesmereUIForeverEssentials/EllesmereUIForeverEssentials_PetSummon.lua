@@ -26,14 +26,15 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 local _, module = ...
 local DELAY = 2  -- seconds after a trigger: lets a load, landing or resurrection settle
 local STAR = "PetJournal-FavoritesIcon"   -- the journal's favorite star, tinted blue below
-local NIGHT_FROM, NIGHT_TO = 21, 6         -- game-clock hours that count as night
 
 -- Settings live in EllesmereUIDB.petSummon; unset keys read these.
 --   enabled                 Auto Summon Pet
 --   chars[player GUID]      own = Favorites per Character, favorites = { [pet GUID] = true },
 --                           dismissed = the player put the pet away (until they summon one)
 --   rules[key]              mode = "next" | "favorites" | "chosen" | "none", pets = { [pet GUID] = true }
-local F = module.Feature("petSummon", { enabled = false })
+--   hoursFrom, hoursTo      the Between Hours range (game clock)
+local F = module.Feature("petSummon", { enabled = false,
+    hoursFrom = module.HOURS_FROM, hoursTo = module.HOURS_TO })
 local IsEnabled = F.Enabled
 
 -------------------------------------------------------------------------------
@@ -54,26 +55,17 @@ local HOLIDAYS = {
     { key = "holiday:fishing",   name = "Stranglethorn Fishing Extravaganza", ids = { [301] = true } },
 }
 
-local function IsNight()
-    local h = GetGameTime()
-    return h >= NIGHT_FROM or h < NIGHT_TO
-end
-
--- The circumstances; holidays come after the instances.
+-- The circumstances: the shared situations (module.SITUATION_ORDER), the
+-- holidays after the instances, then Open World.
 -- s: the state read once per decision (Snapshot).
-local RULES = {
-    { key = "dungeon",   name = "Dungeons",        default = "none", test = function(s) return s.inst == "party" end },
-    { key = "raid",      name = "Raids",           default = "none", test = function(s) return s.inst == "raid" end },
-    { key = "pvp",       name = "Battlegrounds",   default = "none", test = function(s) return s.inst == "pvp" end },
-    { key = "arena",     name = "Arenas",          default = "none", test = function(s) return s.inst == "arena" end },
-    { holidays = true },
-    { key = "raidgroup", name = "In a Raid Group", group = true, test = function() return IsInRaid() end },
-    { key = "group",     name = "In a Group",      group = true, test = function() return IsInGroup() end },
-    { key = "rest",      name = "Cities and Inns", test = function() return IsResting() end },
-    { key = "night",     name = "At Night",        test = function(s) return s.night end },
-    { key = "day",       name = "By Day",          test = function(s) return not s.night end },
-    { key = "world",     name = "Open World",      default = "favorites", test = function() return true end },
-}
+local DEFAULTS = { dungeon = "none", raid = "none", pvp = "none", arena = "none" }
+local RULES = {}
+for _, key in ipairs(module.SITUATION_ORDER) do
+    local sit = module.SITUATIONS[key]
+    RULES[#RULES + 1] = { key = key, name = sit.label, default = DEFAULTS[key], test = sit.test }
+    if key == "arena" then RULES[#RULES + 1] = { holidays = true } end
+end
+RULES[#RULES + 1] = { key = "world", name = "Open World", default = "favorites", test = function() return true end }
 local DEFAULT_MODE = {}
 for _, r in ipairs(RULES) do
     if r.key then DEFAULT_MODE[r.key] = r.default or "next" end
@@ -154,8 +146,7 @@ local function ActiveHolidays()
 end
 
 local function Snapshot()
-    local _, inst = IsInInstance()
-    return { inst = inst, night = IsNight() }
+    return module.SituationState(F.Get("hoursFrom"), F.Get("hoursTo"))
 end
 
 -- The deciding circumstance: its key and mode ("favorites", "chosen" with
@@ -431,7 +422,11 @@ local function Circumstances()
         if r.holidays then
             for _, h in ipairs(HOLIDAYS) do out[#out + 1] = { key = h.key, name = L(h.name), holiday = true } end
         else
-            out[#out + 1] = { key = r.key, name = L(r.name) }
+            local name = L(r.name)
+            if r.key == "hours" then
+                name = name .. format(" (%d:00 - %d:00)", F.Get("hoursFrom"), F.Get("hoursTo"))
+            end
+            out[#out + 1] = { key = r.key, name = name }
         end
     end
     return out
@@ -502,6 +497,21 @@ local function ModeMenu(parent, key, name, active)
     return sub
 end
 
+-- The Between Hours range: a radio list of game-clock hours for each end.
+local function HoursMenu(parent)
+    parent:CreateDivider()
+    for _, k in ipairs({ { "hoursFrom", "From (Server Time)" }, { "hoursTo", "To (Server Time)" } }) do
+        local key = k[1]
+        local sub = parent:CreateButton(L(k[2]))
+        for h = 0, 23 do
+            sub:CreateRadio(format("%d:00", h), function() return F.Get(key) == h end, function()
+                F.Cfg()[key] = h
+                RulesChanged()
+            end)
+        end
+    end
+end
+
 local function BuildRulesMenu(_, root)
     root:CreateTitle(L("Auto Summon Pet"))
     local holidays = UsesHolidays() and ActiveHolidays() or {}
@@ -511,7 +521,8 @@ local function BuildRulesMenu(_, root)
             eventsMenu = eventsMenu or root:CreateButton(L("Seasonal Events"))
             ModeMenu(eventsMenu, c.key, c.name, holidays[c.key])
         else
-            ModeMenu(root, c.key, c.name)
+            local sub = ModeMenu(root, c.key, c.name)
+            if c.key == "hours" then HoursMenu(sub) end
         end
     end
 end

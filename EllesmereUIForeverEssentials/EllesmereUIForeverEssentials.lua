@@ -160,6 +160,40 @@ function ns.MicroClickLayer(microName, onClick)
 end
 
 -------------------------------------------------------------------------------
+--  Situations (Auto Summon Pet, Character Highlight)
+-------------------------------------------------------------------------------
+-- Where a feature lets the player pick a setting per situation: it offers
+-- these in this order, with its own ones above or between them, and the
+-- first one that applies, top to bottom, decides. Cities come before groups
+-- (user decision). Each feature keeps its own hour range.
+ns.SITUATION_ORDER = { "dungeon", "raid", "pvp", "arena", "rest", "hours", "raidgroup", "group" }
+ns.SITUATIONS = {
+    dungeon   = { label = "Dungeons",        test = function(s) return s.inst == "party" end },
+    raid      = { label = "Raids",           test = function(s) return s.inst == "raid" end },
+    pvp       = { label = "Battlegrounds",   test = function(s) return s.inst == "pvp" end },
+    arena     = { label = "Arenas",          test = function(s) return s.inst == "arena" end },
+    rest      = { label = "Cities and Inns", test = function() return IsResting() end },
+    hours     = { label = "Between Hours",   test = function(s) return s.inHours end },
+    raidgroup = { label = "In a Raid Group", test = function() return IsInRaid() end },
+    group     = { label = "In a Group",      test = function() return IsInGroup() end },
+}
+ns.HOURS_FROM, ns.HOURS_TO = 21, 6  -- default hour range (game clock)
+
+-- What the situations are tested on, read once per decision. from, to: the
+-- feature's hour range on the game clock; equal hours never match.
+function ns.SituationState(from, to)
+    local _, inst = IsInInstance()
+    local h = GetGameTime()
+    local inHours = false
+    if from < to then
+        inHours = h >= from and h < to
+    elseif from > to then
+        inHours = h >= from or h < to
+    end
+    return { inst = inst, inHours = inHours }
+end
+
+-------------------------------------------------------------------------------
 --  Auctionator prices (Loot Feed, Junk Items)
 -------------------------------------------------------------------------------
 -- Auctionator's API, while that addon is loaded.
