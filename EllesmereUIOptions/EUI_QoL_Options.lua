@@ -2406,8 +2406,56 @@ initFrame:SetScript("OnEvent", function(self)
                 if EllesmereUI._applyCrosshair then EllesmereUI._applyCrosshair() end
                 EllesmereUI:RefreshPage()
               end },
-            { type="label", text="" }
+            { type="toggle", text="Character Highlight",
+              tooltip="Shows the game's own highlight under your character (circle, outline or icon) and lets you pick it per situation with the cog. Situations are read top to bottom and the first one that applies decides. Turning it off puts your game settings back.",
+              getValue=function() return EllesmereUIDB and EllesmereUIDB.charHighlight or false end,
+              setValue=function(v)
+                  if not EllesmereUIDB then EllesmereUIDB = {} end
+                  EllesmereUIDB.charHighlight = v
+                  if EllesmereUI._applyCharHighlight then EllesmereUI._applyCharHighlight() end
+                  EllesmereUI:RefreshPage()
+              end }
         );  y = y - h
+        -- Cog on Character Highlight (right region): one style per situation
+        -- (EllesmereUIQoL_CharacterHighlight.lua owns the list and its order).
+        if not EllesmereUI._prebuilding and EllesmereUI._charHighlightSituations then
+            local STYLE_VALUES = { pass = "Same as Below", none = "None", circle = "Circle",
+                outline = "Outline", both = "Circle and Outline", icon = "Icon" }
+            local function apply()
+                if EllesmereUI._applyCharHighlight then EllesmereUI._applyCharHighlight() end
+            end
+            local rows = {}
+            for _, s in ipairs(EllesmereUI._charHighlightSituations) do
+                local key, last = s.key, s.key == "world"
+                rows[#rows + 1] = { type="dropdown", label=s.label, values=STYLE_VALUES,
+                    order = last and { "none", "circle", "outline", "both", "icon" }
+                        or { "pass", "none", "circle", "outline", "both", "icon" },
+                    get=function()
+                        local r = EllesmereUIDB and EllesmereUIDB.charHighlightRules
+                        return (r and r[key]) or (last and "circle" or "pass")
+                    end,
+                    set=function(v)
+                        if not EllesmereUIDB then EllesmereUIDB = {} end
+                        EllesmereUIDB.charHighlightRules = EllesmereUIDB.charHighlightRules or {}
+                        EllesmereUIDB.charHighlightRules[key] = v
+                        apply()
+                    end }
+                if key == "hours" then
+                    rows[#rows + 1] = { type="slider", label="From (Server Time)", min=0, max=23, step=1,
+                        get=function() return (EllesmereUIDB and EllesmereUIDB.charHighlightFrom) or 20 end,
+                        set=function(v) EllesmereUIDB.charHighlightFrom = v; apply() end }
+                    rows[#rows + 1] = { type="slider", label="To (Server Time)", min=0, max=23, step=1,
+                        get=function() return (EllesmereUIDB and EllesmereUIDB.charHighlightTo) or 6 end,
+                        set=function(v) EllesmereUIDB.charHighlightTo = v; apply() end }
+                end
+            end
+            EllesmereUI.BuildInlineCog(meleeRow._rightRegion, {
+                title = "Character Highlight Settings",
+                rows = rows, gap = 9,
+                disabled = function() return not (EllesmereUIDB and EllesmereUIDB.charHighlight) end,
+                disabledTooltip = "Character Highlight",
+            })
+        end
         -- Inline color swatch (disabled when toggle is off or crosshair is None)
         if not EllesmereUI._prebuilding then
             local leftRgn = meleeRow._leftRegion
@@ -2917,6 +2965,12 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.inviteOnWhisper = nil
                 EllesmereUIDB.inviteKeyword = nil
                 EllesmereUIDB.inviteKnownOnly = nil
+                -- Character Highlight: off puts the saved game settings back.
+                EllesmereUIDB.charHighlight = nil
+                EllesmereUIDB.charHighlightRules = nil
+                EllesmereUIDB.charHighlightFrom = nil
+                EllesmereUIDB.charHighlightTo = nil
+                if EllesmereUI._applyCharHighlight then EllesmereUI._applyCharHighlight() end
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_TargetDistance = nil
                     EllesmereUIDB.unlockAnchors.EUI_CombatAlert = nil
