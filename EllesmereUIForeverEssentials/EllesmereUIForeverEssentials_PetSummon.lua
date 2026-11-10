@@ -306,7 +306,7 @@ local function Summon()
         if not entered or Allowed(out, mode, list) then return end
         if mode == "none" then
             ownCall = true
-            C_PetJournal.DismissSummonedPet()
+            C_PetJournal.DismissSummonedPet(out)  -- the pet's GUID is required on WoW Forever
             ownCall = false
             return
         end
