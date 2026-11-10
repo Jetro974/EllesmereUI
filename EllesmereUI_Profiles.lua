@@ -2454,6 +2454,8 @@ end
 --    qolUpgradeCalcChars  Upgrade Calculator per-character cache
 --    xpBarChars           XP bar session clock, XP rate and time this level
 --    timePlayedChars      Time Played block: each character's total played time
+--    travelHearths        Travel block's Show Other Characters: each character's
+--                         hearthstone bind and ready time
 --    questWatchChars      WoW Forever quest tools: quests each character's
 --                         filters and auto-track moved
 --    questTrackerChars    WoW Forever Custom Quest Tracker: each character's
@@ -2464,6 +2466,7 @@ end
 --                         character's birthday
 --    cdmCachedBarSizes    Cooldown Manager bar sizes cached per character
 --    bagCurrencyByChar    Bags' tracked currencies per character
+--    bagPinnedByChar      Bags' pinned items per character
 --    mageArmorByChar      AuraBuff Reminders (WoW Forever): the mage armor
 --                         each character last had up
 --    classBuffByChar      and the class buff lines each character last had up
@@ -2493,6 +2496,7 @@ local FULL_EXPORT_EXCLUDED = {
     qolUpgradeCalcChars   = true,
     xpBarChars            = true,
     timePlayedChars       = true,
+    travelHearths         = true,
     restoreOnUninstall    = true,
     gfxBackup             = true,
     friendlyPlateVisSaved = true,
@@ -2507,6 +2511,7 @@ local FULL_EXPORT_EXCLUDED = {
     raidHoroscope         = true,
     cdmCachedBarSizes     = true,
     bagCurrencyByChar     = true,
+    bagPinnedByChar       = true,
     mageArmorByChar       = true,
     classBuffByChar       = true,
     spellUprankChars      = true,
@@ -4658,7 +4663,7 @@ local function BuildStringPopup(title, subtitle, readOnly, onConfirm, confirmLab
     local bg = popup:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(0.077, 0.068, 0.058, 1)
-    EllesmereUI.MakeBorder(popup, 1, 1, 1, 0.15, EllesmereUI.PanelPP)
+    EllesmereUI.MakeRoundedBorder(popup, 1, 1, 1, 0.15, bg)
 
     -- Title
     local titleFS = EllesmereUI.MakeFont(popup, 15, "", 1, 1, 1)
