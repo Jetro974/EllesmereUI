@@ -20,6 +20,23 @@ local OWNER = "EllesmereUIForeverEssentials"
 --   rules[situation]   a STYLES key, or "pass" (Same as Below)
 --   hoursFrom, hoursTo the Between Hours range (game clock)
 --   saved              the game's CVars from before ours
+-- Test bundle only (never in the PR): the QoL test build kept charHighlight as
+-- a plain switch with flat keys beside it; fold them into the feature table.
+do
+    local db = EllesmereUIDB
+    if db and ((db.charHighlight ~= nil and type(db.charHighlight) ~= "table")
+        or db.charHighlightSaved or db.charHighlightRules) then
+        local t = type(db.charHighlight) == "table" and db.charHighlight or {}
+        if db.charHighlight == true then t.enabled = true end
+        t.rules = t.rules or db.charHighlightRules
+        t.hoursFrom = t.hoursFrom or db.charHighlightFrom
+        t.hoursTo = t.hoursTo or db.charHighlightTo
+        t.saved = t.saved or db.charHighlightSaved
+        db.charHighlight = t
+        db.charHighlightRules, db.charHighlightFrom = nil, nil
+        db.charHighlightTo, db.charHighlightSaved = nil, nil
+    end
+end
 local F = module.Feature("charHighlight", { enabled = false,
     hoursFrom = module.HOURS_FROM, hoursTo = module.HOURS_TO })
 
