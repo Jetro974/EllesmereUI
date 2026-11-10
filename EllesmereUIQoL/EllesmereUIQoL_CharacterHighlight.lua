@@ -59,6 +59,7 @@ end
 -- Most specific first. The options page lists them in this order.
 local SITUATIONS = {
     { key = "combat",    label = "In Combat",       test = function() return inCombat end },
+    { key = "taxi",      label = "On a Flight Path", test = function() return UnitOnTaxi("player") end },
     { key = "dungeon",   label = "Dungeons",        test = function() return EUI.IsInDungeon() end },
     { key = "raid",      label = "Raids",           test = function(t) return t == "raid" end },
     { key = "pvp",       label = "Battlegrounds",   test = function(t) return t == "pvp" end },
@@ -114,7 +115,8 @@ end
 local frame = CreateFrame("Frame")
 local ticker
 local EVENTS = { "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA",
-    "PLAYER_UPDATE_RESTING", "GROUP_ROSTER_UPDATE", "PLAYER_REGEN_DISABLED" }
+    "PLAYER_UPDATE_RESTING", "GROUP_ROSTER_UPDATE", "PLAYER_REGEN_DISABLED",
+    "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED" }
 
 frame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_REGEN_DISABLED" then
@@ -123,6 +125,9 @@ frame:SetScript("OnEvent", function(_, event)
             inCombat = false
             Evaluate()
         end)
+    elseif event == "PLAYER_CONTROL_LOST" then
+        -- A flight path takes control first; the taxi flag can follow a moment later.
+        C_Timer.After(1, Evaluate)
     end
     Evaluate()
 end)
