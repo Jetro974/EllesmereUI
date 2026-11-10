@@ -102,6 +102,9 @@ initFrame:SetScript("OnEvent", function(self)
                 local mf = EllesmereUIDB.worldMapFade
                 EllesmereUIDB.worldMapFade = mf and mf.mapFadeWas ~= nil and { mapFadeWas = mf.mapFadeWas } or nil
                 EllesmereUIDB.gatherSkill = nil
+                -- The game's highlight settings from before stay, so Apply can give them back.
+                local ch = EllesmereUIDB.charHighlight
+                EllesmereUIDB.charHighlight = ch and ch.saved and { saved = ch.saved } or nil
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_FlightTimer = nil
                     EllesmereUIDB.unlockAnchors.EUI_ThreatMeter = nil
@@ -140,6 +143,7 @@ initFrame:SetScript("OnEvent", function(self)
             if EllesmereUI._MapTravel then EllesmereUI._MapTravel.Apply() end
             if EllesmereUI._MapFade then EllesmereUI._MapFade.Apply() end
             if EllesmereUI._GatherSkill then EllesmereUI._GatherSkill.Apply() end
+            if EllesmereUI._CharHighlight then EllesmereUI._CharHighlight.Apply() end
             EllesmereUI:InvalidatePageCache()
         end,
     })

@@ -6755,3 +6755,12 @@ L["Next Rule"] = "Règle suivante"
 L["Chosen Pets"] = "Mascottes choisies"
 L["(now)"] = "(en cours)"
 L["Auto Summon Pet: which pets come out where."] = "Invocation auto de mascotte : quelles mascottes sortent où."
+
+-- Forever Essentials: Character Highlight
+L["Character Highlight"] = "Repère du personnage"
+L["Character Highlight Settings"] = "Réglages du repère du personnage"
+L["Shows the game's own highlight under your character (circle, outline or icon) and lets you pick it per situation with the cog. Situations are read top to bottom and the first one that applies decides. Turning it off puts your game settings back."] = "Affiche le repère du jeu sous votre personnage (cercle, contour ou icône) et vous laisse le choisir selon la situation avec la roue crantée. Les situations sont lues de haut en bas et la première qui s'applique décide. Désactiver l'option rétablit vos réglages du jeu."
+L["Same as Below"] = "Comme en dessous"
+L["Circle and Outline"] = "Cercle et contour"
+L["On a Flight Path"] = "En vol"
+L["Elsewhere"] = "Ailleurs"
