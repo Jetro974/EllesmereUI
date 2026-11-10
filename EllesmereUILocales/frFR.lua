@@ -7145,19 +7145,3 @@ L["Enemy players take the Enemies color instead of their class color."] = "Les j
 -- Bags: Pins per Character
 L["Pins per Character"] = "Objets épinglés par personnage"
 L["Each character keeps its own pinned items, starting from the shared ones."] = "Chaque personnage conserve ses propres objets épinglés, à partir des objets partagés."
-
--- QoL: Character Highlight
-L["Character Highlight"] = "Repère du personnage"
-L["Character Highlight Settings"] = "Réglages du repère du personnage"
-L["Shows the game's own highlight under your character (circle, outline or icon) and lets you pick it per situation with the cog. Situations are read top to bottom and the first one that applies decides. Turning it off puts your game settings back."] = "Affiche le repère du jeu sous votre personnage (cercle, contour ou icône) et vous laisse le choisir selon la situation avec la roue crantée. Les situations sont lues de haut en bas et la première qui s'applique décide. Désactiver l'option rétablit vos réglages du jeu."
-L["Same as Below"] = "Comme en dessous"
-L["Circle and Outline"] = "Cercle et contour"
-L["Battlegrounds"] = "Champs de bataille"
-L["Arenas"] = "Arènes"
-L["Cities and Inns"] = "Villes et auberges"
-L["Between Hours"] = "Plage horaire"
-L["In a Raid Group"] = "En groupe de raid"
-L["In a Group"] = "En groupe"
-L["Elsewhere"] = "Ailleurs"
-L["From (Server Time)"] = "De (heure du serveur)"
-L["To (Server Time)"] = "À (heure du serveur)"

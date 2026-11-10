@@ -34,7 +34,6 @@ EllesmereUIQoL_Dismount.lua
 EllesmereUIQoL_Requests.lua
 EllesmereUIQoL_AccountIgnore.lua
 EllesmereUIQoL_UpgradeTooltip.lua
-EllesmereUIQoL_CharacterHighlight.lua
 EUI_UpgradeCalc.lua
 
 # Options
