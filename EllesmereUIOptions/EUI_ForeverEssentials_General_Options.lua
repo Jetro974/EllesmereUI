@@ -350,6 +350,62 @@ _G._EUI_BuildForeverGeneralPage = function(pageName, parent, yOffset)
         );  y = y - h
     end
 
+    -- Character Highlight (EllesmereUIForeverEssentials_CharacterHighlight.lua):
+    -- the cog picks a style per situation, in the module's order.
+    local CH = EllesmereUI._CharHighlight
+    if CH then
+        local chRow
+        chRow, h = W:DualRow(parent, y,
+            { type = "toggle", text = "Character Highlight",
+              tooltip = "Shows the game's own highlight under your character (circle, outline or icon) and lets you pick it per situation with the cog. Situations are read top to bottom and the first one that applies decides. Turning it off puts your game settings back.",
+              getValue = function() return CH.Get("enabled") end,
+              setValue = function(v)
+                  CH.Cfg().enabled = v
+                  CH.Apply()
+                  EllesmereUI:RefreshPage()
+              end },
+            EllesmereUI.BlankRowCfg()
+        );  y = y - h
+        if not EllesmereUI._prebuilding then
+            local STYLE_VALUES = { pass = "Same as Below", none = "None", circle = "Circle",
+                outline = "Outline", both = "Circle and Outline", icon = "Icon" }
+            local rows = {}
+            for _, sit in ipairs(CH.Situations) do
+                local key, last = sit.key, sit.key == "world"
+                rows[#rows + 1] = { type = "dropdown", label = sit.label, values = STYLE_VALUES,
+                    order = last and { "none", "circle", "outline", "both", "icon" }
+                        or { "pass", "none", "circle", "outline", "both", "icon" },
+                    get = function()
+                        local r = CH.Get("rules")
+                        return (r and r[key]) or (last and "circle" or "pass")
+                    end,
+                    set = function(v)
+                        local cfg = CH.Cfg()
+                        cfg.rules = cfg.rules or {}
+                        cfg.rules[key] = v
+                        CH.Apply()
+                    end }
+                if key == "hours" then
+                    for _, k in ipairs({ { "hoursFrom", "From (Server Time)" }, { "hoursTo", "To (Server Time)" } }) do
+                        local field = k[1]
+                        rows[#rows + 1] = { type = "slider", label = k[2], min = 0, max = 23, step = 1,
+                            get = function() return CH.Get(field) end,
+                            set = function(v)
+                                CH.Cfg()[field] = v
+                                CH.Apply()
+                            end }
+                    end
+                end
+            end
+            EllesmereUI.BuildInlineCog(chRow._leftRegion, {
+                title = "Character Highlight Settings",
+                rows = rows, gap = 9,
+                disabled = function() return not CH.Get("enabled") end,
+                disabledTooltip = "Character Highlight",
+            })
+        end
+    end
+
     ---------------------------------------------------------------------------
     --  NAME FORMAT (while a module with a Name Format is on)
     ---------------------------------------------------------------------------

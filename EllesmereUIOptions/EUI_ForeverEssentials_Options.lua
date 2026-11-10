@@ -112,6 +112,9 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.levelUpToast = nil
                 -- The talent plans are the player's own: only the switch resets.
                 if EllesmereUIDB.talentPlanner then EllesmereUIDB.talentPlanner.enabled = nil end
+                -- The game's highlight settings from before stay, so Apply can give them back.
+                local ch = EllesmereUIDB.charHighlight
+                EllesmereUIDB.charHighlight = ch and ch.saved and { saved = ch.saved } or nil
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_FlightTimer = nil
                     EllesmereUIDB.unlockAnchors.EUI_ThreatMeter = nil
@@ -157,6 +160,7 @@ initFrame:SetScript("OnEvent", function(self)
             if EllesmereUI._TrainingPlanner then EllesmereUI._TrainingPlanner.Apply() end
             if EllesmereUI._LevelUpToast then EllesmereUI._LevelUpToast.Apply() end
             if EllesmereUI._TalentPlanner then EllesmereUI._TalentPlanner.Apply() end
+            if EllesmereUI._CharHighlight then EllesmereUI._CharHighlight.Apply() end
             EllesmereUI:InvalidatePageCache()
         end,
     })

@@ -48,6 +48,7 @@ EllesmereUIForeverEssentials_ThreatFeed.lua
 
 # Companion pets (auto summon)
 EllesmereUIForeverEssentials_PetSummon.lua
+EllesmereUIForeverEssentials_CharacterHighlight.lua
 
 # Loot (loot feed)
 EllesmereUIForeverEssentials_LootFeed.lua
