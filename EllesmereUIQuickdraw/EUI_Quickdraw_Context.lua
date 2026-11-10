@@ -339,6 +339,9 @@ ns.UpdateContextHint = UpdateHint
 -------------------------------------------------------------------------------
 -- The context a player aura belongs to (by spell ID), or nil.
 local function ContextOfAura(auraInstanceID, index)
+    -- A secret instance ID (an aura during a restriction) cannot reach the
+    -- aura API from addon code.
+    if auraInstanceID ~= nil and issecretvalue and issecretvalue(auraInstanceID) then return nil end
     local data
     if auraInstanceID and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
         data = C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)
