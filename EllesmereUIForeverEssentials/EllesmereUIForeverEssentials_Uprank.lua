@@ -19,10 +19,12 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --
 --  Place New Spells (its cog): a class spell learned for the first time also
 --  goes on the first empty slot of the main action bar, since the WoW Forever
---  client never places learned spells itself. Passives, higher ranks,
---  profession spells and spells already on a bar are left alone. It goes on the
---  page the bar shows (stances and forms page it) and its icon glides there
---  from the trainer.
+--  client never places learned spells itself. Only a spell the spellbook
+--  shows under a class tab goes: passives, higher ranks, the General tab,
+--  profession spells (a lure, a campfire) and spells already on a bar are
+--  left alone. A spell the spellbook does not list yet waits for its next
+--  update. It goes on the page the bar shows (stances and forms page it) and
+--  its icon glides there from the trainer.
 -------------------------------------------------------------------------------
 local _, module = ...
 
@@ -40,7 +42,8 @@ local firstScan     -- the first SPELLS_CHANGED after login reads the player's s
 local wantPlayer, wantPet = false, false  -- what the next check reads
 local learned = {}  -- spell IDs learned since the last check
 local pending = { player = {}, pet = {} } -- spell names to uprank once out of combat with an empty cursor
-local placeQueue = {} -- { id, line } first-time spells for Place New Spells, same wait
+local placeQueue = {} -- { id } first-time spells for Place New Spells, same wait
+local bookWait = {}   -- the ones the spellbook did not list yet: tried again at its next update
 -- Read tables, reused by every read
 local playerTop, petTop, petSlots, counts = {}, {}, {}, {}
 
@@ -150,20 +153,13 @@ local function RankAboveOne(id)
     return n ~= nil and n > 1
 end
 
--- A spell of one of the player's professions (primary, cooking, fishing...):
--- its spellbook block, read the way Quickdraw reads it (EUI_Quickdraw_Slots).
-local function IsProfessionSpell(id)
-    if not (GetProfessions and GetProfessionInfo) then return false end
-    local bank = Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player
-    local books = { GetProfessions() }
-    for i = 1, 5 do  -- holes for the missing ones, so no ipairs
-        local book = books[i]
-        if book then
-            local _, _, _, _, numSpells, offset = GetProfessionInfo(book)
-            for n = 1, (numSpells or 0) do
-                local info = C_SpellBook.GetSpellBookItemInfo(n + (offset or 0), bank)
-                if info and info.spellID == id then return true end
-            end
+-- Whether a spellbook slot sits under a class tab: past the General tab
+-- (1), and before the profession blocks, which follow every tab.
+local function InClassTab(slot)
+    for line = GENERAL_SKILL_LINE + 1, (C_SpellBook.GetNumSpellBookSkillLines() or 0) do
+        local li = C_SpellBook.GetSpellBookSkillLineInfo(line)
+        if li and slot > li.itemIndexOffset and slot <= li.itemIndexOffset + li.numSpellBookItems then
+            return true
         end
     end
     return false
@@ -318,11 +314,15 @@ local function Fly(spellID, button)
 end
 
 -- The first empty slot of the main action bar gets the new spell.
-local function PlaceNew(newID, line)
-    if not F.Get("placeNew") or line == GENERAL_SKILL_LINE then return end
+-- Returns "later" while the spellbook does not list the spell yet: the learn
+-- event can come first, and a profession's spell only shows its block then.
+local function PlaceNew(newID)
+    if not F.Get("placeNew") then return end
+    local slot, bank = C_SpellBook.FindSpellBookSlotForSpell(newID)
+    if not slot then return "later" end
+    if bank ~= PLAYER or not InClassTab(slot) then return end
     local spell = C_Spell.GetSpellLink(newID) or C_Spell.GetSpellName(newID) or "?"
-    if C_Spell.IsSpellPassive(newID) or RankAboveOne(newID) or OnBars(newID)
-       or IsProfessionSpell(newID) then return end
+    if C_Spell.IsSpellPassive(newID) or RankAboveOne(newID) or OnBars(newID) then return end
     for _, item in ipairs(MainBar()) do
         if not HasAction(item.slot) then
             C_Spell.PickupSpell(newID)
@@ -397,7 +397,12 @@ local function Flush()
     local list = placeQueue
     placeQueue = {}
     flights = 0
-    for _, item in ipairs(list) do PlaceNew(item.id, item.line) end
+    for _, item in ipairs(list) do
+        if PlaceNew(item.id) == "later" and not item.waited then
+            item.waited = true
+            bookWait[#bookWait + 1] = item
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -436,7 +441,7 @@ local function Queue()
     flusher:Show()
 end
 
-local function OnEvent(_, event, spellID, skillLineIndex, isGuildPerkSpell)
+local function OnEvent(_, event, spellID, _, isGuildPerkSpell)
     if event == "CURSOR_CHANGED" then
         Flush()
         return
@@ -446,12 +451,14 @@ local function OnEvent(_, event, spellID, skillLineIndex, isGuildPerkSpell)
         if not spellID then return end
         learned[spellID] = true
         if F.Get("placeNew") and not isGuildPerkSpell then
-            placeQueue[#placeQueue + 1] = { id = spellID, line = Plain(skillLineIndex) }
+            placeQueue[#placeQueue + 1] = { id = spellID }
             -- Placed in the event itself, as before the uprank moved to a check
             -- on the next frame: by then the slot may be filled and the fly-in lost.
             Flush()
         end
     elseif event == "SPELLS_CHANGED" then
+        for _, item in ipairs(bookWait) do placeQueue[#placeQueue + 1] = item end
+        wipe(bookWait)
         if firstScan then
             firstScan = false
             wantPlayer = true
@@ -475,6 +482,7 @@ local function Apply()
         wipe(pending.player)
         wipe(pending.pet)
         placeQueue = {}
+        wipe(bookWait)
         return
     end
     if not events then
