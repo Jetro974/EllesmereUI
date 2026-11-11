@@ -888,12 +888,11 @@ local function CtxArrow(row)
     return arrow
 end
 
-local CTX_BOX_W = 50  -- an isInput row's number box
 local function CtxBox(row, fontPath, outline)
     local box = row._box
     if not box then
         box = CreateFrame("EditBox", nil, row)
-        box:SetSize(CTX_BOX_W, 18)
+        box:SetSize(50, 18)
         box:SetPoint("RIGHT", row, "RIGHT", -8, 0)
         box:SetFrameLevel(row:GetFrameLevel() + 3)
         box:SetFont(fontPath, 10, outline)
@@ -1010,7 +1009,6 @@ local function CtxLayout(panel, items, minW, fontKey)
             mfs:SetText(item.noLoc and item.text or L(item.text or ""))
             local w = mfs:GetStringWidth() or 0
             if item.onRemove then w = w + 20 end
-            if item.isInput then w = w + CTX_BOX_W end  -- the label ends before its box
             if w > widest then widest = w end
             if item.desc then
                 mfs:SetFont(fontPath, size - 2, outline)
