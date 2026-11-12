@@ -13,6 +13,10 @@ if not (EllesmereUI and EllesmereUI.IS_FOREVER) then return end
 --  of that flight. The client gives no destination or progress for a flight
 --  already under way, and saving it would go stale across a logout or crash,
 --  so the bar returns with the next takeoff instead.
+--
+--  While the bar shows its early exit button, Blizzard's leave button (out on
+--  a flight too) is faded out and click-through: alpha and mouse only, never
+--  shown or hidden, out of combat, and given back when the flight ends.
 -------------------------------------------------------------------------------
 local _, module = ...
 -- The options page pool's table (made by the core, filled in place when the
@@ -470,10 +474,28 @@ local function CreateBar()
     F.Place(bar)
 end
 
+-- Blizzard's leave button repeats ours on a flight. Its shown state stays
+-- Blizzard's (EllesmereUI's action bars set it on vehicle events); only what
+-- was changed here is given back. Mouse on it waits for combat to end.
+local leaveFaded = false
+local function SyncLeaveButton()
+    local btn = MainMenuBarVehicleLeaveButton
+    local want = flight ~= nil and Enabled() and Get("earlyExit") and true or false
+    if not btn or want == leaveFaded then return end
+    if InCombatLockdown() then
+        EllesmereUI.CombatQueue.Defer("FlightTimerLeave", SyncLeaveButton)
+        return
+    end
+    leaveFaded = want
+    btn:SetAlpha(want and 0 or 1)
+    btn:EnableMouse(not want)
+end
+
 local RefreshPreview -- the options preview's restyle; defined with it below
 
 local function ApplyStyle()
     if bar then StyleBar(bar, flight) end
+    SyncLeaveButton()
     RefreshPreview()
 end
 
@@ -512,6 +534,7 @@ end
 
 local function EndFlight()
     flight = nil
+    SyncLeaveButton()
     if ticker then ticker:Cancel(); ticker = nil end
     if bar then ShowBar(false) end
 end
@@ -551,6 +574,7 @@ local function StartFlight(yards, points)
     ArmTimer(bar, flight)
     ShowBar(true)
     StyleBar(bar, flight)
+    SyncLeaveButton()
     UpdateText()
     if not ticker then ticker = C_Timer.NewTicker(1, UpdateText) end
 end
